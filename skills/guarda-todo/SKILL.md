@@ -25,7 +25,7 @@ Procedimiento (en este orden; no saltar pasos):
    - Nunca `git add` de `.env*`, `.venv/`, `.pgdata*/` ni de archivos que no reconoces: si aparece algo inesperado, pregunta.
 2. **Exportar la transcripción** de esta sesión a `documentacion/sesiones/AAAA-MM-DD_<tema>.md`:
    - La transcripción de Claude Code está en `~/.claude/projects/<carpeta-del-proyecto-codificada>/<id-de-sesión>.jsonl` (la carpeta es la ruta de trabajo con `:`, `\` y `/` cambiados por `-`). Toma el `.jsonl` más reciente de esa carpeta o el de la sesión actual.
-   - `python documentacion/analisis/exportar_sesion.py <sesion.jsonl> documentacion/sesiones/<archivo>.md "<título>"`.
+   - `python documentacion/analisis/exportar_sesion.py --ultima documentacion/sesiones/<archivo>.md "<título>"` (`--ultima` toma el `.jsonl` más reciente de la carpeta de trabajo actual; también puedes pasar la ruta de un `.jsonl`).
    - Si la sesión ya se había exportado ese día, se **re-exporta completa** sobre el mismo archivo (reemplaza al anterior).
 3. **gitleaks** por Docker sobre lo versionado y lo nuevo no ignorado (la transcripción puede contener secretos pegados por error): `python "${CLAUDE_PLUGIN_ROOT}/scripts/gitleaks_archivos.py"`. Si hay hallazgos: **no** se hace commit; se redacta el secreto en la transcripción (y se avisa al usuario para que lo rote) y se repite.
 4. **Commit** de la transcripción: `git add documentacion/sesiones && git commit -m "docs: export session transcript <tema>"`.
@@ -36,7 +36,7 @@ Procedimiento (en este orden; no saltar pasos):
 
 ```bash
 git status --short && git stash list
-python documentacion/analisis/exportar_sesion.py <sesion.jsonl> documentacion/sesiones/<AAAA-MM-DD_tema>.md "<título>"
+python documentacion/analisis/exportar_sesion.py --ultima documentacion/sesiones/<AAAA-MM-DD_tema>.md "<título>"
 python "${CLAUDE_PLUGIN_ROOT}/scripts/gitleaks_archivos.py"
 git add documentacion/sesiones && git commit -m "docs: export session transcript <tema>"
 ```

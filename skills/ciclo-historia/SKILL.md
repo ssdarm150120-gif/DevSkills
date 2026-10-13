@@ -48,7 +48,7 @@ Desarrollo ──► punto de control ──► QA ──► Angel Fixer ──�
 ### 3. Cerrar
 1. Lanzar o ejecutar `devskills:registrar-avance`: reporte `documentacion/avance/S{NN}/{ID}.md`, estado oficial `Listo`, índice y **regeneración del plan y del tablero** (`python documentacion/analisis/plan_sprints.py`; el elemento queda **tachado**).
 2. **Squash a main** (ver regla 4 de "Puntos de control").
-3. **Documentación en commit aparte:** si el ciclo cambió SRS o DISEÑO (preguntas cerradas, ADR, versiones), el `analista-arquitecto` hace la pasada (skill `devskills:pasada-documental`): regenera el Anexo C (`python documentacion/analisis/trazabilidad.py _tmp.md --escribir`), el plan y los Word (`python documentacion/analisis/md_a_word.py`). Los commits de documentación (`docs: ...`) van **separados** del commit del código (`feat(...)` / `fix(...)`); los Word regenerados en su propio `docs: regenerate Word documents after <ID>`.
+3. **Documentación en commit aparte:** si el ciclo cambió SRS o DISEÑO (preguntas cerradas, ADR, versiones), el `analista-arquitecto` hace la pasada (skill `devskills:pasada-documental`): regenera el Anexo C (`python documentacion/analisis/trazabilidad.py _tmp.md --escribir`), el plan y los Word (`python documentacion/analisis/md_a_word.py --mermaid <carpeta de mermaid-cli>`). Los commits de documentación (`docs: ...`) van **separados** del commit del código (`feat(...)` / `fix(...)`); los Word regenerados en su propio `docs: regenerate Word documents after <ID>`.
 4. **gitleaks** por Docker antes del último commit, sobre los archivos de `git ls-files -co --exclude-standard` (script `${CLAUDE_PLUGIN_ROOT}/scripts/gitleaks_archivos.py`, ver Commands). Sin hallazgos o no se hace commit.
 5. Guardar en engram (`mem_save`, project de `CONTEXTO.md`, topic_key `<project>/<id>/cierre`) el resultado, commits y hallazgos no obvios.
 6. Responder al usuario (y por Telegram si el canal está activo) con: veredicto, rondas, enlace al reporte, commits y avance de la entrega en puntos.
@@ -77,7 +77,7 @@ git switch -c hu-60                                        # rama del elemento
 git add -A codigo && git commit -m "wip(hu-60): ronda 1 del desarrollador"
 python documentacion/analisis/plan_sprints.py              # regenera PLAN.md y el tablero (tacha lo Listo)
 python documentacion/analisis/trazabilidad.py _tmp.md --escribir
-python documentacion/analisis/md_a_word.py                 # regenera los Word
+python documentacion/analisis/md_a_word.py --mermaid ~/.devskills/doc   # regenera los Word (ver devskills:pasada-documental)
 # gitleaks por Docker sobre `git ls-files -co --exclude-standard` (copia temporal, sin red, salida redactada)
 python "${CLAUDE_PLUGIN_ROOT}/scripts/gitleaks_archivos.py"
 git switch main && git merge --squash hu-60 && git commit -m "feat(hu-60): manage users and roles"

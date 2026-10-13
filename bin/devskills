@@ -147,8 +147,9 @@ cmd_doctor() {
     faltan=$((faltan + 1))
   fi
   revisar "Node.js (presentación y mermaid-cli)" "node --version" "Instala Node LTS: https://nodejs.org (o 'winget install OpenJS.NodeJS.LTS')." || faltan=$((faltan + 1))
-  revisar "mermaid-cli (diagramas de los Word)" "command -v mmdc || test -x \"\${DEVSKILLS_MMDC:-}\"" \
-    "Instálalo en una carpeta local: 'npm install --prefix ~/.devskills-tools @mermaid-js/mermaid-cli' y exporta DEVSKILLS_MMDC=~/.devskills-tools/node_modules/.bin/mmdc (ver README)." || faltan=$((faltan + 1))
+  revisar "mermaid-cli (diagramas de los Word)" \
+    "command -v mmdc || test -e \"\$HOME/.devskills/doc/node_modules/.bin/mmdc\" || test -e \"\$HOME/.devskills/doc/node_modules/.bin/mmdc.cmd\"" \
+    "Instálalo en una carpeta local: 'npm install --prefix ~/.devskills/doc @mermaid-js/mermaid-cli' y úsalo con 'md_a_word.py --mermaid ~/.devskills/doc' (ver docs/generadores.md)." || faltan=$((faltan + 1))
   revisar "gitleaks por Docker" "docker image inspect zricethezav/gitleaks:v8.21.2" "Descárgalo: 'docker pull zricethezav/gitleaks:v8.21.2'." || faltan=$((faltan + 1))
   revisar "Claude Code" "claude --version" "Instálalo: https://code.claude.com" || faltan=$((faltan + 1))
   revisar "Plugin engram (memoria persistente)" "claude plugin list 2>/dev/null | grep -qi engram || command -v engram" \
