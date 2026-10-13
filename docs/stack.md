@@ -17,7 +17,7 @@ Python 3.12 · Django 5 + Django REST Framework · PostgreSQL 16 · Redis · Cel
 | `herramientas/` | Generador de contratos de import-linter, roles de PostgreSQL con mínimo privilegio, bases embebidas para desarrollo y pruebas, sonda de salud |
 | `despliegue/` | Dockerfile, Compose de desarrollo y de pruebas, nginx con TLS, pasos `certificado` y `migrar`, `.env.ejemplo` |
 
-El único rol que trae es **Administrador**. Los nombres propios del sistema van por variables de entorno con el prefijo `APP_`.
+Trae el rol **Administrador** (gestiona usuarios y exige segundo factor) y dos roles **de ejemplo** que cada proyecto sustituye por los de su SRS: `auditor` (rol sensible, con segundo factor) y `usuario` (sin segundo factor). Hacen falta para ejercitar en las pruebas los dos caminos del ingreso y la suma de permisos de varios roles. También trae `auditoria`, un módulo hexagonal vacío que sirve de molde para los módulos nuevos. Los nombres propios del sistema van por variables de entorno con el prefijo `APP_`.
 
 ## Arquitectura
 
