@@ -1,0 +1,14 @@
+{
+  "name": "devskills-local",
+  "description": "Marketplace local del plugin DevSkills",
+  "owner": {
+    "name": "DevSkills"
+  },
+  "plugins": [
+    {
+      "name": "devskills",
+      "source": "./",
+      "description": "Metodología, agentes, skills, plantillas y esqueleto del stack fijo para construir sistemas nuevos de principio a fin."
+    }
+  ]
+}

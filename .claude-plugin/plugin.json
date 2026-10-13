@@ -1,0 +1,23 @@
+{
+  "name": "devskills",
+  "displayName": "DevSkills",
+  "version": "1.0.0",
+  "description": "Metodología completa para construir sistemas nuevos con un equipo de agentes: descubrimiento con el Product Owner, SRS ISO/IEC/IEEE 29148, DISEÑO IEEE 1016, plan por entregas y sprints, ciclo por historia (desarrollo, QA, Angel Fixer, cero deuda, puntos de control en git) y el esqueleto del stack fijo (Django modular hexagonal, PostgreSQL 16, Redis, Celery, nginx TLS, Docker Compose).",
+  "author": {
+    "name": "DevSkills"
+  },
+  "license": "Apache-2.0",
+  "keywords": [
+    "metodologia",
+    "srs",
+    "iso-29148",
+    "ieee-1016",
+    "scrum",
+    "django",
+    "hexagonal",
+    "qa",
+    "agentes"
+  ],
+  "homepage": "https://github.com/ssdarm150120-gif/DevSkills",
+  "repository": "https://github.com/ssdarm150120-gif/DevSkills"
+}
