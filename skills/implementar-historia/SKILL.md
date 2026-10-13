@@ -33,7 +33,7 @@ metadata:
 | Pantallas Django + HTMX, accesibilidad | `<modulo>/adaptadores/entrada/` y plantillas | `devskills:dev-interfaz` |
 | Servicio interno separado (algoritmos, modelos) | su propia carpeta de servicio | `devskills:dev-servicios` |
 
-Delegar en el subagente que corresponda; si la historia cruza capas, empezar por el dominio. Un módulo nuevo se declara en `configuracion/modulos.py` (con sus dependencias del DISEÑO) y se regeneran los contratos de import-linter con `python -m herramientas.contratos_importlinter`.
+Delegar en el subagente que corresponda; si la historia cruza capas, empezar por el dominio. Un módulo nuevo se declara en `configuracion/modulos.py` (con sus dependencias del DISEÑO) y se regeneran los contratos de import-linter con `python -m herramientas.contratos_importlinter --escribir`.
 
 ### Paso 2. TDD (rojo → verde → refactor)
 - Escribir primero las **pruebas unitarias del dominio** derivadas de los escenarios Gherkin.

@@ -1,4 +1,4 @@
-# Actualizaciones semanales de dependencias (decisión del Product Owner).
+# Actualizaciones semanales de dependencias (regla heredada del esqueleto).
 # Cada PR pasa por todo el CI (calidad, seguridad, imagen y pruebas) antes de aceptarse.
 #
 # Lo que cubre Dependabot:

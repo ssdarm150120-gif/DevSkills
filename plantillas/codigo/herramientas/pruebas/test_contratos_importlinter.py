@@ -332,9 +332,11 @@ def _flechas_de_diseno() -> dict[str, set[str]] | None:
     alias = dict(re.findall(r"^\s+(\w+)\[(\w+)\]", diagrama, re.MULTILINE))
     flechas: dict[str, set[str]] = {}
     for origen, destinos in re.findall(r"^\s+(\w+) --> (.+)$", diagrama, re.MULTILINE):
-        flechas.setdefault(alias[origen], set()).update(
-            alias[destino.strip()] for destino in destinos.split("&")
-        )
+        # Las flechas hacia `nucleo` no cuentan: todo modulo puede usar el nucleo compartido y
+        # `DEPENDENCIAS` solo lista las flechas entre modulos.
+        usados = {alias[destino.strip()] for destino in destinos.split("&")} - {"nucleo"}
+        if usados:
+            flechas.setdefault(alias[origen], set()).update(usados)
     return flechas
 
 

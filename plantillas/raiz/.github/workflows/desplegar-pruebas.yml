@@ -1,14 +1,14 @@
 # Paso 5 de DISENO D.6.2: despliegue en el entorno de PRUEBAS (staging). PREPARADO, SIN EJECUTAR.
 #
-# Es manual (`workflow_dispatch`) a proposito: el servidor de pruebas lo provee TI y a la
+# Es manual (`workflow_dispatch`) a proposito: el servidor de pruebas lo provee quien opera la infraestructura y a la
 # fecha NO existe, asi que no hay host, usuario, llave ni registro de imagenes que configurar. Cuando
-# TI lo entregue, se definen en GitHub (Settings > Secrets and variables > Actions) y este flujo se
+# exista, se definen en GitHub (Settings > Secrets and variables > Actions) y este flujo se
 # prueba una primera vez a mano; despues se puede encadenar al CI (`workflow_run`).
 #
 # Variables del repositorio: PRUEBAS_HOST, PRUEBAS_USUARIO, PRUEBAS_RUTA (carpeta del servidor).
 # Secretos: PRUEBAS_SSH_LLAVE (llave privada), PRUEBAS_SSH_KNOWN_HOSTS (huella del servidor),
 #           PRUEBAS_ENV (contenido completo de .env.pruebas, ver codigo/despliegue/.env.ejemplo).
-# Registro de imagenes: GHCR (`ghcr.io`) con el `GITHUB_TOKEN`; es una suposicion a confirmar con TI.
+# Registro de imagenes: GHCR (`ghcr.io`) con el `GITHUB_TOKEN`; es una suposicion a confirmar con quien opere la infraestructura.
 # El servidor tambien debe poder descargar la imagen (`docker login ghcr.io` o paquete publico).
 #
 # PROTECCION DEL ENTORNO `pruebas` (configuracion de GitHub que hara una persona: Settings >
@@ -49,10 +49,10 @@ jobs:
         run: |
           echo "::error::Solo se despliega a pruebas desde main (esta corrida es de ${GITHUB_REF})."
           exit 1
-      - name: Falta el servidor de pruebas (SRS S-09)
+      - name: Falta el servidor de pruebas
         if: ${{ vars.PRUEBAS_HOST == '' }}
         run: |
-          echo "::error::PRUEBAS_HOST no esta definida: el servidor de pruebas lo provee TI (SRS S-09)."
+          echo "::error::PRUEBAS_HOST no esta definida: todavia no hay servidor de pruebas configurado."
           exit 1
       # GHCR solo admite minusculas en el nombre de la imagen y el propietario puede llevar mayusculas.
       - name: Nombre de la imagen (en minusculas)

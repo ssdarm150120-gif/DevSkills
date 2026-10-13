@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/versi%C3%B3n-1.0.0-blue.svg" alt="Versión">
   <img src="https://img.shields.io/badge/licencia-MIT-green.svg" alt="Licencia">
   <img src="https://img.shields.io/badge/plataformas-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey.svg" alt="Plataformas">
-  <img src="https://img.shields.io/badge/pruebas-__PRUEBAS__%20pasando-brightgreen.svg" alt="Pruebas">
+  <img src="https://img.shields.io/badge/pruebas-26%20pasando-brightgreen.svg" alt="Pruebas">
   <img src="https://img.shields.io/badge/Claude%20Code-plugin-D97757.svg" alt="Plugin de Claude Code">
   <img src="https://img.shields.io/badge/PRs-bienvenidos-brightgreen.svg" alt="PRs bienvenidos">
 </p>
@@ -49,7 +49,14 @@
 
 ```console
 $ devskills init ~/proyectos/inventarios --nombre "Sistema de Inventarios" --puerto-base 21000
-__SALIDA_INIT__
+Proyecto creado en ~/proyectos/inventarios
+  raiz: 6 archivos
+  codigo: 208 archivos
+  documentacion: 13 archivos
+  analisis: 7 archivos
+  prefijo de Docker y proyecto de engram: inventarios
+  rango de puertos del host: 21000-21049
+  primer commit: chore: bootstrap project from devskills
 
 $ cd ~/proyectos/inventarios && claude
 > /devskills:ciclo HU-01

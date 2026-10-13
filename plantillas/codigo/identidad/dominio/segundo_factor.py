@@ -23,7 +23,7 @@ TOLERANCIA_EN_PASOS = 1
 BYTES_DEL_SECRETO = 20
 
 # `[0-9]` y no `\d`: `\d` acepta digitos de otros alfabetos, que nunca coinciden con un codigo.
-_CODIGO = re.compile(rf"[0-9]{{{DIGITOS}}}")
+_CODIGO = re.compile("[0-9]{" + str(DIGITOS) + "}")
 # Lo que una aplicacion de codigos muestra a veces con un espacio o un guion en medio ("123 456").
 _SEPARADORES = re.compile(r"[ \-]")
 

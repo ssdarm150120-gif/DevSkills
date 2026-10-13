@@ -741,7 +741,8 @@ def test_desplegar_pruebas_pasa_el_propietario_a_minusculas_y_lo_exporta() -> No
     assert "IMAGEN" not in flujo["jobs"]["desplegar"].get("env", {})  # ya no sale de `${{ }}`
     paso = next(p for p in _pasos_de_despliegue() if "GITHUB_ENV" in p.get("run", ""))
     assert "${GITHUB_REPOSITORY_OWNER,,}" in paso["run"]
-    assert f"IMAGEN=ghcr.io/${{GITHUB_REPOSITORY_OWNER,,}}/{SLUG}:${{GITHUB_SHA}}" in paso["run"]
+    imagen = "IMAGEN=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/" + SLUG + ":${GITHUB_SHA}"
+    assert imagen in paso["run"]
     assert '>> "$GITHUB_ENV"' in paso["run"]
     nombres = [p.get("name", p.get("uses", "")) for p in _pasos_de_despliegue()]
     exportar = _pasos_de_despliegue().index(paso)

@@ -83,7 +83,7 @@ El esqueleto solo trae lo genérico: `configuracion`, `nucleo`, `identidad`, `he
 | **Roles** | SRS 2.3 (clases de usuarios) y el RF de control de acceso | El catálogo de roles de `identidad` (una migración de datos nueva; nunca se edita una migración ya aplicada), con `exige_segundo_factor` para los roles sensibles que diga el SRS |
 | **Permisos** | SRS (qué puede hacer cada rol) y el ADR de la matriz de permisos | `nucleo/permisos.py`: capacidades por rol, con denegación por defecto. Una sola fuente; los casos de uso la consultan |
 | **Módulos de negocio** | DISEÑO D.1.2 (módulos) y D.1.3 (grafo de dependencias, sin ciclos) | `configuracion/modulos.py`: cada módulo con su esquema de PostgreSQL y sus dependencias permitidas; después se crea el paquete con `dominio/`, `aplicacion/`, `adaptadores/`, `api_publica.py` y `pruebas/` |
-| **Contratos de import-linter** | Se **generan** desde `modulos.py` | `python -m herramientas.contratos_importlinter` (desde `codigo/`) reescribe `.importlinter`; después `lint-imports`. Nunca se editan a mano |
+| **Contratos de import-linter** | Se **generan** desde `modulos.py` | `python -m herramientas.contratos_importlinter --escribir` (desde `codigo/`) reescribe `.importlinter`; después `lint-imports`. Nunca se editan a mano |
 | **Puertos de integraciones** (solo si el SRS tiene sistemas externos) | SRS 5 y DISEÑO D.1.4 | `nucleo/puertos/` (los compartidos) o el módulo dueño, cada uno con su adaptador falso y su prueba de contrato |
 | **Eventos** | DISEÑO D.5 | El catálogo de eventos de `nucleo`; cada módulo publica solo los suyos |
 | **Asignación Dev A / Dev B** | DISEÑO D.1.2 | Tabla "Asignación de módulos" de `documentacion/CONTEXTO.md` |
