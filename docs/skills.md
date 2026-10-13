@@ -1,6 +1,6 @@
 # Skills
 
-DevSkills trae 22 skills. Con el plugin se invocan como `/devskills:<nombre>`; con el instalador, como `/devskills-<nombre>`. Las que tienen "atajo" son comandos pensados para que los escribas tú; las demás también las carga Claude cuando la tarea coincide con su descripción.
+DevSkills, metodología y stack para construir cualquier sistema, trae 22 skills; ninguna asume un dominio. Con el plugin se invocan como `/devskills:<nombre>`; con el instalador, como `/devskills-<nombre>`. Las que tienen "atajo" son comandos pensados para que los escribas tú; las demás también las carga Claude cuando la tarea coincide con su descripción.
 
 ## Arranque y documentación
 

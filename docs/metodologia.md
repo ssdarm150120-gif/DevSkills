@@ -1,6 +1,6 @@
 # Metodología
 
-DevSkills empaqueta una forma de construir sistemas que ya se probó en un proyecto real: requisitos y diseño por escrito antes de programar, un equipo de agentes con roles separados, y un ciclo de calidad que no deja deuda.
+DevSkills es una metodología y un stack para construir **cualquier sistema**, nacida de un proyecto real: requisitos y diseño por escrito antes de programar, un equipo de agentes con roles separados, y un ciclo de calidad que no deja deuda. No presupone un dominio: los actores, los procesos, los roles y las integraciones (si las hay) salen del descubrimiento de cada proyecto, sea un sistema de inventarios, una plataforma escolar o una app interna de recursos humanos.
 
 ## Flujo completo de un proyecto
 

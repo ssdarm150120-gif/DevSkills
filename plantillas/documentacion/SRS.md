@@ -99,10 +99,13 @@ El sistema **{{NOMBRE_PROYECTO}}** va a permitir:
 ## 2. Descripción general
 
 ### 2.1 Perspectiva del producto
-<!-- ¿Sistema nuevo o reemplazo? Diagrama de contexto con los actores y las integraciones externas. -->
+<!-- ¿Sistema nuevo o reemplazo? Diagrama de contexto con los actores y, solo si las hay, las integraciones
+externas. No presupongas ninguna: un sistema puede no integrarse con nada. Ejemplos de contexto según el dominio:
+inventarios (almacenistas, compras, quizá un lector de códigos), plataforma escolar (docentes, alumnos, tutores),
+recursos humanos (colaboradores, jefes, quizá la nómina como sistema externo). -->
 
 ```
- <!-- Usuarios ──► {{NOMBRE_PROYECTO}} ──(solo lectura)──► Sistema externo -->
+ <!-- Usuarios ──► {{NOMBRE_PROYECTO}}        (agrega cada sistema externo y el sentido del flujo, si existe) -->
 ```
 
 ### 2.2 Funciones principales
@@ -113,6 +116,10 @@ El sistema **{{NOMBRE_PROYECTO}}** va a permitir:
 |-----|-------------|-------------------------------|
 | Administrador | Gestiona el sistema | Usuarios, roles y configuración |
 | <!-- rol --> | <!-- descripción --> | <!-- responsabilidades --> |
+
+<!-- El esqueleto solo trae el rol Administrador. Los demás roles salen del descubrimiento de ESTE proyecto
+(quién usa el sistema y qué decide cada quien); esta tabla es la fuente del catálogo de roles que se carga en
+`identidad` y de la matriz de permisos. Marca qué roles exigen segundo factor. -->
 
 <!-- Un usuario puede tener más de un rol. Anota la separación de funciones si aplica y el volumen estimado de usuarios concurrentes. -->
 
@@ -194,7 +201,9 @@ documentacion/analisis/trazabilidad.json y aparece en el Anexo C.3. -->
 
 ## 5. Interfaces externas
 
-### 5.1 <!-- Sistema externo -->
+<!-- Si el sistema no se integra con nada, deja solo la interfaz de usuario y escribe "Sin integraciones externas en el MVP". -->
+
+### 5.1 <!-- Sistema externo (una subsección por cada uno; bórrala si no hay) -->
 <!-- Qué se envía y se recibe, mecanismo (API, webhook, base de datos en solo lectura), credenciales necesarias y quién las provee. -->
 
 ### 5.n Interfaz de usuario interna

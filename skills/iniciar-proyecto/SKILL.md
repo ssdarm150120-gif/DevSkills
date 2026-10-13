@@ -35,6 +35,8 @@ Lo conduce el orquestador con el `analista-arquitecto`, preguntando con `devskil
 
 Todo lo que no se pueda responder queda como pregunta `P-nn` abierta para el SRS.
 
+**El método no presupone un dominio.** No des por hecho clientes, pedidos, canales de mensajería ni sistemas externos: pregunta por los actores, los procesos y las integraciones **si las hay**. Sirve igual para un sistema de inventarios (almacenistas, entradas y salidas, conteos), una plataforma escolar (docentes, alumnos, calificaciones) o una app interna de recursos humanos (colaboradores, vacaciones, autorizaciones).
+
 ### Fase 2. Crear la carpeta del proyecto
 Ejecuta el script del plugin (Python 3.12, solo librería estándar):
 
@@ -70,8 +72,23 @@ No hace falta `.claude/`: el plugin aporta los agentes y las skills.
 1. SRS hasta la línea base de requisitos: RF, RNF, Anexo A, Anexo B con Gherkin, Anexo C (`devskills:redactar-srs`).
 2. DISEÑO (`devskills:redactar-diseno`): módulos y su grafo de dependencias (que se vuelve `configuracion/modulos.py`), puertos, datos, estados, eventos, despliegue y ADR.
 3. PLAN (`devskills:planear-entregas`): Entrega 0 de cimientos y entregas por valor; tablero con `plan_sprints.py`.
-4. Entrega 0: los habilitadores de cimientos adaptan el esqueleto al proyecto (módulos del DISEÑO en `modulos.py` y contratos regenerados, catálogo de roles y matriz de permisos, puertos y falsos de las integraciones, Compose) y pasan el ciclo completo (`devskills:ciclo-historia`).
+4. Entrega 0: los habilitadores de cimientos adaptan el esqueleto al proyecto (ver "Cargar el dominio en el esqueleto") y pasan el ciclo completo (`devskills:ciclo-historia`).
 5. Ciclo por historia hasta cerrar cada entrega; `devskills:guarda-todo` al terminar cada sesión.
+
+### Cargar el dominio en el esqueleto (roles, módulos y contratos)
+El esqueleto solo trae lo genérico: `configuracion`, `nucleo`, `identidad`, `herramientas` y `despliegue`, con **un único rol, Administrador**. Todo lo demás sale del SRS y del DISEÑO del proyecto, y lo carga el equipo en la Entrega 0 por el ciclo normal (el analista lo especifica; los desarrolladores lo implementan con sus pruebas):
+
+| Qué | De dónde sale | Dónde se carga |
+|-----|---------------|----------------|
+| **Roles** | SRS 2.3 (clases de usuarios) y el RF de control de acceso | El catálogo de roles de `identidad` (una migración de datos nueva; nunca se edita una migración ya aplicada), con `exige_segundo_factor` para los roles sensibles que diga el SRS |
+| **Permisos** | SRS (qué puede hacer cada rol) y el ADR de la matriz de permisos | `nucleo/permisos.py`: capacidades por rol, con denegación por defecto. Una sola fuente; los casos de uso la consultan |
+| **Módulos de negocio** | DISEÑO D.1.2 (módulos) y D.1.3 (grafo de dependencias, sin ciclos) | `configuracion/modulos.py`: cada módulo con su esquema de PostgreSQL y sus dependencias permitidas; después se crea el paquete con `dominio/`, `aplicacion/`, `adaptadores/`, `api_publica.py` y `pruebas/` |
+| **Contratos de import-linter** | Se **generan** desde `modulos.py` | `python -m herramientas.contratos_importlinter` (desde `codigo/`) reescribe `.importlinter`; después `lint-imports`. Nunca se editan a mano |
+| **Puertos de integraciones** (solo si el SRS tiene sistemas externos) | SRS 5 y DISEÑO D.1.4 | `nucleo/puertos/` (los compartidos) o el módulo dueño, cada uno con su adaptador falso y su prueba de contrato |
+| **Eventos** | DISEÑO D.5 | El catálogo de eventos de `nucleo`; cada módulo publica solo los suyos |
+| **Asignación Dev A / Dev B** | DISEÑO D.1.2 | Tabla "Asignación de módulos" de `documentacion/CONTEXTO.md` |
+
+El `README.md` de `codigo/` del proyecto explica los pasos exactos y los nombres de archivo del esqueleto; léelo antes de planear la Entrega 0.
 
 ## Commands
 

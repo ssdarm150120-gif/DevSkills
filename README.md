@@ -3,8 +3,8 @@
 </p>
 
 <p align="center">
-  <strong>Del descubrimiento al Listo, con un equipo de agentes y cero deuda</strong><br>
-  Metodología, agentes, skills, plantillas y stack fijo para construir sistemas nuevos con Claude Code.<br>
+  <strong>Metodología y stack para construir cualquier sistema, nacida de un proyecto real</strong><br>
+  Del descubrimiento al Listo con un equipo de agentes de Claude Code y cero deuda: inventarios, una plataforma escolar, una app interna de recursos humanos o lo que necesites.<br>
   SRS ISO/IEC/IEEE 29148 · DISEÑO IEEE 1016 · plan por sprints · Dev → QA → Angel Fixer.
 </p>
 
@@ -59,7 +59,7 @@ $ cd ~/proyectos/inventarios && claude
 
 Tienes una idea de sistema. Le pides código a un agente y sale rápido… hasta que nadie sabe qué se pidió, qué se probó ni qué quedó pendiente.
 
-**DevSkills** pone orden antes y durante: requisitos y diseño por escrito, un equipo de agentes con roles separados, y un ciclo de calidad en el que nada se da por terminado con hallazgos abiertos. Es el método con el que ya se construyó un sistema real, empaquetado para el siguiente.
+**DevSkills** pone orden antes y durante: requisitos y diseño por escrito, un equipo de agentes con roles separados, y un ciclo de calidad en el que nada se da por terminado con hallazgos abiertos. Es el método con el que ya se construyó un sistema real, empaquetado para el siguiente, **sea del dominio que sea**: el método no presupone actores, procesos ni integraciones; todo eso sale del descubrimiento y del SRS de cada proyecto.
 
 - 📋 **Requisitos antes que código** — SRS con historias en Gherkin y trazabilidad generada (requisito → caso de uso → historia)
 - 👥 **Un equipo, no un agente** — analista, dos desarrolladores, QA, Angel Fixer y verificador, coordinados por un orquestador que no escribe código
@@ -228,6 +228,8 @@ Corre `devskills doctor` para revisarlos.
 ---
 
 ## ❓ Preguntas frecuentes
+
+**¿Para qué tipo de sistemas sirve?** Para cualquiera que quepa en una aplicación web con el stack fijo: un sistema de inventarios, una plataforma escolar, una app interna de recursos humanos, una mesa de servicio… El esqueleto solo trae lo genérico (configuración, núcleo, identidad, herramientas y despliegue) y un único rol, Administrador; los módulos de negocio, los demás roles y las integraciones los define el SRS de tu proyecto.
 
 **¿Puedo cambiar el stack?** No dentro de DevSkills: el stack es fijo a propósito, porque el esqueleto ya trae identidad, permisos, outbox y despliegue probados. Lo que cambia por proyecto son los módulos de negocio.
 

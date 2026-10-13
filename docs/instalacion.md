@@ -1,6 +1,6 @@
 # Instalación
 
-Hay dos formas de instalar DevSkills. Las dos traen lo mismo; cambia cómo se llaman los agentes y las skills.
+DevSkills es una metodología y un stack para construir cualquier sistema, nacida de un proyecto real. Hay dos formas de instalarlo. Las dos traen lo mismo; cambia cómo se llaman los agentes y las skills.
 
 | Forma | Nombres | Cuándo conviene |
 |-------|---------|-----------------|

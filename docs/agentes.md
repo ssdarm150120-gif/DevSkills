@@ -1,6 +1,6 @@
 # Agentes
 
-DevSkills trae 13 agentes. La sesión principal es el orquestador; los demás trabajan como subagentes.
+DevSkills, metodología y stack para construir cualquier sistema, trae 13 agentes sin dominio propio: lo que saben del negocio lo leen del SRS, del DISEÑO y de `documentacion/CONTEXTO.md` de cada proyecto. La sesión principal es el orquestador; los demás trabajan como subagentes.
 
 ```
 Sesión principal (orquestador)

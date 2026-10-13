@@ -1,6 +1,6 @@
 # Generadores de contenido
 
-Cada proyecto creado con DevSkills trae sus generadores en `documentacion/analisis/` y `documentacion/presentacion/`. Todos leen los datos del propio proyecto (SRS, PLAN, archivos JSON que llena el analista): nada del contenido está escrito en el código. Los comandos se corren **desde la raíz del proyecto**.
+DevSkills es una metodología y un stack para construir cualquier sistema. Cada proyecto creado con DevSkills trae sus generadores en `documentacion/analisis/` y `documentacion/presentacion/`. Todos leen los datos del propio proyecto (SRS, PLAN, archivos JSON que llena el analista): nada del contenido está escrito en el código. Los comandos se corren **desde la raíz del proyecto**.
 
 | Genera | Comando | Skill | Dependencias |
 |--------|---------|-------|--------------|

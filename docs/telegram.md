@@ -1,6 +1,6 @@
 # Trabajar por Telegram
 
-Puedes dirigir al orquestador desde el celular con el canal de Telegram de Claude Code. El orquestador te avisa de cada hito y te hace las preguntas de negocio por ahí.
+DevSkills sirve para construir cualquier sistema, y puedes dirigir al orquestador desde el celular con el canal de Telegram de Claude Code. El orquestador te avisa de cada hito y te hace las preguntas de negocio por ahí.
 
 ## Requisitos
 
