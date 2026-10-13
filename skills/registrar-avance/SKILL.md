@@ -4,7 +4,7 @@ description: >
   Escribe el reporte de avance (MD) de un elemento del backlog después de QA, del Angel Fixer y de la
   verificación final, actualiza el estado oficial, el índice, y regenera el PLAN y el tablero de sprints
   (tacha lo Listo). Trigger: al cerrar el ciclo de calidad de una HU o un EN, o al bloquearlo.
-license: Apache-2.0
+license: MIT
 metadata:
   author: devskills
   version: "1.0"

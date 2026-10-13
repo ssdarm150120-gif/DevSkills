@@ -5,7 +5,7 @@ description: >
   navegación por rol y datos ficticios), un prompt por grupo de sprints, la maqueta de venta, y los
   prompts de actualización y de correcciones. Trigger: "prompts de Figma", "Figma Make", "maqueta del
   proyecto", "prototipo navegable", "corrige la maqueta", "actualiza los prompts de la maqueta".
-license: Apache-2.0
+license: MIT
 metadata:
   author: devskills
   version: "1.0"

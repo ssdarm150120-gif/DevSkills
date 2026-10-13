@@ -6,7 +6,7 @@ description: >
   del método (código con el esqueleto del stack fijo, documentación con SRS, DISEÑO, PLAN y CONTEXTO vacíos,
   avance, análisis con los scripts), git init y primer commit. Trigger: "/devskills:nuevo-proyecto",
   "nuevo proyecto", "iniciar un sistema", "arrancar un proyecto".
-license: Apache-2.0
+license: MIT
 metadata:
   author: devskills
   version: "1.0"
@@ -35,7 +35,7 @@ Lo conduce el orquestador con el `analista-arquitecto`, preguntando con `devskil
 
 Todo lo que no se pueda responder queda como pregunta `P-nn` abierta para el SRS.
 
-**El método no presupone un dominio.** No des por hecho clientes, pedidos, canales de mensajería ni sistemas externos: pregunta por los actores, los procesos y las integraciones **si las hay**. Sirve igual para un sistema de inventarios (almacenistas, entradas y salidas, conteos), una plataforma escolar (docentes, alumnos, calificaciones) o una app interna de recursos humanos (colaboradores, vacaciones, autorizaciones).
+**El método no presupone un dominio.** No des por hecho clientes, ventas, canales de mensajería ni sistemas externos: pregunta por los actores, los procesos y las integraciones **si las hay**. Sirve igual para un sistema de inventarios (almacenistas, entradas y salidas, conteos), una plataforma escolar (docentes, alumnos, calificaciones) o una app interna de recursos humanos (colaboradores, vacaciones, autorizaciones).
 
 ### Fase 2. Crear la carpeta del proyecto
 Ejecuta el script del plugin (Python 3.12, solo librería estándar):
@@ -76,7 +76,7 @@ No hace falta `.claude/`: el plugin aporta los agentes y las skills.
 5. Ciclo por historia hasta cerrar cada entrega; `devskills:guarda-todo` al terminar cada sesión.
 
 ### Cargar el dominio en el esqueleto (roles, módulos y contratos)
-El esqueleto solo trae lo genérico: `configuracion`, `nucleo`, `identidad`, `herramientas` y `despliegue`, con **un único rol, Administrador**. Todo lo demás sale del SRS y del DISEÑO del proyecto, y lo carga el equipo en la Entrega 0 por el ciclo normal (el analista lo especifica; los desarrolladores lo implementan con sus pruebas):
+El esqueleto solo trae lo genérico: `configuracion`, `nucleo`, `identidad`, `herramientas` y `despliegue`, más `auditoria` (un módulo hexagonal vacío que sirve de molde), con el rol **Administrador** y dos roles de ejemplo (`auditor`, sensible; `usuario`, sin segundo factor) que se sustituyen por los del SRS. Todo lo demás sale del SRS y del DISEÑO del proyecto, y lo carga el equipo en la Entrega 0 por el ciclo normal (el analista lo especifica; los desarrolladores lo implementan con sus pruebas):
 
 | Qué | De dónde sale | Dónde se carga |
 |-----|---------------|----------------|

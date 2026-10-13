@@ -5,7 +5,7 @@ description: >
   adaptadores, modelo de datos, máquinas de estado, flujos de integración, contratos, despliegue y
   seguridad, con sus ADR y su historial. Trigger: "redacta el diseño", "documento de diseño", "agrega un
   ADR", "define el puerto", "el diseño no define", "siguiente paso del diseño".
-license: Apache-2.0
+license: MIT
 metadata:
   author: devskills
   version: "1.0"

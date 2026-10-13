@@ -6,7 +6,7 @@ description: >
   los confirmados a `devskills:angel-fixer` para su remediación quirúrgica. Trigger: "gga", "gentleman guardian
   angel", "security scan", "revisar seguridad", "escanear vulnerabilidades", "buscar inyecciones",
   "auditoría de seguridad".
-license: Apache-2.0
+license: MIT
 metadata:
   author: devskills
   version: "1.0"

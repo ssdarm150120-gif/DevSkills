@@ -4,7 +4,7 @@ description: >
   Cierre de sesión ("guarda todo"): commit del trabajo pendiente, exportar la transcripción de la sesión a
   Markdown con `exportar_sesion.py`, gitleaks por Docker, commit de la transcripción y resumen de la sesión
   en engram. Trigger: "/devskills:guarda-todo", "guarda todo", "cerrar sesión", "cierra la sesión", "ya me voy".
-license: Apache-2.0
+license: MIT
 metadata:
   author: devskills
   version: "1.0"

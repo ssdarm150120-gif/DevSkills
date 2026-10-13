@@ -6,7 +6,7 @@ description: >
   Product Owner, ronda extra con lista congelada, verificación final, reporte, regeneración del plan, Word y
   Anexo C, gitleaks y cierre con squash a main. Trigger: "/devskills:ciclo-historia HU-xx", "/devskills:ciclo",
   "implementa la historia", "ciclo de la HU", "cerrar el sprint".
-license: Apache-2.0
+license: MIT
 metadata:
   author: devskills
   version: "1.0"
@@ -16,7 +16,7 @@ argument-hint: "HU-35 | EN-04 | S05 (todo un sprint)"
 
 ## When to Use
 
-- El usuario pide implementar un elemento del backlog (`HU-xx`, `EN-xx`) o todo un sprint (`SNN`). Elemento pedido: **$id**.
+- El usuario pide implementar un elemento del backlog (`HU-xx`, `EN-xx`) o todo un sprint (`SNN`). Elemento solicitado: **$id**.
 
 ## Critical Patterns
 

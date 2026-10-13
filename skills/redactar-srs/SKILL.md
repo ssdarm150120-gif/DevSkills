@@ -6,7 +6,7 @@ description: >
   con Gherkin en español (Anexo B) y matriz de trazabilidad (Anexo C).
   Trigger: "redacta el SRS", "escribe los requisitos", "siguiente paso del SRS", "agrega historias al SRS",
   "casos de uso", "línea base de requisitos".
-license: Apache-2.0
+license: MIT
 metadata:
   author: devskills
   version: "1.0"

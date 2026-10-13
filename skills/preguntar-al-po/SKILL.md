@@ -6,7 +6,7 @@ description: >
   sin suponer; registrar en el SRS (o en el reporte) quién decidió. Trigger: cuando una decisión es de
   negocio, cuando un agente encuentra un hueco o contradicción del SRS, al llegar a 3 rondas sin aprobar,
   o para autorizar una ronda extra o un cierre con pendientes.
-license: Apache-2.0
+license: MIT
 metadata:
   author: devskills
   version: "1.0"

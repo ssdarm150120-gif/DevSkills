@@ -5,7 +5,7 @@ description: >
   del PLAN, con el generador de Node documentacion/presentacion/generar_presentacion.js y su archivo
   datos_presentacion.json. Trigger: "genera la presentación", "presentación del proyecto", "pptx de la
   propuesta", "actualiza la presentación", "deck para la dirección".
-license: Apache-2.0
+license: MIT
 metadata:
   author: devskills
   version: "1.0"

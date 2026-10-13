@@ -8,6 +8,7 @@
     {
       "name": "devskills",
       "source": "./",
+      "license": "MIT",
       "description": "Metodología, agentes, skills, plantillas y esqueleto del stack fijo para construir sistemas nuevos de principio a fin."
     }
   ]

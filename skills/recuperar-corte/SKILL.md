@@ -5,7 +5,7 @@ description: >
   git status, stash y contenedores con su prefijo, hacer un commit de respaldo, reanudar con SendMessage al
   mismo agente sin rehacer su trabajo, y limpiar. Trigger: "se cortó el agente", "límite de uso", "rate limit",
   "el agente no terminó", "retoma donde se quedó".
-license: Apache-2.0
+license: MIT
 metadata:
   author: devskills
   version: "1.0"

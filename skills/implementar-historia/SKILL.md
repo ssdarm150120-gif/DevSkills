@@ -4,7 +4,7 @@ description: >
   Flujo de desarrollo de una historia (HU) o habilitador (EN) con TDD, arquitectura hexagonal, trazabilidad
   al SRS y la lista de lecciones aprendidas. Trigger: cuando un agente desarrollador implementa un elemento
   del backlog o una ronda de correcciones.
-license: Apache-2.0
+license: MIT
 metadata:
   author: devskills
   version: "1.0"

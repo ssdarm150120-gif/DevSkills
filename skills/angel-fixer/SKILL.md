@@ -8,7 +8,7 @@ description: >
   de forma quirúrgica solo los CRÍTICOS/ALTOS confirmados. Trigger: "angel-fixer", "arreglar vulnerabilidades",
   "aplicar fixes de seguridad", "evaluar historia", "revisión del angel fixer", cuando GGA delega hallazgos
   confirmados o cuando `devskills:ciclo-historia` pide la evaluación.
-license: Apache-2.0
+license: MIT
 metadata:
   author: devskills
   version: "2.0"

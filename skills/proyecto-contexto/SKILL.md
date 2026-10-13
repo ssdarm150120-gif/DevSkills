@@ -5,7 +5,7 @@ description: >
   el diseño y el plan, la arquitectura fija (Django modular hexagonal), las convenciones, la Definición
   de Listo y de Terminado, la política de cero deuda y el entorno local. Lee `documentacion/CONTEXTO.md`
   para lo propio de cada proyecto. Trigger: al empezar cualquier tarea de análisis, desarrollo, QA o evaluación.
-license: Apache-2.0
+license: MIT
 metadata:
   author: devskills
   version: "1.0"

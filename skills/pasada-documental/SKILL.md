@@ -6,7 +6,7 @@ description: >
   y deja un commit docs separado del código. Trigger: "/devskills:pasada-documental", "pasada documental",
   "sube la versión del SRS", "actualiza el diseño", "registra la decisión en el SRS", "cambio de alcance",
   "retrospectiva del Product Owner", "regenera los Word".
-license: Apache-2.0
+license: MIT
 metadata:
   author: devskills
   version: "1.0"

@@ -6,7 +6,7 @@ description: >
   y criterios ponderados, cerrado con un ADR aceptado o rechazado. Trigger: "¿por qué no usamos X?",
   "comprar o construir", "evalúa el producto", "evaluación de alternativas", "manifiesto de evaluación",
   "montar el sistema sobre".
-license: Apache-2.0
+license: MIT
 metadata:
   author: devskills
   version: "1.0"

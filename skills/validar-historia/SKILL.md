@@ -4,7 +4,7 @@ description: >
   Validación de QA de una historia (HU) o habilitador (EN) contra sus escenarios Gherkin y los requisitos
   no funcionales del SRS, con veredicto APROBADA / APROBADA CON OBSERVACIONES / RECHAZADA.
   Trigger: cuando QA valida un elemento en estado "En validación" o re-valida tras correcciones.
-license: Apache-2.0
+license: MIT
 metadata:
   author: devskills
   version: "1.0"

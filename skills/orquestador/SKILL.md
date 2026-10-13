@@ -5,7 +5,7 @@ description: >
   código, sintetiza, decide lo técnico y pregunta lo de negocio al Product Owner, mantiene el estado del
   backlog, hace los puntos de control en git antes de cada revisión, usa engram y avisa por Telegram si el
   canal está activo. Trigger: al abrir una sesión de trabajo en un proyecto DevSkills, "orquesta", "coordina el equipo".
-license: Apache-2.0
+license: MIT
 metadata:
   author: devskills
   version: "1.0"

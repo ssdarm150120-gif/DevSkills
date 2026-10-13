@@ -5,7 +5,7 @@ description: >
   objetivo, sintetiza sus hallazgos, aplica fixes con un agente separado y vuelve a juzgar hasta que los dos
   aprueben o se escale después de 2 iteraciones. Trigger: "judgment day", "judgment-day", "revisión adversarial",
   "doble revisión", "juzgar", "que lo juzguen".
-license: Apache-2.0
+license: MIT
 metadata:
   author: devskills
   version: "1.4"

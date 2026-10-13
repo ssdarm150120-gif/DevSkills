@@ -4,7 +4,7 @@ description: >
   Atajo para arrancar un sistema nuevo con la skill `devskills:iniciar-proyecto`: descubrimiento con el
   Product Owner, carpeta del proyecto con el esqueleto del stack fijo y las plantillas, git init y primer
   commit. Uso: "/devskills:nuevo-proyecto <nombre>".
-license: Apache-2.0
+license: MIT
 disable-model-invocation: true
 arguments: [nombre]
 argument-hint: "\"Nombre del sistema\""

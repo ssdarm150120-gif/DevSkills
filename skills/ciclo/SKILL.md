@@ -3,7 +3,7 @@ name: ciclo
 description: >
   Atajo para ejecutar el ciclo completo de un elemento del backlog o de un sprint con la skill
   `devskills:ciclo-historia`. Uso: "/devskills:ciclo HU-35", "/devskills:ciclo S05".
-license: Apache-2.0
+license: MIT
 disable-model-invocation: true
 arguments: [id]
 argument-hint: "HU-35 | EN-04 | S05"

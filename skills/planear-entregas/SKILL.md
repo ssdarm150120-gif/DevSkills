@@ -5,7 +5,7 @@ description: >
   puntos, dependencias y velocidad; carga los datos en plan_entregas.json y regenera PLAN.md y el tablero
   de sprints con plan_sprints.py. Trigger: "arma el plan", "plan de entregas", "planea los sprints",
   "reestima", "reprioriza el backlog", "regenera el plan", "recalibra la velocidad", "parte la historia".
-license: Apache-2.0
+license: MIT
 metadata:
   author: devskills
   version: "1.0"
