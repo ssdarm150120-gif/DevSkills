@@ -41,7 +41,7 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "*/pruebas/*" = ["S101", "S603", "S607"]  # assert y subprocess son normales en pruebas
 # Unico archivo que usa `importlib.import_module` (recarga `configuracion.settings.*`). Se exime ESE
-# archivo y no un directorio: cualquier otro `pruebas/` (p. ej. `clientes/dominio/pruebas/`) sigue
+# archivo y no un directorio: cualquier otro `pruebas/` (p. ej. `auditoria/dominio/pruebas/`) sigue
 # prohibido. Si otro archivo lo necesitara, se agrega aqui por su ruta exacta.
 "configuracion/pruebas/test_settings.py" = ["TID251"]
 "conftest.py" = ["S101"]

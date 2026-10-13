@@ -102,7 +102,6 @@ PROHIBIDAS_COMO_SUBCADENA = (
     "celular",
     "movil",
     "phone",
-    "whatsapp",
     "contrasena",
     "password",
     "passwd",

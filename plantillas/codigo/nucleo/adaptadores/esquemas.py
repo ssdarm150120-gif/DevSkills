@@ -2,14 +2,14 @@
 
 Mecanismo:
 
-1. Cada modulo es dueno de un esquema con su mismo nombre (`pedidos`, `clientes`...);
+1. Cada modulo es dueno de un esquema con su mismo nombre (`identidad`, `auditoria`...);
    `nucleo` usa `nucleo` (outbox).
 2. El esquema se crea en la migracion `0001_esquema` de cada modulo, con `crear_esquema`.
    Las migraciones viven en `<modulo>/adaptadores/salida/migraciones` (ver `MIGRATION_MODULES`).
 3. Los modelos de Django declaran su tabla calificada con `nombre_tabla`:
 
        class Meta:
-           db_table = nombre_tabla("pedidos", "pedido")   # -> "pedidos"."pedido"
+           db_table = nombre_tabla("ejemplo", "elemento")   # -> "ejemplo"."elemento"
 
    No se usa `search_path`: la tabla siempre va calificada, asi que un modulo no puede tocar
    por accidente las tablas de otro y no depende de la configuracion de la conexion.

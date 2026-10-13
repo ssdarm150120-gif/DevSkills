@@ -260,7 +260,7 @@ def test_el_mismo_codigo_en_hilos_simultaneos_sin_transaccion_externa_solo_lo_ac
 
 
 def test_iniciar_el_enrolamiento_en_hilos_simultaneos_crea_un_solo_secreto(settings: Any) -> None:
-    """en el adaptador: varios pedidos a la vez no chocan ni crean dos secretos."""
+    """en el adaptador: varias peticiones a la vez no chocan ni crean dos secretos."""
     correo = "enrolar-simultaneo@empresa.example"
     with _usuario_temporal(correo, None, settings.APP_LLAVE_SEGUNDO_FACTOR) as usuario_id:
         ahora = datetime.now(UTC)

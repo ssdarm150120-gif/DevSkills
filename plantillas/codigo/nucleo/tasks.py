@@ -1,7 +1,7 @@
 """Tareas de Celery de `nucleo` (DISENO, D.6.1).
 
 `despachar_outbox` la dispara `beat` cada pocos segundos y la atiende `worker-outbox`, una cola
-propia: un pico de campañas no frena las confirmaciones de pedidos. Dos corridas a la vez son
+propia: un pico de tareas pesadas no frena la entrega de eventos. Dos corridas a la vez son
 seguras (cada entrega se toma con `SKIP LOCKED`).
 
 Tiempo máximo: `soft_time_limit` (el trabajo se interrumpe con `SoftTimeLimitExceeded`; lo ya

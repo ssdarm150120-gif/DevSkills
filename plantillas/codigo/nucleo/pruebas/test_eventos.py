@@ -48,7 +48,7 @@ def test_un_evento_valido_toma_la_version_del_catalogo_y_un_id_propio() -> None:
 
 def test_un_nombre_fuera_del_catalogo_se_rechaza() -> None:
     with pytest.raises(EventoDesconocido):
-        _evento("PedidoRegalado")
+        _evento("ElementoInventado")
 
 
 def test_faltar_un_campo_requerido_se_rechaza() -> None:

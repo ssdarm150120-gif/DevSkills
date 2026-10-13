@@ -38,7 +38,6 @@ EVASIONES = [
     "movil",
     "celular",
     "phone",
-    "whatsapp",
     "mail",
     "e-mail",
     "e_mail",

@@ -48,7 +48,7 @@ def test_el_codigo_de_produccion_pide_el_publicador_de_su_propio_modulo() -> Non
 
 
 def test_el_detector_encuentra_una_suplantacion() -> None:
-    codigo = 'obtener(FabricaDePublicadores).de("pedidos")'
+    codigo = 'obtener(FabricaDePublicadores).de("ejemplo")'
     nodo = ast.parse(codigo).body[0]
     assert isinstance(nodo, ast.Expr) and isinstance(nodo.value, ast.Call)
     func = nodo.value.func

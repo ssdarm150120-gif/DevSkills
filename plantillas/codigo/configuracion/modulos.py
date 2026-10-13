@@ -36,7 +36,7 @@ APPS_PROPIAS: tuple[str, ...] = (MODULO_NUCLEO, *MODULOS_HEXAGONALES)
 # `lint-imports`. No hay ciclos (se verifica al generar `.importlinter`). La comunicacion por
 # eventos no es un import: el bus de eventos vive en `nucleo`.
 # Los modulos sin entrada (identidad, ...) no importan a ningun otro modulo.
-# Ejemplo: "ventas": ("clientes", "catalogo"),
+# Ejemplo: "modulo_a": ("modulo_b", "modulo_c"),
 DEPENDENCIAS: dict[str, tuple[str, ...]] = {}
 
 # Esquema de PostgreSQL por modulo (D.2.1): el mismo nombre del modulo. Si un modulo necesita otro
