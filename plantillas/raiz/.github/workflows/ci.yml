@@ -1,0 +1,164 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: codigo
+
+jobs:
+  # Pasos 1, 2 y 4 de DISENO D.6.2: estilo, tipos, limites entre modulos y seguridad.
+  calidad:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            codigo/requirements.txt
+            codigo/requirements-dev.txt
+      - run: pip install -r requirements-dev.txt
+      - name: Estilo (ruff)
+        run: ruff check . && ruff format --check .
+      - name: Tipos (mypy estricto en */dominio)
+        run: mypy
+      - name: Tipos (mypy en todo el codigo)
+        run: mypy .
+      - name: Limites entre modulos (import-linter)
+        run: lint-imports
+      - name: Contratos sincronizados con el mapa de modulos
+        run: python -m herramientas.contratos_importlinter | diff - .importlinter
+      - name: Analisis estatico (bandit)
+        run: bandit -q -r . -x "*/pruebas/*,./conftest.py"
+      - name: Dependencias vulnerables (pip-audit)
+        run: pip-audit -r requirements.txt -r requirements-dev.txt
+      # `check --deploy` sobre los settings de produccion. Los valores son de PRUEBA: validos
+      # (SECRET_KEY de >= 50 caracteres y >= 16 distintos; sin `*` en ALLOWED_HOSTS) y NO secretos.
+      # No se conecta a ninguna base ni a Redis. Los secretos reales viven en el despliegue.
+      - name: Configuracion de produccion (check --deploy)
+        run: python manage.py check --deploy --fail-level WARNING
+        env:
+          DJANGO_SETTINGS_MODULE: configuracion.settings.prod
+          SECRET_KEY: ci-clave-de-prueba-no-secreta-solo-para-check-deploy-0123456789
+          APP_LLAVE_HUELLA: ci-llave-de-huella-de-prueba-no-secreta-solo-para-check-deploy-9876543210
+          APP_LLAVE_SEGUNDO_FACTOR: ci-llave-del-segundo-factor-de-prueba-no-secreta-solo-para-check-deploy-5555
+          ALLOWED_HOSTS: app.ejemplo.invalid
+          DATABASE_URL: postgres://app:app@db.invalid:5432/app
+          REDIS_URL: redis://redis.invalid:6379/0
+
+  # Paso 4 de D.6.2 (lo que no cubre `calidad`): semgrep (analisis estatico) y gitleaks (secretos).
+  seguridad:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0  # gitleaks revisa todo el historial
+      - name: Analisis estatico (semgrep)
+        run: >-
+          pipx run --spec "semgrep==1.178.0" semgrep scan
+          --config p/python --config p/django --error --metrics=off
+          --exclude pruebas --exclude conftest.py .
+      - name: Secretos (gitleaks)
+        working-directory: .
+        env:
+          GITLEAKS_VERSION: "8.21.2"
+        run: |
+          base="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
+          archivo="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          cd "${RUNNER_TEMP}"
+          curl -sSfLO "${base}/${archivo}"
+          curl -sSfLO "${base}/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          sha256sum --ignore-missing -c "gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          tar -xzf "${archivo}" gitleaks
+          cd "${GITHUB_WORKSPACE}"
+          "${RUNNER_TEMP}/gitleaks" detect --source . --redact --no-banner --verbose
+
+  # Paso 3 de D.6.2: pruebas unitarias y escenarios Gherkin (pytest-bdd) contra PostgreSQL 16 real.
+  pruebas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: app
+          POSTGRES_DB: app
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U app"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://app:app@localhost:5432/app
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            codigo/requirements.txt
+            codigo/requirements-dev.txt
+      - run: pip install -r requirements-dev.txt
+      - name: Migraciones al dia
+        run: python manage.py makemigrations --check --dry-run
+        env:
+          DJANGO_SETTINGS_MODULE: configuracion.settings.pruebas
+      - name: Pruebas (pytest)
+        run: pytest -q
+
+  # Pasos 4 (trivy) y 5 (construccion de la imagen) de D.6.2. Las herramientas corren como imagenes
+  # Docker fijadas por version y digest, las mismas que se usan en la maquina del desarrollador
+  # (README de codigo/). El despliegue a pruebas es un flujo aparte y manual: desplegar-pruebas.yml.
+  imagen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      IMAGEN: {{SLUG}}:ci
+      HADOLINT: hadolint/hadolint:v2.15.1@sha256:32dac94127fd60b7b7e3fbfc65e1383b9b5e25c9bfd7b8536de7a539fe68a12d
+      TRIVY: aquasec/trivy:0.75.0@sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Dockerfile (hadolint)
+        run: docker run --rm -i "$HADOLINT" < despliegue/Dockerfile
+      - name: Compose valido (con los valores ficticios de .env.ejemplo)
+        working-directory: codigo/despliegue
+        run: |
+          docker compose --env-file .env.ejemplo config --quiet
+          docker compose --env-file .env.ejemplo \
+            -f docker-compose.yml -f docker-compose.pruebas.yml config --quiet
+          APP_IMAGEN=ghcr.io/ejemplo/{{SLUG}}:ci APP_PULL_POLICY=always \
+            docker compose --env-file .env.ejemplo \
+            -f docker-compose.yml -f docker-compose.pruebas.yml config --quiet
+      - name: Construccion de la imagen
+        run: docker build -f despliegue/Dockerfile -t "$IMAGEN" .
+      # Falla con CRITICAL o HIGH que tengan parche disponible (los que aun no tienen se ven en el
+      # informe de trivy, pero no bloquean: no hay nada que actualizar).
+      - name: Imagen (trivy)
+        run: >-
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock "$TRIVY" image
+          --exit-code 1 --severity CRITICAL,HIGH --ignore-unfixed --no-progress "$IMAGEN"

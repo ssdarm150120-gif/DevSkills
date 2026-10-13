@@ -1,0 +1,121 @@
+# GENERADO: `python -m herramientas.contratos_importlinter --escribir`. No editar.
+[importlinter]
+root_packages =
+    identidad
+    auditoria
+    nucleo
+    configuracion
+    django
+    rest_framework
+    celery
+    redis
+    psycopg
+    http
+    urllib
+    sqlite3
+include_external_packages = True
+
+[importlinter:contract:aislamiento-identidad]
+name = identidad solo usa la api_publica de otros modulos
+type = forbidden
+source_modules =
+    identidad
+forbidden_modules =
+    auditoria.*
+ignore_imports =
+    identidad.** -> auditoria.api_publica
+unmatched_ignore_imports_alerting = none
+allow_indirect_imports = True
+
+[importlinter:contract:aislamiento-auditoria]
+name = auditoria solo usa la api_publica de otros modulos
+type = forbidden
+source_modules =
+    auditoria
+forbidden_modules =
+    identidad.*
+ignore_imports =
+    auditoria.** -> identidad.api_publica
+unmatched_ignore_imports_alerting = none
+allow_indirect_imports = True
+
+[importlinter:contract:dependencias-identidad]
+name = identidad solo depende de las flechas permitidas en D.1.3
+type = forbidden
+source_modules =
+    identidad
+forbidden_modules =
+    auditoria
+allow_indirect_imports = True
+
+[importlinter:contract:dependencias-auditoria]
+name = auditoria solo depende de las flechas permitidas en D.1.3
+type = forbidden
+source_modules =
+    auditoria
+forbidden_modules =
+    identidad
+allow_indirect_imports = True
+
+[importlinter:contract:nadie-importa-identidad]
+name = ningun modulo importa identidad: los permisos llegan como un Actor de nucleo
+type = forbidden
+source_modules =
+    auditoria
+    nucleo
+forbidden_modules =
+    identidad
+
+[importlinter:contract:sin-ciclos]
+name = sin ciclos entre modulos (D.1.3)
+type = layers
+layers =
+    auditoria
+    identidad
+
+[importlinter:contract:dominio-puro]
+name = dominio/ y nucleo.puertos no importan Django, ORM ni IO
+type = forbidden
+source_modules =
+    identidad.dominio
+    auditoria.dominio
+    nucleo.puertos
+forbidden_modules =
+    django
+    rest_framework
+    celery
+    redis
+    psycopg
+    http
+    urllib
+    sqlite3
+
+[importlinter:contract:capas-hexagonales]
+name = adaptadores -> aplicacion -> dominio dentro de cada modulo
+type = layers
+containers =
+    identidad
+    auditoria
+layers =
+    adaptadores
+    aplicacion
+    dominio
+
+[importlinter:contract:nucleo-independiente]
+name = nucleo no depende de ningun modulo ni de la configuracion
+type = forbidden
+source_modules =
+    nucleo
+forbidden_modules =
+    identidad
+    auditoria
+    configuracion
+
+[importlinter:contract:modulos-sin-configuracion]
+name = los modulos no importan la configuracion de Django
+type = forbidden
+source_modules =
+    identidad
+    auditoria
+forbidden_modules =
+    configuracion

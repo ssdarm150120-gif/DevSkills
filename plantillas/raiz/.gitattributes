@@ -1,0 +1,49 @@
+# Fin de linea: el texto se guarda y se extrae con LF en todos los sistemas.
+# Sin esto, `core.autocrlf=true` en Windows convierte a CRLF y rompe las comparaciones con la
+# salida de los generadores (por ejemplo `codigo/.importlinter`).
+* text=auto eol=lf
+
+*.py   text eol=lf
+*.md   text eol=lf
+*.toml text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+*.cfg  text eol=lf
+*.ini  text eol=lf
+*.txt  text eol=lf
+*.sh   text eol=lf
+*.sql  text eol=lf
+*.html text eol=lf
+*.css  text eol=lf
+*.js   text eol=lf
+*.json text eol=lf
+*.feature text eol=lf
+*.conf text eol=lf
+*.template text eol=lf
+.importlinter text eol=lf
+.gitattributes text eol=lf
+.gitignore text eol=lf
+.dockerignore text eol=lf
+.env.ejemplo text eol=lf
+Dockerfile text eol=lf
+
+# Binarios: no se tocan ni se comparan como texto.
+*.docx binary
+*.doc  binary
+*.pptx binary
+*.potx binary
+*.xlsx binary
+*.xls  binary
+*.pdf  binary
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.woff binary
+*.woff2 binary
+*.parquet binary
+*.pkl  binary
+*.zip  binary
+*.gz   binary
+*.ipynb text eol=lf

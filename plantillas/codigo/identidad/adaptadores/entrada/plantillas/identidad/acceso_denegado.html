@@ -1,0 +1,7 @@
+{% extends "identidad/base.html" %}
+{% block titulo %}Acceso denegado · {{ nombre_aplicacion }}{% endblock %}
+{% block contenido %}
+<h2>Acceso denegado</h2>
+<p class="aviso aviso-error" role="alert">{{ motivo }}</p>
+<p><a href="/">Volver al inicio</a></p>
+{% endblock %}

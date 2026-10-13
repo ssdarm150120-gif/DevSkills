@@ -1,0 +1,86 @@
+# Todas las herramientas se ejecutan desde `codigo/` (cwd): pytest, ruff, mypy, lint-imports, bandit.
+[project]
+name = "{{SLUG}}"
+version = "0.1.0"
+description = "{{NOMBRE_PROYECTO}}: monolito modular Django con arquitectura hexagonal"
+# SRS: Python 3.12+ (local, CI y produccion).
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "configuracion.settings.pruebas"
+pythonpath = ["."]
+python_files = ["test_*.py"]
+testpaths = ["."]
+addopts = "-ra --strict-markers"
+markers = [
+    "lento: prueba que ejecuta procesos externos (lint-imports)",
+]
+# Los escenarios Gherkin de las HU viven en <modulo>/pruebas/**/*.feature (pytest-bdd).
+bdd_features_base_dir = "."
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["*/migraciones/*"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "C4", "SIM", "RUF", "TID251"]
+ignore = [
+    "RUF001",  # texto en espanol con caracteres tipograficos
+    "RUF002",
+    "RUF003",
+]
+
+# un import dinamico esquiva import-linter (que solo ve imports estaticos). Se prohibe en todo
+# el codigo; ruff NO detecta `__import__`, de eso se encarga la prueba AST de
+# `herramientas/pruebas/test_imports_dinamicos.py`.
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"importlib.import_module".msg = "Import dinamico: esquiva los contratos de import-linter."
+"django.utils.module_loading.import_string".msg = "Import dinamico: esquiva los contratos de import-linter."
+
+[tool.ruff.lint.per-file-ignores]
+"*/pruebas/*" = ["S101", "S603", "S607"]  # assert y subprocess son normales en pruebas
+# Unico archivo que usa `importlib.import_module` (recarga `configuracion.settings.*`). Se exime ESE
+# archivo y no un directorio: cualquier otro `pruebas/` (p. ej. `clientes/dominio/pruebas/`) sigue
+# prohibido. Si otro archivo lo necesitara, se agrega aqui por su ruta exacta.
+"configuracion/pruebas/test_settings.py" = ["TID251"]
+"conftest.py" = ["S101"]
+"configuracion/settings/*" = ["F403", "F405"]
+
+[tool.mypy]
+python_version = "3.12"
+# `mypy` (sin argumentos) revisa solo los dominios, en modo estricto; `mypy .` revisa todo el codigo
+# (con la configuracion base) y tambien debe quedar en 0 errores. Ambos corren en CI.
+files = ["*/dominio"]
+exclude = ["/migraciones/"]  # generadas por Django (y excluidas tambien en ruff)
+explicit_package_bases = true
+# django-stubs entiende los modelos (trae los primeros): campos, managers y consultas tipados.
+plugins = ["mypy_django_plugin.main"]
+warn_redundant_casts = true
+
+[tool.django-stubs]
+django_settings_module = "configuracion.settings.pruebas"
+
+# Bibliotecas sin stubs ni py.typed: se acota la excepcion al modulo (no es un ignore global).
+[[tool.mypy.overrides]]
+module = ["celery", "celery.schedules", "celery.exceptions", "tzdata", "psutil", "publicsuffixlist", "django_otp", "django_otp.*"]
+ignore_missing_imports = true
+
+# Estricto en dominio/ (convencion del proyecto).
+[[tool.mypy.overrides]]
+module = ["*.dominio", "*.dominio.*"]
+disallow_any_generics = true
+disallow_subclassing_any = true
+disallow_untyped_calls = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_unused_ignores = true
+warn_return_any = true
+no_implicit_reexport = true
+strict_equality = true
+
+# bandit se invoca desde la CLI (los patrones de exclusion de pyproject no son fiables en Windows):
+#   bandit -r . -x "*/pruebas/*,./conftest.py"

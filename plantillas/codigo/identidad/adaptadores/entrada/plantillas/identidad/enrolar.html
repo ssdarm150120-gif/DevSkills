@@ -1,0 +1,37 @@
+{% extends "identidad/base.html" %}
+{% block titulo %}Registra tu aplicación de códigos · {{ nombre_aplicacion }}{% endblock %}
+{% block contenido %}
+<h2>Registra tu aplicación de códigos</h2>
+<p class="ayuda">Tu rol exige un segundo factor. Registra una aplicación de códigos (de las que
+generan un código de 6 dígitos cada 30 segundos) y confirma con un código para terminar de ingresar.</p>
+{% if errores %}
+<div class="aviso aviso-error" role="alert">
+  <ul>{% for error in errores %}<li>{{ error }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+<ol class="pasos">
+  <li>En tu aplicación de códigos, agrega una cuenta nueva y escanea este código QR.</li>
+  {# El QR lo dibuja el servidor como <svg>: sin JavaScript, sin estilos en línea y sin imagen data:, para no relajar la CSP. #}
+  <li>
+    <figure class="qr" role="img" aria-label="Código QR para registrar tu aplicación de códigos">
+      <svg viewBox="0 0 {{ qr_lado }} {{ qr_lado }}" width="220" height="220"
+           shape-rendering="crispEdges" focusable="false" aria-hidden="true">
+        <rect width="{{ qr_lado }}" height="{{ qr_lado }}" fill="#ffffff"/>
+        <path d="{{ qr_trazo }}" fill="#000000"/>
+      </svg>
+    </figure>
+  </li>
+  <li>Si no puedes escanearlo, elige «ingresar una clave» y escribe esta:
+    <p class="clave"><code id="clave">{{ clave }}</code></p>
+  </li>
+  <li>Escribe aquí el código de 6 dígitos que muestra tu aplicación.</li>
+</ol>
+<form method="post" action="/ingresar/enrolar" novalidate>
+  {% csrf_token %}
+  <label for="codigo">Código de 6 dígitos</label>
+  <input id="codigo" name="codigo" type="text" inputmode="numeric" autocomplete="one-time-code"
+         pattern="[0-9 ]*" maxlength="9" required autofocus>
+  <button type="submit">Confirmar y entrar</button>
+</form>
+<p class="ayuda"><a href="/ingresar">Volver a ingresar</a></p>
+{% endblock %}

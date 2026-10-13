@@ -1,0 +1,132 @@
+# nginx de la aplicacion (DISENO D.6.1): unica puerta de entrada. Plantilla de la imagen oficial: el
+# arranque sustituye SOLO las variables NGINX_* (ver NGINX_ENVSUBST_FILTER en el Compose) y deja
+# intactas las variables propias de nginx ($host, $remote_addr...).
+#
+# Quien hace que (una sola fuente por encabezado, para no mandar dos al navegador):
+#   nginx  -> TLS, redireccion HTTP -> HTTPS, proxy, limite de carga (10 MB), Host desconocido y
+#             limite de peticiones (POST) por IP en el ingreso (/ingresar y sus etapas, D.5.4).
+#   Django -> Content-Security-Policy, Strict-Transport-Security, X-Frame-Options, nosniff y
+#             Referrer-Policy (configuracion/seguridad.py y configuracion/settings/prod.py).
+# Por eso AQUI no hay `add_header` de seguridad: lo prueba herramientas/pruebas/test_despliegue.py.
+# Pendiente de otros elementos (no se adelanta): limite de peticiones del webhook, paginas
+# con token (HU de enlaces) y WebSocket de Channels (HU del chat).
+#
+# El contenedor corre sin privilegios (nginx-unprivileged): escucha en 8080 y 8443; el Compose los
+# publica en el puerto que corresponda (443 y 80 en el servidor).
+
+# TLS comun a todos los `server` (perfil "intermediate" de Mozilla, solo la parte ECDHE con AEAD).
+# Va a nivel `http` (este archivo se incluye ahi) para que tambien lo herede el `server` por
+# defecto: un cliente sin SNI o con una IP directa no debe negociar algo mas debil. TLS 1.3 no usa
+# `ssl_ciphers` (sus suites son todas AEAD). Se descartan CBC, RSA estatico y DHE: ya no hay
+# cliente soportado que los necesite.
+ssl_protocols       TLSv1.2 TLSv1.3;
+ssl_ciphers         ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305;
+ssl_prefer_server_ciphers off;
+
+# DNS interno de Docker. nginx resuelve `web` al ARRANCAR; si `web` se recrea con otra IP, un
+# `proxy_pass` fijo seguiria apuntando a la vieja y daria 502 hasta reiniciar nginx. Con una
+# VARIABLE en `proxy_pass`, nginx vuelve a resolver el nombre cada `valid` segundos.
+# Costo: sin el bloque `upstream` no hay conexiones persistentes (`keepalive`) hacia `web`.
+resolver 127.0.0.11 valid=10s;
+
+# Limite de peticiones por IP en el ingreso (DISENO D.5.4: `/ingresar` es la unica ruta interna sin
+# sesion y "lleva limite de peticiones ademas del bloqueo por cuenta"). Cubre `/ingresar` y todas sus
+# etapas (`/ingresar/contrasena`, `/ingresar/enrolar`, `/ingresar/codigo`), pero SOLO los POST: son los
+# que intentan una contrasena o un codigo (y cuestan un hash Argon2). Los GET (pintar la pantalla) no
+# se cuentan. Todo lo demas (la aplicacion con sesion, /salud, los estilos) tampoco: la clave vacia no
+# se contabiliza.
+#
+# El bloqueo por cuenta (5 intentos) es el control PRINCIPAL contra adivinar una contrasena; este
+# limite protege al servidor y frena a quien prueba muchas cuentas desde un mismo origen. Por eso es
+# holgado: varios usuarios detras de una VPN o un NAT comparten IP y no deben estorbarse entre si.
+# `$binary_remote_addr` es la IP real porque nginx es el borde. Si un dia hay un balanceador delante,
+# todos los usuarios compartirian IP: habria que usar el modulo `realip` antes de tocar esto.
+# La ruta se evalua sobre `$uri` (ya decodificado y con las barras repetidas fusionadas), asi que
+# `//ingresar`, `/%69ngresar`, `/ingresar/` y `/ingresar?x=1` cuentan igual que `/ingresar`.
+# Valores (variables NGINX_*, que sustituye la imagen al arrancar; ver el Compose y el README):
+#   NGINX_LIMITE_INGRESO  ritmo sostenido de POST por IP, p. ej. 180r/m (3 por segundo).
+#   NGINX_RAFAGA_INGRESO  POST extra que se admiten de golpe antes de rechazar (p. ej. 40).
+map $uri $app_clave_limite_ingreso {
+    default "";
+    ~^/ingresar(/|$) $binary_remote_addr;
+}
+map $request_method $app_clave_limite_ingreso_post {
+    default "";
+    POST $app_clave_limite_ingreso;
+}
+limit_req_zone $app_clave_limite_ingreso_post zone=app_ingreso:10m rate=${NGINX_LIMITE_INGRESO};
+limit_req_status 429;
+limit_req_log_level warn;
+
+# Host desconocido (IP directa, dominio ajeno apuntando aqui): se corta la conexion sin responder.
+# Esto tambien evita que el `Host` de un atacante llegue a Django o forme una redireccion.
+server {
+    listen 8080 default_server;
+    listen 8443 ssl default_server;
+    server_name _;
+
+    ssl_certificate     /etc/nginx/certs/tls.crt;
+    ssl_certificate_key /etc/nginx/certs/tls.key;
+
+    return 444;
+}
+
+# HTTP: solo redirige a HTTPS. El destino sale de la configuracion, nunca del `Host` de la peticion.
+server {
+    listen 8080;
+    server_name ${NGINX_NOMBRE_PUBLICO};
+    server_tokens off;
+
+    location / {
+        return 301 https://${NGINX_NOMBRE_PUBLICO}${NGINX_SUFIJO_PUERTO_HTTPS}$request_uri;
+    }
+}
+
+server {
+    listen 8443 ssl;
+    http2 on;
+    server_name ${NGINX_NOMBRE_PUBLICO};
+    server_tokens off;
+
+    ssl_certificate     /etc/nginx/certs/tls.crt;
+    ssl_certificate_key /etc/nginx/certs/tls.key;
+    ssl_session_cache   shared:SSL:10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+
+    # Archivos de hasta 10 MB (D.6.1); lo demas se rechaza con 413 antes de llegar a Django.
+    client_max_body_size 10m;
+
+    # Respuesta clara cuando se rebasa el limite de peticiones del ingreso (429).
+    error_page 429 = @app_demasiadas_peticiones;
+    location @app_demasiadas_peticiones {
+        default_type text/plain;
+        charset utf-8;
+        return 429 "Demasiadas peticiones desde tu red. Espera un minuto e inténtalo de nuevo.
+";
+    }
+
+    location / {
+        limit_req zone=app_ingreso burst=${NGINX_RAFAGA_INGRESO} nodelay;
+        # Variable (no un literal): obliga a resolver `web` de nuevo (ver `resolver` arriba). Sin
+        # URI en `proxy_pass`, nginx reenvia la ruta y la consulta tal como llegaron.
+        set $app_web web:8000;
+        proxy_pass http://$app_web;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        # `$http_host` (con puerto) y NO `$host`: Django compara el `Origin` del navegador
+        # (`https://localhost:8443`) con el host de la peticion; sin el puerto, todo POST fallaria
+        # la verificacion CSRF en cualquier puerto distinto de 443. El nombre ya lo valido el
+        # `server_name` de este bloque y Django vuelve a validarlo contra ALLOWED_HOSTS.
+        proxy_set_header Host $http_host;
+        # `X-Forwarded-Proto` se FIJA a https (esta es la unica rama TLS): nunca se reenvia el del
+        # cliente (`$http_x_forwarded_proto`), porque Django confia en este encabezado
+        # (CONFIAR_EN_PROXY_TLS). Igual con la IP: nginx es el borde, asi que se sobrescribe.
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Forwarded "";
+        proxy_redirect off;
+        proxy_read_timeout 60s;
+    }
+}

@@ -1,0 +1,16 @@
+# Dependencias de ejecucion (versiones acotadas). Python 3.12+ (local, CI y produccion).
+Django>=5.2,<5.3
+djangorestframework>=3.15,<4
+celery>=5.4,<6
+redis>=5,<7
+psycopg[binary]>=3.2,<4
+uvicorn>=0.54,<1  # servidor ASGI de web (D.6.1); la imagen lo ejecuta, sin extras
+# Public Suffix List EMPAQUETADA (archivo .dat dentro del paquete): valida ALLOWED_HOSTS sin red.
+# Elegida sobre `tldextract` (que descarga la lista por defecto y guarda cache en disco) y sin sus
+# dependencias (requests, filelock...). No usar el extra `[update]` ni `publicsuffixlist-download`.
+publicsuffixlist>=1.0,<2
+argon2-cffi>=25.1,<26  # hash de contrasenas Argon2 (D.6.3)
+django-otp>=1.7,<2  # algoritmo TOTP (`django_otp.oath`, RFC 6238) del segundo factor
+cryptography>=46,<51  # AES-256-GCM y HKDF para cifrar el secreto del segundo factor
+segno>=1.6,<2  # matriz del codigo QR del enrolamiento, en Python puro y sin dependencias
+tzdata>=2024.1,<2027  # zonas de `zoneinfo` en Windows y en desarrollo (no hay /usr/share/zoneinfo); la imagen slim de Linux SI las trae y `zoneinfo` las prefiere

@@ -1,0 +1,95 @@
+# Paso 5 de DISENO D.6.2: despliegue en el entorno de PRUEBAS (staging). PREPARADO, SIN EJECUTAR.
+#
+# Es manual (`workflow_dispatch`) a proposito: el servidor de pruebas lo provee TI y a la
+# fecha NO existe, asi que no hay host, usuario, llave ni registro de imagenes que configurar. Cuando
+# TI lo entregue, se definen en GitHub (Settings > Secrets and variables > Actions) y este flujo se
+# prueba una primera vez a mano; despues se puede encadenar al CI (`workflow_run`).
+#
+# Variables del repositorio: PRUEBAS_HOST, PRUEBAS_USUARIO, PRUEBAS_RUTA (carpeta del servidor).
+# Secretos: PRUEBAS_SSH_LLAVE (llave privada), PRUEBAS_SSH_KNOWN_HOSTS (huella del servidor),
+#           PRUEBAS_ENV (contenido completo de .env.pruebas, ver codigo/despliegue/.env.ejemplo).
+# Registro de imagenes: GHCR (`ghcr.io`) con el `GITHUB_TOKEN`; es una suposicion a confirmar con TI.
+# El servidor tambien debe poder descargar la imagen (`docker login ghcr.io` o paquete publico).
+#
+# PROTECCION DEL ENTORNO `pruebas` (configuracion de GitHub que hara una persona: Settings >
+# Environments > pruebas). Los secretos del despliegue (llave SSH, .env.pruebas) son del entorno, y
+# un `workflow_dispatch` puede lanzarse desde CUALQUIER rama; por eso:
+#   1. Deployment branches: "Selected branches" = solo `main`.
+#   2. Required reviewers: al menos una persona que apruebe cada despliegue.
+# Como segunda barrera, el primer paso falla si el flujo no corre sobre `main`.
+#
+# Sin las variables del servidor el flujo falla en el segundo paso, sin tocar nada.
+
+name: Desplegar en pruebas
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desplegar-pruebas
+  cancel-in-progress: false
+
+jobs:
+  desplegar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: pruebas
+    # `packages: write` solo en este job (publica la imagen en GHCR).
+    permissions:
+      contents: read
+      packages: write
+    env:
+      TRIVY: aquasec/trivy:0.75.0@sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa
+    steps:
+      - name: Solo desde main
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Solo se despliega a pruebas desde main (esta corrida es de ${GITHUB_REF})."
+          exit 1
+      - name: Falta el servidor de pruebas (SRS S-09)
+        if: ${{ vars.PRUEBAS_HOST == '' }}
+        run: |
+          echo "::error::PRUEBAS_HOST no esta definida: el servidor de pruebas lo provee TI (SRS S-09)."
+          exit 1
+      # GHCR solo admite minusculas en el nombre de la imagen y el propietario puede llevar mayusculas.
+      - name: Nombre de la imagen (en minusculas)
+        run: echo "IMAGEN=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/{{SLUG}}:${GITHUB_SHA}" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Construccion de la imagen
+        working-directory: codigo
+        run: docker build -f despliegue/Dockerfile -t "$IMAGEN" .
+      - name: Imagen (trivy)
+        run: >-
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock "$TRIVY" image
+          --exit-code 1 --severity CRITICAL,HIGH --ignore-unfixed --no-progress "$IMAGEN"
+      - name: Publicar la imagen
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USUARIO: ${{ github.actor }}
+        run: |
+          echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USUARIO" --password-stdin
+          docker push "$IMAGEN"
+      - name: Copiar el Compose y desplegar
+        env:
+          SSH_LLAVE: ${{ secrets.PRUEBAS_SSH_LLAVE }}
+          SSH_KNOWN_HOSTS: ${{ secrets.PRUEBAS_SSH_KNOWN_HOSTS }}
+          ENV_PRUEBAS: ${{ secrets.PRUEBAS_ENV }}
+          DESTINO: ${{ vars.PRUEBAS_USUARIO }}@${{ vars.PRUEBAS_HOST }}
+          RUTA: ${{ vars.PRUEBAS_RUTA }}
+        run: |
+          trap 'rm -f ~/.ssh/id_pruebas' EXIT
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_LLAVE" > ~/.ssh/id_pruebas && chmod 600 ~/.ssh/id_pruebas
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          SSH="ssh -i $HOME/.ssh/id_pruebas -o StrictHostKeyChecking=yes"
+          $SSH "$DESTINO" "mkdir -p '$RUTA'"
+          scp -i ~/.ssh/id_pruebas -o StrictHostKeyChecking=yes \
+            codigo/despliegue/docker-compose.yml codigo/despliegue/docker-compose.pruebas.yml "$DESTINO:$RUTA/"
+          scp -i ~/.ssh/id_pruebas -o StrictHostKeyChecking=yes -r codigo/despliegue/nginx "$DESTINO:$RUTA/"
+          printf '%s\nAPP_IMAGEN=%s\nAPP_PULL_POLICY=always\n' "$ENV_PRUEBAS" "$IMAGEN" | $SSH "$DESTINO" "umask 077 && cat > '$RUTA/.env.pruebas'"
+          $SSH "$DESTINO" "cd '$RUTA' && docker compose --env-file .env.pruebas -f docker-compose.yml -f docker-compose.pruebas.yml up -d --remove-orphans"

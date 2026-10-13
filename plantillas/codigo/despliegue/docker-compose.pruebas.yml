@@ -1,0 +1,51 @@
+# Docker Compose de PRUEBAS (staging, DISENO D.6.2). Se superpone al de desarrollo:
+#
+#   docker compose --env-file .env.pruebas -f docker-compose.yml -f docker-compose.pruebas.yml up -d
+#
+# Mientras no exista el servidor de pruebas, staging corre en LOCALHOST, con una imagen construida
+# en tu maquina; cuando exista, corre la imagen que publica el despliegue.
+# Paso a paso, en el README (seccion "Entorno de pruebas").
+#
+# Diferencias con desarrollo:
+#   - NO construye: usa una imagen ya hecha (`APP_IMAGEN`), la misma que luego pasa a produccion.
+#       * Local (por defecto): `{{SLUG}}:pruebas`, que se construye a mano con `docker build`.
+#       * Registro: `APP_IMAGEN=ghcr.io/<organizacion>/{{SLUG}}:<sha>` y `APP_PULL_POLICY=always`.
+#     `pull_policy: missing` (por defecto) usa la imagen local si existe y solo la descarga si falta;
+#     con `always` se baja siempre del registro (lo que fija el flujo desplegar-pruebas.yml).
+#   - Proyecto aparte (`{{SLUG}}-pruebas`): sus volumenes no se mezclan con los de desarrollo.
+#   - En el servidor, puertos 80/443 en todas las interfaces (se definen en .env.pruebas:
+#     APP_ENLACE=0.0.0.0, APP_PUERTO_HTTP=80, APP_PUERTO_HTTPS=443, APP_SUFIJO_PUERTO_HTTPS vacio).
+#   - HSTS de produccion en el servidor: en .env.pruebas se borran HSTS_SEGUNDOS, HSTS_SUBDOMINIOS y
+#     HSTS_PRELOAD. En localhost se dejan (HSTS de un ano en `localhost` rompe otros servidores locales).
+#
+# El certificado sigue siendo autofirmado hasta que exista el del dominio de pruebas; cuando
+# exista, se monta en el volumen `certificados` como tls.crt y tls.key.
+
+name: {{SLUG}}-pruebas
+
+x-imagen-ya-construida: &imagen-ya-construida
+  image: ${APP_IMAGEN:-{{SLUG}}:pruebas}
+  build: !reset null
+  pull_policy: ${APP_PULL_POLICY:-missing}
+
+# Staging NO usa adaptadores falsos (los hereda del Compose de desarrollo, aqui se revierten).
+# Mientras un adaptador real no exista, su puerto queda sin conectar y la aplicacion arranca, pero
+# ningun falso entra a staging. Cada puerto elegible que agregues va aqui con su adaptador real.
+x-adaptadores-reales: &adaptadores-reales
+  APP_PERMITIR_ADAPTADORES_FALSOS: "false"
+
+services:
+  migrar:
+    <<: *imagen-ya-construida
+  web:
+    <<: *imagen-ya-construida
+    environment: *adaptadores-reales
+  worker:
+    <<: *imagen-ya-construida
+    environment: *adaptadores-reales
+  worker-outbox:
+    <<: *imagen-ya-construida
+    environment: *adaptadores-reales
+  beat:
+    <<: *imagen-ya-construida
+    environment: *adaptadores-reales

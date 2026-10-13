@@ -1,0 +1,26 @@
+{% extends "identidad/base.html" %}
+{# Base de las dos pantallas de contraseña: cada una pone sus textos y, si aplica, la actual. #}
+{% block titulo %}{{ titulo }} · {{ nombre_aplicacion }}{% endblock %}
+{% block contenido %}
+<h2>{{ titulo }}</h2>
+{% block introduccion %}{% endblock %}
+{% for mensaje in messages %}<p class="aviso aviso-ok" role="status">{{ mensaje }}</p>{% endfor %}
+{% if errores %}
+<div class="aviso aviso-error" role="alert">
+  <ul>{% for error in errores %}<li>{{ error }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+<form method="post" action="{{ accion }}" novalidate>
+  {% csrf_token %}
+  {% block campo_actual %}{% endblock %}
+  <label for="nueva">Contraseña nueva</label>
+  <input id="nueva" name="nueva" type="password" autocomplete="new-password" required minlength="12"
+         aria-describedby="requisitos">
+  <p id="requisitos" class="ayuda">Al menos 12 caracteres y que no aparezca en listas de contraseñas
+  filtradas. La validación se hace aquí, sin enviarla a ningún servicio externo.</p>
+  <label for="confirmar">Confirma la contraseña nueva</label>
+  <input id="confirmar" name="confirmar" type="password" autocomplete="new-password" required>
+  <button type="submit">Guardar contraseña</button>
+</form>
+{% block pie %}{% endblock %}
+{% endblock %}

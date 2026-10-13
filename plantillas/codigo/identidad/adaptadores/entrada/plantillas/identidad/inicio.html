@@ -1,0 +1,20 @@
+{% extends "identidad/base.html" %}
+{% block titulo %}Inicio · {{ nombre_aplicacion }}{% endblock %}
+{% block contenido %}
+<h2>Inicio</h2>
+{% if aviso_reuso %}<div class="aviso aviso-error" id="aviso-reuso" role="alert">
+  <p>{{ aviso_reuso }}</p>
+  <p><a href="/cuenta/contrasena">Cambiar mi contraseña</a></p>
+</div>{% endif %}
+<p>Ingresaste como <strong>{{ user.correo }}</strong>.</p>
+<p class="ayuda">Tus roles:</p>
+<ul class="roles">{% for rol in roles %}<li>{{ rol }}</li>{% endfor %}</ul>
+<p class="ayuda">Colas y acciones de tus roles:</p>
+<ul class="roles" id="capacidades">{% for capacidad in capacidades %}<li>{{ capacidad }}</li>{% empty %}<li>Ninguna por ahora</li>{% endfor %}</ul>
+{% if puede_gestionar_usuarios %}<p><a href="{% url 'lista_usuarios' %}">Administrar usuarios</a></p>{% endif %}
+<p><a href="/cuenta/contrasena">Cambiar mi contraseña</a></p>
+<form method="post" action="/salir">
+  {% csrf_token %}
+  <button type="submit" class="secundario">Salir</button>
+</form>
+{% endblock %}

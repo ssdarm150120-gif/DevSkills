@@ -1,0 +1,14 @@
+{% extends "identidad/base.html" %}
+{# Base de las pantallas de gestion de usuarios: tarjeta ancha, navegacion y avisos. #}
+{% block clase_tarjeta %}tarjeta-ancha{% endblock %}
+{% block contenido %}
+<nav class="barra" aria-label="Administración">
+  <a href="/">Inicio</a>
+  <a href="{% url 'lista_usuarios' %}">Usuarios</a>
+</nav>
+{% for mensaje in messages %}
+<p class="aviso {% if mensaje.level_tag == 'error' %}aviso-error{% else %}aviso-ok{% endif %}"
+   role="{% if mensaje.level_tag == 'error' %}alert{% else %}status{% endif %}">{{ mensaje }}</p>
+{% endfor %}
+{% block cuerpo %}{% endblock %}
+{% endblock %}

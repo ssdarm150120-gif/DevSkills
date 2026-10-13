@@ -1,0 +1,78 @@
+{% extends "identidad/admin_base.html" %}
+{% block titulo %}{{ d.cuenta.correo }} · {{ nombre_aplicacion }}{% endblock %}
+{% block cuerpo %}
+<div class="encabezado">
+  <h2>{{ d.cuenta.nombre|default:d.cuenta.correo }}</h2>
+  <p>
+    {% if d.cuenta.activo %}<span class="estado estado-ok">Activo</span>{% else %}<span class="estado estado-apagado">Desactivado</span>{% endif %}
+    {% if d.bloqueada %}<span class="estado estado-alerta">Bloqueada</span>{% endif %}
+    {% if d.cuenta.debe_cambiar_contrasena %}<span class="estado estado-info">Contraseña temporal</span>{% endif %}
+  </p>
+</div>
+<p class="ayuda">{{ d.cuenta.correo }} · Roles: {{ d.roles_nombres|join:", " }}</p>
+
+<section aria-labelledby="t-datos">
+  <h3 id="t-datos">Datos y roles</h3>
+  <form method="post" action="{% url 'editar_usuario' d.cuenta.id %}" novalidate>
+    {% csrf_token %}
+    {% include "identidad/_datos_usuario.html" with nombre=d.cuenta.nombre marcados=roles_del_usuario catalogo=d.roles_del_catalogo %}
+    <p class="ayuda">Si cambias los roles, las sesiones abiertas del usuario se cierran y aplicará los roles nuevos
+    en su siguiente ingreso.</p>
+    <button type="submit">Guardar cambios</button>
+  </form>
+</section>
+
+<section aria-labelledby="t-acceso">
+  <h3 id="t-acceso">Acceso</h3>
+  {% if d.segundo_factor == "enrolado" %}<p class="ayuda">Segundo factor: registrado.</p>
+  {% elif d.segundo_factor == "sin_enrolar" %}<p class="ayuda">Segundo factor: pendiente, se registra en su siguiente ingreso.</p>
+  {% elif d.segundo_factor == "no_disponible" %}<p class="ayuda">Segundo factor: no disponible. Con su rol no podrá ingresar.</p>
+  {% else %}<p class="ayuda">Sus roles no exigen segundo factor.</p>{% endif %}
+  {% if d.puede_recuperar %}
+  <div class="acciones">
+    <form method="post" action="{% url 'restablecer_contrasena' d.cuenta.id %}">
+      {% csrf_token %}
+      <button type="submit" class="secundario">Restablecer contraseña</button>
+    </form>
+    {% if d.cuenta.exige_segundo_factor %}
+    <form method="post" action="{% url 'reiniciar_segundo_factor' d.cuenta.id %}">
+      {% csrf_token %}
+      <button type="submit" class="secundario">Reiniciar segundo factor</button>
+    </form>
+    {% endif %}
+    {% if d.bloqueada %}
+    <form method="post" action="{% url 'desbloquear_cuenta' d.cuenta.id %}">
+      {% csrf_token %}
+      <button type="submit" class="secundario">Desbloquear cuenta</button>
+    </form>
+    {% endif %}
+  </div>
+  {% else %}
+  <p class="aviso aviso-ok">Tu propia contraseña y tu segundo factor de Administrador los restablece otro administrador.</p>
+  {% if d.bloqueada %}
+  <form method="post" action="{% url 'desbloquear_cuenta' d.cuenta.id %}">
+    {% csrf_token %}
+    <button type="submit" class="secundario">Desbloquear cuenta</button>
+  </form>
+  {% endif %}
+  {% endif %}
+</section>
+
+<section aria-labelledby="t-estado">
+  <h3 id="t-estado">Estado</h3>
+  {% if d.es_el_actor %}
+  <p class="ayuda">No puedes desactivar tu propia cuenta.</p>
+  {% elif d.cuenta.activo %}
+  <p class="ayuda">Desactivar no borra al usuario: ya no puede entrar y sus acciones pasadas siguen en la bitácora con su nombre.</p>
+  <form method="post" action="{% url 'desactivar_usuario' d.cuenta.id %}">
+    {% csrf_token %}
+    <button type="submit" class="peligro">Desactivar usuario</button>
+  </form>
+  {% else %}
+  <form method="post" action="{% url 'reactivar_usuario' d.cuenta.id %}">
+    {% csrf_token %}
+    <button type="submit" class="secundario">Reactivar usuario</button>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}

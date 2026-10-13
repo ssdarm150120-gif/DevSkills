@@ -1,0 +1,13 @@
+{# Campos comunes del alta y de la edicion: nombre y roles. #}
+<label for="nombre">Nombre</label>
+<input id="nombre" name="nombre" type="text" maxlength="150" required value="{{ nombre|default:'' }}">
+
+<fieldset class="roles-campo">
+  <legend>Roles</legend>
+  {% for rol in catalogo %}
+  <label class="casilla" for="rol-{{ rol.codigo }}">
+    <input id="rol-{{ rol.codigo }}" name="roles" type="checkbox" value="{{ rol.codigo }}"{% if rol.codigo in marcados %} checked{% endif %}>
+    {{ rol.nombre }}{% if rol.exige_segundo_factor %} <span class="ayuda">(exige segundo factor)</span>{% endif %}
+  </label>
+  {% endfor %}
+</fieldset>

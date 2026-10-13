@@ -1,0 +1,10 @@
+{% extends "identidad/admin_base.html" %}
+{% block titulo %}Contraseña temporal · {{ nombre_aplicacion }}{% endblock %}
+{% block cuerpo %}
+<h2>{% if motivo == "alta" %}Usuario creado{% else %}Contraseña restablecida{% endif %}</h2>
+<p>Contraseña temporal de <strong>{{ correo }}</strong>:</p>
+<p class="clave"><code id="contrasena-temporal">{{ temporal }}</code></p>
+<p class="aviso aviso-error" role="alert">Anótala ahora: se muestra una sola vez y no se puede volver a ver.
+Entrégasela al usuario por un medio seguro. {% if motivo != "alta" %}La contraseña anterior ya no sirve. {% endif %}Tendrá que cambiarla en su próximo ingreso.</p>
+<p><a class="boton" href="{% url 'detalle_usuario' usuario_id %}">Ir al usuario</a></p>
+{% endblock %}

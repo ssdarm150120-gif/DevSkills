@@ -1,0 +1,157 @@
+/* Pantallas de acceso. Tokens en :root; modo oscuro por preferencia del sistema (Prompt 0). */
+:root {
+  --fondo: #f1f5f9;
+  --superficie: #ffffff;
+  --borde: #cbd5e1;
+  --texto: #0f172a;
+  --texto-suave: #475569;
+  --primario: #0f4c5c;
+  --primario-texto: #ffffff;
+  --error-fondo: #fef2f2;
+  --error-borde: #b91c1c;
+  --error-texto: #7f1d1d;
+  --ok-fondo: #f0fdf4;
+  --ok-borde: #15803d;
+  --ok-texto: #14532d;
+  --foco: #0f4c5c;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fondo: #0b1220;
+    --superficie: #111a2c;
+    --borde: #334155;
+    --texto: #e2e8f0;
+    --texto-suave: #94a3b8;
+    --primario: #3a9bb3;
+    --primario-texto: #04141a;
+    --error-fondo: #2a1215;
+    --error-borde: #f87171;
+    --error-texto: #fecaca;
+    --ok-fondo: #0f2418;
+    --ok-borde: #4ade80;
+    --ok-texto: #bbf7d0;
+    --foco: #7dd3fc;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: var(--fondo);
+  color: var(--texto);
+  font: 14px/1.5 Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+.tarjeta {
+  width: 100%;
+  max-width: 400px;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  padding: 24px;
+}
+.marca { margin: 0 0 16px; font-size: 14px; font-weight: 600; color: var(--primario); }
+h2 { margin: 0 0 16px; font-size: 20px; }
+label { display: block; margin: 12px 0 4px; font-weight: 500; }
+input {
+  width: 100%;
+  padding: 8px 10px;
+  font: inherit;
+  color: var(--texto);
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: 6px;
+}
+input:focus-visible, button:focus-visible, a:focus-visible {
+  outline: 2px solid var(--foco);
+  outline-offset: 2px;
+}
+button {
+  width: 100%;
+  margin-top: 16px;
+  padding: 9px 12px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--primario-texto);
+  background: var(--primario);
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+button.secundario {
+  color: var(--texto);
+  background: transparent;
+  border: 1px solid var(--borde);
+}
+a { color: var(--primario); }
+.ayuda { color: var(--texto-suave); font-size: 13px; margin: 8px 0; }
+.aviso { margin: 0 0 12px; padding: 10px 12px; border-radius: 6px; border: 1px solid; }
+.aviso ul { margin: 0; padding-left: 18px; }
+.aviso-error { background: var(--error-fondo); border-color: var(--error-borde); color: var(--error-texto); }
+.aviso-ok { background: var(--ok-fondo); border-color: var(--ok-borde); color: var(--ok-texto); }
+.roles { padding-left: 18px; }
+/* Segundo factor. El QR siempre va oscuro sobre blanco: asi lo leen los lectores, tambien
+   en el modo oscuro. */
+.pasos { margin: 0 0 8px; padding-left: 20px; }
+.pasos li { margin: 0 0 8px; }
+.qr { margin: 8px 0; padding: 0; display: flex; justify-content: center; }
+.qr svg { width: 100%; max-width: 220px; height: auto; background: #ffffff; }
+.clave { margin: 6px 0 0; }
+.clave code {
+  display: block;
+  padding: 8px 10px;
+  font: 600 15px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0.08em;
+  word-break: break-all;
+  user-select: all;
+  background: var(--fondo);
+  border: 1px solid var(--borde);
+  border-radius: 6px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  button { transition: filter 0.15s; }
+  button:hover { filter: brightness(1.08); }
+}
+/* Gestion de usuarios: tarjeta ancha, tabla, estados y acciones. Sin estilos en linea. */
+.tarjeta-ancha { max-width: 960px; }
+.barra { display: flex; gap: 16px; margin: 0 0 16px; padding-bottom: 8px; border-bottom: 1px solid var(--borde); }
+.encabezado { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.encabezado h2 { margin: 0; }
+.encabezado p { margin: 0; }
+.boton {
+  display: inline-block;
+  padding: 9px 12px;
+  font-weight: 600;
+  color: var(--primario-texto);
+  text-decoration: none;
+  background: var(--primario);
+  border-radius: 6px;
+}
+.tabla-contenedor { overflow-x: auto; }
+.tabla { width: 100%; border-collapse: collapse; }
+.tabla th, .tabla td { padding: 8px 10px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--borde); }
+.solo-lectores { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.estado { display: inline-block; margin-right: 4px; padding: 1px 8px; font-size: 12px; font-weight: 600; border: 1px solid; border-radius: 999px; }
+.estado-ok { color: var(--ok-texto); background: var(--ok-fondo); border-color: var(--ok-borde); }
+.estado-alerta { color: var(--error-texto); background: var(--error-fondo); border-color: var(--error-borde); }
+.estado-apagado, .estado-info { color: var(--texto-suave); background: transparent; border-color: var(--borde); }
+select {
+  width: 100%;
+  padding: 8px 10px;
+  font: inherit;
+  color: var(--texto);
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: 6px;
+}
+select:focus-visible { outline: 2px solid var(--foco); outline-offset: 2px; }
+.roles-campo { margin: 12px 0 0; padding: 8px 12px; border: 1px solid var(--borde); border-radius: 6px; }
+.casilla { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-weight: 400; }
+input[type="checkbox"] { width: auto; margin: 0; }
+section { margin: 24px 0 0; padding-top: 8px; border-top: 1px solid var(--borde); }
+section h3 { margin: 8px 0; font-size: 16px; }
+.acciones { display: flex; flex-wrap: wrap; gap: 8px; }
+.acciones form { flex: 1 1 200px; }
+button.peligro { color: var(--error-texto); background: var(--error-fondo); border: 1px solid var(--error-borde); }

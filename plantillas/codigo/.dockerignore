@@ -1,0 +1,32 @@
+# Contexto de construccion de la imagen (ver despliegue/Dockerfile). Solo entra el codigo de la
+# aplicacion: ni secretos, ni pruebas, ni herramientas de desarrollo, ni caches.
+
+# Secretos y entorno
+.env
+.env.*
+**/.env
+**/.env.*
+
+# Despliegue (el Dockerfile se lee desde el contexto, pero no viaja dentro de la imagen)
+despliegue/
+
+# Pruebas y calidad: no corren en produccion
+**/pruebas/
+conftest.py
+requirements-dev.txt
+.importlinter
+.import_linter_cache/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Python
+**/__pycache__/
+**/*.py[cod]
+
+# Control de versiones y editores
+.git
+.gitignore
+.gitattributes
+.dockerignore
+**/*.md

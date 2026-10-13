@@ -1,0 +1,35 @@
+# Entorno (los secretos reales nunca se versionan; solo `.env.ejemplo`, con valores ficticios)
+.venv/
+.env
+.env.*
+!.env.ejemplo
+*.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# PostgreSQL embebido: datos de desarrollo (.pgdata) y de pruebas (.pgdata_pruebas)
+.pgdata/
+.pgdata_pruebas/
+
+# Office (archivos temporales de bloqueo)
+~$*
+
+# Datos de análisis con información del negocio (la línea base se mide con datos reales)
+documentacion/analisis/datos/
+
+# Generador de la presentación (Node): dependencias locales
+documentacion/presentacion/node_modules/
+documentacion/presentacion/package-lock.json
+node_modules/
+
+# Residuos de pruebas manuales con curl (pueden contener cookies de sesión)
+jar_*
+cookies*.txt
+cuerpo*.html

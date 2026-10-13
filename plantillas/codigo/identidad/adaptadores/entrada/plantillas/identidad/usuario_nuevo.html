@@ -1,0 +1,20 @@
+{% extends "identidad/admin_base.html" %}
+{% block titulo %}Nuevo usuario · {{ nombre_aplicacion }}{% endblock %}
+{% block cuerpo %}
+<h2>Nuevo usuario</h2>
+<p class="ayuda">El sistema genera una contraseña temporal y te la muestra una sola vez. El usuario tiene que
+cambiarla en su primer ingreso.</p>
+{% if errores %}
+<div class="aviso aviso-error" role="alert">
+  <ul>{% for error in errores %}<li>{{ error }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+<form method="post" action="{% url 'nuevo_usuario' %}" novalidate>
+  {% csrf_token %}
+  <label for="correo">Correo corporativo</label>
+  <input id="correo" name="correo" type="email" maxlength="254" required autocomplete="off"
+         value="{{ formulario.correo|default:'' }}">
+  {% include "identidad/_datos_usuario.html" with nombre=formulario.nombre marcados=formulario.roles %}
+  <button type="submit">Crear usuario</button>
+</form>
+{% endblock %}

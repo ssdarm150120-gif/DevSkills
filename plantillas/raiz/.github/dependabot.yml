@@ -1,0 +1,74 @@
+# Actualizaciones semanales de dependencias (decisión del Product Owner).
+# Cada PR pasa por todo el CI (calidad, seguridad, imagen y pruebas) antes de aceptarse.
+#
+# Lo que cubre Dependabot:
+#   - pip: requirements.txt y requirements-dev.txt, incluida la Public Suffix List
+#     (paquete `publicsuffixlist`). `versioning-strategy: increase` sube el límite inferior
+#     del rango en cada versión nueva; sin eso, con rangos como `>=1.0,<2`, casi no abriría PRs.
+#   - github-actions: las actions de los workflows, fijadas por SHA.
+#   - docker y docker-compose: la imagen base del Dockerfile y las imágenes del Compose,
+#     fijadas por digest.
+#
+# Lo que NO cubre (se actualiza a mano, revisándolo junto con el PR semanal de actions):
+#   - las imágenes de herramientas del CI que viven en variables `env:` (trivy, hadolint);
+#   - `semgrep==...` (pipx) y `GITLEAKS_VERSION` en ci.yml.
+#
+# Saltos que NUNCA se aceptan automáticamente (requieren un elemento del plan propio):
+#   - versión mayor de cualquier imagen: postgres 16 -> 17 no arranca con el volumen de la 16,
+#     redis 7 -> 8 cambia la licencia y el formato, etc. El CI no levanta el stack, así que un
+#     PR así pasaría en verde y rompería al desplegar;
+#   - versión menor de Python (3.12 -> 3.13): el SRS fija Python 3.12;
+#   - versión menor de nginx (1.28 -> 1.29): las impares son la rama de desarrollo.
+# Las versiones mayores de las actions llegan en un PR propio, fuera del grupo.
+
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /codigo
+    schedule:
+      interval: weekly
+      day: tuesday
+    versioning-strategy: increase
+    open-pull-requests-limit: 5
+    groups:
+      python-menores:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: tuesday
+    groups:
+      actions:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  - package-ecosystem: docker
+    directory: /codigo/despliegue
+    schedule:
+      interval: weekly
+      day: tuesday
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "python"
+        update-types: ["version-update:semver-minor"]
+    groups:
+      imagenes:
+        patterns: ["*"]
+
+  - package-ecosystem: docker-compose
+    directory: /codigo/despliegue
+    schedule:
+      interval: weekly
+      day: tuesday
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+      # nginx: las menores pares son estables y las impares de desarrollo (1.28 -> 1.29 no se acepta).
+      - dependency-name: "nginxinc/nginx-unprivileged"
+        update-types: ["version-update:semver-minor"]
+    groups:
+      compose:
+        patterns: ["*"]

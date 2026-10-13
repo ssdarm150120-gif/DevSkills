@@ -1,0 +1,17 @@
+{% extends "identidad/base.html" %}
+{% block titulo %}Iniciar sesión · {{ nombre_aplicacion }}{% endblock %}
+{% block contenido %}
+<h2>Iniciar sesión</h2>
+<form method="post" action="/ingresar" novalidate>
+  {% csrf_token %}
+  {% if error %}<p class="aviso aviso-error" role="alert">{{ error }}</p>{% endif %}
+  <label for="correo">Correo corporativo</label>
+  <input id="correo" name="correo" type="email" autocomplete="username" required autofocus
+         maxlength="254" value="{{ correo|default:'' }}">
+  <label for="contrasena">Contraseña</label>
+  <input id="contrasena" name="contrasena" type="password" autocomplete="current-password" required>
+  <button type="submit">Ingresar</button>
+</form>
+{# Sin autoservicio por correo: la recuperacion la hace el administrador. #}
+<p class="ayuda">Si olvidaste tu contraseña, solicítala al administrador.</p>
+{% endblock %}

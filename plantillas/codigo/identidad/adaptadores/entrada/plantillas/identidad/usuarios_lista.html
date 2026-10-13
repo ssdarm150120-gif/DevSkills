@@ -1,0 +1,35 @@
+{% extends "identidad/admin_base.html" %}
+{% block titulo %}Usuarios · {{ nombre_aplicacion }}{% endblock %}
+{% block cuerpo %}
+<div class="encabezado">
+  <h2>Usuarios</h2>
+  <a class="boton" href="{% url 'nuevo_usuario' %}">Nuevo usuario</a>
+</div>
+{% if solo_un_administrador %}
+<p class="aviso aviso-error" role="alert">Solo hay un administrador activo. Te recomendamos tener al menos
+dos: si ese usuario pierde su contraseña o su segundo factor, nadie podrá recuperar su cuenta.</p>
+{% endif %}
+<div class="tabla-contenedor">
+  <table class="tabla">
+    <caption class="solo-lectores">Usuarios del sistema</caption>
+    <thead>
+      <tr><th scope="col">Correo</th><th scope="col">Nombre</th><th scope="col">Roles</th><th scope="col">Estado</th></tr>
+    </thead>
+    <tbody>
+    {% for fila in filas %}
+      <tr>
+        <td><a href="{% url 'detalle_usuario' fila.cuenta.id %}">{{ fila.cuenta.correo }}</a></td>
+        <td>{{ fila.cuenta.nombre|default:"—" }}</td>
+        <td>{{ fila.roles|join:", " }}</td>
+        <td>
+          {% if not fila.cuenta.activo %}<span class="estado estado-apagado">Desactivado</span>
+          {% else %}<span class="estado estado-ok">Activo</span>{% endif %}
+          {% if fila.bloqueada %}<span class="estado estado-alerta">Bloqueada</span>{% endif %}
+          {% if fila.cuenta.debe_cambiar_contrasena %}<span class="estado estado-info">Contraseña temporal</span>{% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
