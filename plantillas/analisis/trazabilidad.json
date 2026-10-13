@@ -1,0 +1,6 @@
+{
+  "_instrucciones": "Lo lee trazabilidad.py para el Anexo C del SRS. 'fase2': RF que quedan fuera del MVP a propósito (además de los que tienen prioridad 'Fase 2' o 'Excluido' en el SRS). 'verificacion': la verificación técnica de cada RNF-nn (columna de C.3, parte de la Definición de Terminado). 'nota_cu_sin_hu': aclaración para los casos de uso sin historia (por ejemplo, 'fase 2'). Las claves que empiezan con '_' se ignoran.",
+  "fase2": [],
+  "verificacion": {},
+  "nota_cu_sin_hu": ""
+}

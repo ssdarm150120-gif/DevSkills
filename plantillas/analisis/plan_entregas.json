@@ -1,0 +1,23 @@
+{
+  "_instrucciones": "Datos del plan que lee plan_sprints.py. Lo llena el analista con la skill planear-entregas. 'inicio' es el primer día del sprint 1 (AAAA-MM-DD); 'velocidad' son los puntos por sprint (capacidad); 'dias_sprint' es la duración del sprint en días (14 = 2 semanas). 'habilitadores' define cada EN-nn con su título y la referencia al DISENO (los títulos de las HU salen del SRS). 'entregas' va en orden de prioridad; cada elemento es [ID, puntos] y respeta sus dependencias. Las claves que empiezan con '_' se ignoran. Nunca edites PLAN.md a mano: edita este archivo y ejecuta python documentacion/analisis/plan_sprints.py.",
+  "inicio": "{{FECHA}}",
+  "velocidad": 24,
+  "dias_sprint": 14,
+  "habilitadores": {
+    "_ejemplo EN-01": {"titulo": "Adaptar el esqueleto del monolito modular (módulos del proyecto, contratos de import-linter y CI)", "ref": "D.1.5, D.6.2"}
+  },
+  "entregas": [
+    {
+      "num": "0",
+      "nombre": "Cimientos",
+      "objetivo": "Que todo lo demás se pueda construir y desplegar con seguridad",
+      "items": []
+    }
+  ],
+  "_ejemplo_entrega": {
+    "num": "1",
+    "nombre": "<nombre de la entrega>",
+    "objetivo": "<objetivo medible ligado a las metas del SRS 1.1.1>",
+    "items": [["HU-01", 5], ["EN-02", 3]]
+  }
+}

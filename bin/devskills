@@ -1,0 +1,195 @@
+#!/usr/bin/env bash
+
+# ============================================================================
+# DevSkills - CLI
+# ============================================================================
+# Crea proyectos nuevos con la metodología y el stack fijo de DevSkills,
+# revisa los requisitos de la máquina y actualiza la instalación.
+# Funciona en macOS, Linux y Windows con Git Bash.
+# ============================================================================
+
+set -euo pipefail
+
+VERSION="${DEVSKILLS_VERSION:-1.0.0}"
+
+# Carpeta con la carga útil (plantillas, skills, scripts). En el repositorio es
+# la raíz del clon; el instalador reescribe esta línea con la carpeta instalada.
+DEVSKILLS_HOME="${DEVSKILLS_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+
+if [[ -t 1 ]]; then
+  ROJO='\033[0;31m'; VERDE='\033[0;32m'; AMARILLO='\033[1;33m'; CIAN='\033[0;36m'; NEGRITA='\033[1m'; NC='\033[0m'
+else
+  ROJO=''; VERDE=''; AMARILLO=''; CIAN=''; NEGRITA=''; NC=''
+fi
+
+ok()    { echo -e "${VERDE}✔${NC} $*"; }
+aviso() { echo -e "${AMARILLO}⚠${NC} $*"; }
+error() { echo -e "${ROJO}✘${NC} $*" >&2; }
+
+detectar_so() {
+  case "$(uname -s)" in
+    Darwin*) echo "macos" ;;
+    MINGW*|MSYS*|CYGWIN*) echo "windows" ;;
+    *) echo "linux" ;;
+  esac
+}
+
+# Devuelve el comando de un Python 3.12 o vacío si no hay.
+buscar_python() {
+  local candidato
+  for candidato in python3.12 python3 python "py -3.12"; do
+    # shellcheck disable=SC2086
+    if $candidato -c 'import sys; sys.exit(0 if sys.version_info[:2] == (3, 12) else 1)' >/dev/null 2>&1; then
+      echo "$candidato"
+      return 0
+    fi
+  done
+  return 1
+}
+
+mostrar_ayuda() {
+  cat <<EOF
+DevSkills ${VERSION} — metodología y stack fijo para sistemas nuevos
+
+Uso:
+  devskills init <ruta> [opciones]   Crea un proyecto nuevo con la estructura y el esqueleto
+      --nombre "<Nombre>"            Nombre legible del sistema (por defecto, el de la carpeta)
+      --slug <slug>                  Prefijo de Docker y project de engram (por defecto, derivado del nombre)
+      --puerto-base <N>              Inicio del rango de 50 puertos del host (por defecto 20000)
+      --puertos-reservados <lista>   Puertos del host que nunca se usan (por defecto 5432)
+      --autor "<Autor>"              Autor de los documentos (por defecto, git config user.name)
+      --sin-git                      No inicializa git ni hace el primer commit
+  devskills doctor                   Revisa los requisitos (git, Docker, Python 3.12, Node, mermaid-cli, engram, gitleaks)
+  devskills version                  Muestra la versión
+  devskills update                   Actualiza desde el clon de git de origen y reinstala
+  devskills help                     Muestra esta ayuda
+
+Dentro de Claude Code, el mismo arranque se hace con /devskills:nuevo-proyecto.
+EOF
+}
+
+slug_de() {
+  echo "$1" | tr '[:upper:]' '[:lower:]' | iconv -f utf-8 -t ascii//TRANSLIT 2>/dev/null \
+    | sed -e 's/[^a-z0-9]\+/-/g' -e 's/^-*//' -e 's/-*$//' -e 's/^[^a-z]*//' || true
+}
+
+cmd_init() {
+  local ruta="" nombre="" slug="" puerto_base="20000" reservados="5432" autor="" sin_git=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --nombre) nombre="${2:-}"; shift 2 ;;
+      --slug) slug="${2:-}"; shift 2 ;;
+      --puerto-base) puerto_base="${2:-}"; shift 2 ;;
+      --puertos-reservados) reservados="${2:-}"; shift 2 ;;
+      --autor) autor="${2:-}"; shift 2 ;;
+      --sin-git) sin_git="--sin-git"; shift ;;
+      -h|--help) mostrar_ayuda; return 0 ;;
+      -*) error "Opción desconocida: $1"; return 2 ;;
+      *) if [[ -z "$ruta" ]]; then ruta="$1"; shift; else error "Argumento de más: $1"; return 2; fi ;;
+    esac
+  done
+  if [[ -z "$ruta" ]]; then
+    error "Falta la ruta del proyecto. Uso: devskills init <ruta> [--nombre \"<Nombre>\"]"
+    return 2
+  fi
+  [[ -z "$nombre" ]] && nombre="$(basename "$ruta")"
+  [[ -z "$slug" ]] && slug="$(slug_de "$nombre")"
+  if [[ -z "$slug" ]]; then
+    error "No pude derivar un slug de \"$nombre\"; pásalo con --slug"
+    return 2
+  fi
+  [[ -z "$autor" ]] && autor="$(git config user.name 2>/dev/null || echo "Por definir")"
+
+  local python
+  if ! python="$(buscar_python)"; then
+    error "Hace falta Python 3.12. Corre 'devskills doctor' para ver cómo instalarlo."
+    return 1
+  fi
+  local script="$DEVSKILLS_HOME/skills/iniciar-proyecto/scripts/crear_proyecto.py"
+  if [[ ! -f "$script" ]]; then
+    error "No encuentro $script; reinstala DevSkills."
+    return 1
+  fi
+  local args=(--destino "$ruta" --nombre "$nombre" --slug "$slug" --puerto-base "$puerto_base"
+              --puertos-reservados "$reservados" --autor "$autor")
+  [[ -n "$sin_git" ]] && args+=("$sin_git")
+  # shellcheck disable=SC2086
+  $python "$script" "${args[@]}"
+  echo ""
+  echo -e "${NEGRITA}Siguientes pasos:${NC}"
+  echo "  1. cd \"$ruta\" y abre Claude Code con el plugin DevSkills instalado."
+  echo "  2. Pide el descubrimiento: el analista-arquitecto llena documentacion/CONTEXTO.md y el SRS 0.1."
+  echo "  3. SRS → DISEÑO → PLAN → Entrega 0 de cimientos → /devskills:ciclo <ID> por historia."
+}
+
+revisar() {
+  # revisar <etiqueta> <comando de prueba> <cómo instalar>
+  local etiqueta="$1" prueba="$2" como="$3"
+  if eval "$prueba" >/dev/null 2>&1; then
+    ok "$etiqueta"
+    return 0
+  fi
+  aviso "$etiqueta — falta. $como"
+  return 1
+}
+
+cmd_doctor() {
+  local so faltan=0
+  so="$(detectar_so)"
+  echo -e "${CIAN}${NEGRITA}DevSkills doctor${NC} (${so})"
+  revisar "git" "git --version" "Instálalo: https://git-scm.com/downloads" || faltan=$((faltan + 1))
+  revisar "Docker (cliente)" "docker --version" "Instala Docker Desktop (Windows/macOS) o Docker Engine (Linux)." || faltan=$((faltan + 1))
+  revisar "Docker (servicio en marcha)" "docker info" "Arranca Docker Desktop o el servicio de Docker." || faltan=$((faltan + 1))
+  if python="$(buscar_python)"; then
+    ok "Python 3.12 ($python)"
+  else
+    aviso "Python 3.12 — falta. Windows: 'winget install Python.Python.3.12'; macOS: 'brew install python@3.12'; Linux: el paquete python3.12 de tu distribución."
+    faltan=$((faltan + 1))
+  fi
+  revisar "Node.js (presentación y mermaid-cli)" "node --version" "Instala Node LTS: https://nodejs.org (o 'winget install OpenJS.NodeJS.LTS')." || faltan=$((faltan + 1))
+  revisar "mermaid-cli (diagramas de los Word)" "command -v mmdc || test -x \"\${DEVSKILLS_MMDC:-}\"" \
+    "Instálalo en una carpeta local: 'npm install --prefix ~/.devskills-tools @mermaid-js/mermaid-cli' y exporta DEVSKILLS_MMDC=~/.devskills-tools/node_modules/.bin/mmdc (ver README)." || faltan=$((faltan + 1))
+  revisar "gitleaks por Docker" "docker image inspect zricethezav/gitleaks:v8.21.2" "Descárgalo: 'docker pull zricethezav/gitleaks:v8.21.2'." || faltan=$((faltan + 1))
+  revisar "Claude Code" "claude --version" "Instálalo: https://code.claude.com" || faltan=$((faltan + 1))
+  revisar "Plugin engram (memoria persistente)" "claude plugin list 2>/dev/null | grep -qi engram || command -v engram" \
+    "Instálalo como plugin de Claude Code (ver README, sección Requisitos)." || faltan=$((faltan + 1))
+  echo ""
+  if [[ $faltan -eq 0 ]]; then
+    ok "Todo listo."
+  else
+    aviso "Faltan $faltan requisito(s)."
+  fi
+  return 0
+}
+
+cmd_update() {
+  local origen_archivo="$DEVSKILLS_HOME/.origen"
+  if [[ ! -f "$origen_archivo" ]]; then
+    error "No sé de qué clon se instaló DevSkills ($origen_archivo no existe). Actualiza a mano: git pull && bash install.sh"
+    return 1
+  fi
+  local origen
+  origen="$(cat "$origen_archivo")"
+  if [[ ! -d "$origen/.git" ]]; then
+    error "El origen $origen no es un clon de git. Actualiza a mano."
+    return 1
+  fi
+  echo "Actualizando desde $origen..."
+  git -C "$origen" pull --ff-only
+  bash "$origen/install.sh" --si
+}
+
+main() {
+  local comando="${1:-help}"
+  [[ $# -gt 0 ]] && shift
+  case "$comando" in
+    init) cmd_init "$@" ;;
+    doctor) cmd_doctor "$@" ;;
+    version|--version|-v) echo "devskills $VERSION" ;;
+    update) cmd_update "$@" ;;
+    help|--help|-h) mostrar_ayuda ;;
+    *) error "Comando desconocido: $comando"; mostrar_ayuda; return 2 ;;
+  esac
+}
+
+main "$@"
