@@ -181,9 +181,9 @@ def test_la_marca_admite_ids_de_bigint(crear_usuario: Callable[..., Usuario]) ->
 
 def test_la_zona_sale_de_la_configuracion(settings: Any) -> None:
     settings.APP_ZONA_HORARIA = "America/Bogota"
-    assert ZonaHorariaDeConfiguracion().zona().key == "America/Bogota"
+    assert ZonaHorariaDeConfiguracion().zona().key == "America/Bogota"  # gitleaks:allow
     settings.APP_ZONA_HORARIA = "UTC"
-    assert ZonaHorariaDeConfiguracion().zona().key == "UTC"
+    assert ZonaHorariaDeConfiguracion().zona().key == "UTC"  # gitleaks:allow
 
 
 # --- La pantalla de inicio ---------------------------------------------------------------------
@@ -471,7 +471,7 @@ def test_el_caso_de_uso_compuesto_usa_al_actor_y_la_zona_configurada(
     with transaction.atomic():
         aviso = composicion.avisos_pendientes()(Actor.de(str(usuario.id), ["usuario"]))
     assert aviso is not None
-    assert aviso.zona.key == "America/Mexico_City"
+    assert aviso.zona.key == "America/Mexico_City"  # gitleaks:allow
 
 
 # --- El aviso no cambia el ingreso (sin oraculo de tiempo ni de mensajes) ------------
