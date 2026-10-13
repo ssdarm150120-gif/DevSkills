@@ -105,7 +105,7 @@ fi
 # Archivos que ya son nuestros (instalación anterior). Sin arreglos asociativos:
 # el bash 3.2 de macOS no los tiene.
 es_propio() {
-  [[ -f "$MANIFIESTO" ]] && grep -Fxq -- "$1" "$MANIFIESTO"
+  [[ -f "$MANIFIESTO" ]] && grep -Fxq -- "$(ruta_portable "$1")" "$MANIFIESTO"
 }
 
 # Lista de (origen|destino|tipo) a instalar.
@@ -198,7 +198,7 @@ for entrada in "${PLAN[@]}"; do
       chmod +x "$destino"
       ;;
   esac
-  echo "$destino" >>"$MANIFIESTO.nuevo"
+  ruta_portable "$destino" >>"$MANIFIESTO.nuevo"
 done
 
 # Quita lo que la instalación anterior puso y esta ya no trae.

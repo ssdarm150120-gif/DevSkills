@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 320" width="1024" height="320" role="img" aria-labelledby="t d">
+  <title id="t">DevSkills</title>
+  <desc id="d">DevSkills: del descubrimiento al Listo, con un equipo de agentes y cero deuda.</desc>
+  <defs>
+    <linearGradient id="fondo" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f172a"/>
+      <stop offset="1" stop-color="#1e293b"/>
+    </linearGradient>
+    <linearGradient id="acento" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#38bdf8"/>
+      <stop offset="1" stop-color="#34d399"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="320" rx="24" fill="url(#fondo)"/>
+  <rect x="1.5" y="1.5" width="1021" height="317" rx="22.5" fill="none" stroke="#475569" stroke-width="3"/>
+  <g fill="none" stroke="url(#acento)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M96 118 L64 160 L96 202"/>
+    <path d="M176 118 L208 160 L176 202"/>
+    <path d="M150 104 L122 216"/>
+  </g>
+  <text x="256" y="168" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="92" font-weight="700" fill="#f8fafc">DevSkills</text>
+  <rect x="258" y="190" width="420" height="6" rx="3" fill="url(#acento)"/>
+  <text x="258" y="238" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="27" fill="#cbd5e1">Del descubrimiento al Listo, con un equipo de agentes y cero deuda.</text>
+  <text x="258" y="278" font-family="Consolas, Menlo, monospace" font-size="20" fill="#94a3b8">SRS · DISEÑO · PLAN · Dev · QA · Angel Fixer · Listo</text>
+</svg>

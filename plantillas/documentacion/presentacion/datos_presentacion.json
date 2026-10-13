@@ -1,0 +1,133 @@
+{
+  "_instrucciones": "Contenido de la presentación. Lo llena el analista con la skill devskills:generar-presentacion a partir del SRS (1.1.1 problema, metas y línea base; 2.2 funciones; 2.5 restricciones) y del PLAN (entregas, equipo, costos, riesgos). Cada diapositiva tiene 'tipo', 'titulo', 'seccion' y 'notas' (lo que dice quien presenta). Tipos: portada, tarjetas, cifras, flujo, pilares, grafica, recorrido, beneficios, modulos, bloques, reglas, demo, metas, bases, plan, metodo, necesitamos, cierre. Los íconos son nombres de react-icons/fi (FiCalendar, FiUsers, FiDatabase...). Quita las diapositivas que no apliquen; todos los textos entre <> son marcadores por llenar. Nunca pongas datos personales ni cifras sin fuente.",
+  "proyecto": "{{NOMBRE_PROYECTO}}",
+  "version": 1,
+  "autor": "{{AUTOR}}",
+  "pie": "Propuesta del proyecto",
+  "diapositivas": [
+    {
+      "tipo": "portada", "seccion": "Portada",
+      "etiqueta": "PROPUESTA DE PROYECTO · <MES AÑO>",
+      "titulo": "{{NOMBRE_PROYECTO}}",
+      "subtitulo": "<La promesa del proyecto en una frase>",
+      "icono": "FiTarget",
+      "linea": "<Qué es y sobre qué se apoya>",
+      "firma": "{{AUTOR}} · Producto",
+      "notas": "<Presentación del proyecto en tres frases.>"
+    },
+    {
+      "tipo": "tarjetas", "seccion": "El problema", "titulo": "<El problema en una frase>",
+      "tarjetas": [
+        ["FiCalendar", "<Momento 1>", "<Qué pasa hoy>"],
+        ["FiTruck", "<Momento 2>", "<Qué pasa hoy>"],
+        ["FiAlertTriangle", "<Momento crítico>", "<Dónde duele>"]
+      ],
+      "resaltar": 2,
+      "notas": "<Cómo se vive el problema hoy (SRS 1.1.1).>"
+    },
+    {
+      "tipo": "cifras", "seccion": "El problema", "titulo": "Lo que dicen los datos",
+      "cifras": [
+        ["<n %>", "<indicador de la línea base medida>"],
+        ["<n %>", "<indicador>"],
+        ["<n %>", "<indicador>"],
+        ["<n %>", "<indicador>"]
+      ],
+      "resaltar": 2,
+      "fuente": "Fuente: <sistema y periodo de la línea base (SRS 1.1.1)>. Consultas de solo lectura.",
+      "notas": "<No es una opinión: está medido.>"
+    },
+    {
+      "tipo": "flujo", "seccion": "El problema", "titulo": "La causa: <causa raíz>",
+      "pasos": [
+        ["FiUser", "<Actor 1>", "<Qué hace>"],
+        ["FiMessageCircle", "<Actor 2>", "<Qué hace>"],
+        ["FiFileText", "<Actor 3>", "<Qué hace>"],
+        ["FiDatabase", "<Sistema>", "<Qué registra>"]
+      ],
+      "conclusion": "<La conclusión que explica el problema.>",
+      "notas": "<Por qué pasa.>"
+    },
+    {
+      "tipo": "pilares", "seccion": "La solución", "titulo": "<La solución en una frase>",
+      "pilares": [
+        ["FiBell", "<Verbo 1>", "<Qué hace el sistema>"],
+        ["FiCheckCircle", "<Verbo 2>", "<Qué hace el sistema>"],
+        ["FiCompass", "<Verbo 3>", "<Qué hace el sistema>"]
+      ],
+      "notas": "<La solución en tres verbos.>"
+    },
+    {
+      "tipo": "recorrido", "seccion": "La solución", "titulo": "<Un caso de punta a punta>",
+      "pasos": [
+        ["<Paso 1>", "<Qué pasa>"], ["<Paso 2>", "<Qué pasa>"], ["<Paso 3>", "<Qué pasa>"],
+        ["<Paso 4>", "<Qué pasa>"], ["<Paso 5>", "<Qué pasa>"]
+      ],
+      "pie_texto": "Cada paso queda registrado con fecha, hora y responsable.",
+      "notas": "<El recorrido completo.>"
+    },
+    {
+      "tipo": "modulos", "seccion": "La solución", "titulo": "Qué incluye el sistema",
+      "modulos": [
+        ["FiUsers", "<Módulo 1>", "<Para qué>"],
+        ["FiShield", "<Módulo 2>", "<Para qué>"]
+      ],
+      "notas": "<Los módulos del SRS, sección 2.2.>"
+    },
+    {
+      "tipo": "reglas", "seccion": "La solución", "titulo": "Reglas que el sistema hace cumplir",
+      "reglas": [
+        ["FiClock", "<Regla 1>", "<Explicación>"],
+        ["FiLock", "<Regla 2>", "<Explicación>"],
+        ["FiKey", "<Regla 3>", "<Explicación>"],
+        ["FiPackage", "<Regla 4>", "<Explicación>"]
+      ],
+      "notas": "<Las reglas de negocio que no se negocian.>"
+    },
+    {
+      "tipo": "demo", "seccion": "Demo y metas", "titulo": "Demo: la maqueta navegable",
+      "guion": ["<Paso 1 del recorrido de demo>", "<Paso 2>", "<Paso 3>"],
+      "enlace": "[Enlace a la maqueta de Figma]",
+      "panel": ["Todas las pantallas navegables", "Modo claro y modo oscuro", "Datos ficticios"],
+      "notas": "<Es una maqueta: datos ficticios, sin backend.>"
+    },
+    {
+      "tipo": "metas", "seccion": "Demo y metas", "titulo": "Cómo vamos a medir el éxito",
+      "metas": [
+        ["<Indicador del SRS 1.1.1>", "<valor de hoy>", "<meta>"]
+      ],
+      "aclaracion": "Los valores de \"Hoy\" están medidos. Las metas son compromisos del proyecto, no resultados.",
+      "notas": "<Así sabremos si funcionó.>"
+    },
+    {
+      "tipo": "plan", "seccion": "Ejecución", "titulo": "Plan: <valor desde la entrega 1>",
+      "pie_texto": "Fechas estimadas: se recalibran tras el sprint 3.",
+      "notas": "<Las entregas en orden y por qué (PLAN P.2.1). Las fechas salen de PLAN.md.>"
+    },
+    {
+      "tipo": "metodo", "seccion": "Ejecución", "titulo": "Cómo vamos a trabajar",
+      "metodo": [
+        ["2 semanas", "por sprint, con Scrum"],
+        ["<n + n>", "<composición del equipo>"],
+        ["Cada sprint", "demo con usuarios reales"],
+        ["<Piloto>", "<con quién sale primero cada entrega>"]
+      ],
+      "nota": "Las fechas se confirman con la velocidad real del equipo después del sprint 3. Hasta entonces, son una estimación, no un compromiso.",
+      "notas": "<Scrum, demos y piloto.>"
+    },
+    {
+      "tipo": "necesitamos", "seccion": "Decisión", "titulo": "Qué necesitamos para arrancar",
+      "lista": ["<Decisión o acceso 1 (SRS 2.6, S-nn)>", "<Decisión o acceso 2>"],
+      "costos": [["<Concepto (PLAN P.5)>", "<monto>"], ["Total operativo", "<monto>"]],
+      "aclaracion": "Estimación a confirmar con cotización. No incluye el equipo de desarrollo.",
+      "notas": "<Lo que pedimos hoy.>"
+    },
+    {
+      "tipo": "cierre", "seccion": "Decisión",
+      "titulo": "<La promesa del proyecto>",
+      "subtitulo": "Propuesta: <qué se pide aprobar>.",
+      "firma": "{{AUTOR}} · Producto · {{NOMBRE_PROYECTO}}",
+      "notas": "<Cierre con la petición.>"
+    }
+  ]
+}

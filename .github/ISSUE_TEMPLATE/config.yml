@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Preguntas y discusiones
+    url: https://github.com/ssdarm150120-gif/DevSkills/discussions
+    about: Usa las discusiones para preguntas, no los issues

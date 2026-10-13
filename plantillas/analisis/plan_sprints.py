@@ -20,6 +20,7 @@ import json
 import pathlib
 import re
 import sys
+import unicodedata
 
 DOC = pathlib.Path(__file__).resolve().parent.parent  # carpeta documentacion/
 ANALISIS = DOC / "analisis"
@@ -38,6 +39,7 @@ for requerido in (DOC / "SRS.md", PLAN, DATOS):
         salir(f"no existe {requerido.relative_to(DOC.parent)}")
 
 srs = (DOC / "SRS.md").read_text(encoding="utf-8")
+srs = re.sub(r"<!--.*?-->", "", srs, flags=re.S)  # las instrucciones y ejemplos de la plantilla no cuentan
 titulos = {m.group(1): m.group(2).replace("⭐", "").strip()
            for m in re.finditer(r"^#### (HU-\d+) (.+)$", srs, re.M)
            if "retirada en" not in m.group(2).lower()}
@@ -170,7 +172,8 @@ tablero = {
     "items": [{"id": i, "titulo": titulo(i), "puntos": p, "sprint": s, "entrega": e, "prioridad": prioridad[i], "estado": avance.get(i, {}).get("estado", "Pendiente")}
               for s, e, i, p in filas_sprint],
 }
-slug = re.sub(r"[^a-z0-9]+", "_", PROYECTO.lower()).strip("_") or "proyecto"
+sin_acentos = unicodedata.normalize("NFKD", PROYECTO).encode("ascii", "ignore").decode()
+slug = re.sub(r"[^a-z0-9]+", "_", sin_acentos.lower()).strip("_") or "proyecto"
 plantilla = (ANALISIS / "plan_sprints_plantilla.html").read_text(encoding="utf-8")
 # Los datos van dentro de <script>: se escapa "</" para que un título no pueda cerrar la etiqueta.
 html = (plantilla.replace("__DATA__", json.dumps(tablero, ensure_ascii=False).replace("</", "<\\/"))

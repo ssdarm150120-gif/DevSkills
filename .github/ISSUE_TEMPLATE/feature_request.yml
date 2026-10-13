@@ -1,0 +1,45 @@
+name: Propuesta de mejora
+description: Propón una mejora del método, de un agente, de una skill, del CLI o de las plantillas
+labels: ["enhancement", "status:needs-review"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Antes de proponer
+
+        Lee [CONTRIBUTING.md](https://github.com/ssdarm150120-gif/DevSkills/blob/main/CONTRIBUTING.md). DevSkills no inventa reglas: cada regla del método nace de un incidente o de una decisión real. Cuéntanos de dónde nace la tuya.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Revisión previa
+      options:
+        - label: Busqué en los issues existentes y no está duplicado
+          required: true
+
+  - type: textarea
+    id: problema
+    attributes:
+      label: Problema
+      description: Qué pasó o qué falta, y a quién le afecta
+    validations:
+      required: true
+
+  - type: textarea
+    id: propuesta
+    attributes:
+      label: Propuesta
+      description: Qué cambiarías (agente, skill, plantilla, CLI) y cómo se usaría
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternativas
+    attributes:
+      label: Alternativas consideradas
+
+  - type: textarea
+    id: contexto
+    attributes:
+      label: Contexto adicional

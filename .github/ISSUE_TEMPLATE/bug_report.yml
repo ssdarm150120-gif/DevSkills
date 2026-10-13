@@ -1,0 +1,74 @@
+name: Reporte de error
+description: Reporta un error de DevSkills (plugin, CLI, instalador, plantillas o generadores)
+labels: ["bug", "status:needs-review"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Antes de abrir un reporte
+
+        Lee [CONTRIBUTING.md](https://github.com/ssdarm150120-gif/DevSkills/blob/main/CONTRIBUTING.md). **No pegues secretos, correos, IP ni datos de tu empresa.**
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Revisión previa
+      options:
+        - label: Busqué en los issues existentes y no está duplicado
+          required: true
+        - label: Corrí `devskills doctor` y revisé los requisitos
+          required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Área
+      options:
+        - Plugin (agentes o skills)
+        - CLI devskills
+        - Instalador (install.sh / install.ps1)
+        - Esqueleto de código (plantillas/codigo)
+        - Plantillas de documentación
+        - Generadores (plan y tablero, Anexo C, Word, presentación, sesión)
+    validations:
+      required: true
+
+  - type: textarea
+    id: descripcion
+    attributes:
+      label: Descripción del error
+      placeholder: "Al correr `devskills init`…"
+    validations:
+      required: true
+
+  - type: textarea
+    id: pasos
+    attributes:
+      label: Pasos para reproducirlo
+      placeholder: |
+        1. Corrí `devskills init …`
+        2. …
+    validations:
+      required: true
+
+  - type: textarea
+    id: esperado
+    attributes:
+      label: Comportamiento esperado
+    validations:
+      required: true
+
+  - type: textarea
+    id: entorno
+    attributes:
+      label: Entorno
+      description: Sistema operativo, shell (Git Bash, PowerShell, zsh…), versión de DevSkills (`devskills version`), de Claude Code, de Python y de Docker
+    validations:
+      required: true
+
+  - type: textarea
+    id: salida
+    attributes:
+      label: Salida o registros
+      render: shell
