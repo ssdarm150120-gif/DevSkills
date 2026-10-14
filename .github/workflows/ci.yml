@@ -62,7 +62,7 @@ jobs:
           git config --global user.name "Pruebas"
           git config --global user.email "pruebas@example.invalid"
       - name: Correr las pruebas
-        # En Windows, RUNNER_TEMP llega como D:\_temp y ShellSpec necesita una ruta de Unix.
+        # En Windows, RUNNER_TEMP llega con formato de Windows (unidad y barras invertidas) y ShellSpec necesita una ruta de Unix.
         run: |
           temporal="${RUNNER_TEMP:-/tmp}"
           if command -v cygpath >/dev/null 2>&1; then temporal="$(cygpath -u "$temporal")"; fi
