@@ -106,6 +106,77 @@ Quita exactamente lo que está en el manifiesto y la carpeta de la carga útil. 
 
 Como plugin: `/plugin uninstall devskills@devskills-local`.
 
+## Uso no interactivo
+
+Sirve para correr un ciclo sin una persona frente a la terminal (un servidor, una prueba, un trabajo programado). Lo que sigue es lo que se comprobó en una prueba real con una historia pequeña.
+
+```bash
+claude -p "<prompt con el ID y las respuestas del Product Owner>" \
+  --plugin-dir /ruta/a/DevSkills \
+  --output-format stream-json --verbose \
+  --permission-mode acceptEdits \
+  --allowedTools "Read,Edit,Write,Glob,Grep,Agent,Skill,Bash(git *),Bash(python *),Bash(docker *)" \
+  --max-turns 200 --max-budget-usd 25
+```
+
+| Qué | Para qué |
+|-----|----------|
+| `--plugin-dir <ruta a DevSkills>` | Carga el plugin desde el clon sin instalarlo. Si ya está instalado como plugin, no hace falta |
+| `--output-format stream-json --verbose` | Emite un evento JSON por línea: ves qué agentes (`devskills:dev-a`, `devskills:qa`…) y qué skills se invocan, y de ahí sacas el `session_id` |
+| `--permission-mode acceptEdits` | Acepta las ediciones de archivos; el resto de herramientas solo corre si está permitida |
+| `--allowedTools` | Lista **acotada**: solo lo que el ciclo necesita. Sin humano, una herramienta no permitida se rechaza y el agente se detiene; amplía la lista solo con lo que veas rechazado |
+| `--max-turns` y `--max-budget-usd` | Tope de turnos y de gasto: sin ellos un ciclo que se atora gasta sin límite. Ajusta los números al tamaño del elemento |
+
+### Las respuestas del Product Owner van en el prompt
+
+Sin humano, `AskUserQuestion` y `devskills:preguntar-al-po` no tienen quién conteste. Incluye en el prompt las decisiones que normalmente darías en vivo y el default para lo que no esté previsto:
+
+```text
+Ejecuta /devskills:ciclo-historia HU-01.
+Respuestas del Product Owner: (1) el límite de intentos es 5; (2) el aviso va por correo, no por SMS;
+(3) si tras 3 rondas quedan pendientes, marca Bloqueado y registra el motivo; no pidas más rondas.
+Si algo no está cubierto aquí, no inventes: deja la pregunta registrada en el reporte y detente.
+```
+
+### Retomar tras un corte por límite de uso
+
+Si la corrida se corta (límite de uso o de presupuesto), el punto de control `wip` protege lo hecho: lo que alcanzó a commitearse sigue en la rama del elemento. Retoma la **misma sesión**, con su contexto:
+
+```bash
+claude -p "Continúa exactamente donde te quedaste; no rehagas lo que ya está en el commit wip." \
+  --resume <id de sesión> --plugin-dir /ruta/a/DevSkills --permission-mode acceptEdits
+```
+
+El `<id de sesión>` sale del campo `session_id` de los eventos del `stream-json`. Antes de reanudar sigue el diagnóstico de la skill [`recuperar-corte`](../skills/recuperar-corte/SKILL.md): `git status`, contenedores huérfanos con tu prefijo y commit de respaldo.
+
+### Costo observado y cómo abaratarlo
+
+En la prueba real, una historia **pequeña** costó **unos 17 USD** con el modelo más potente en los subagentes (el ciclo lanza desarrollador, QA, Angel Fixer y verificador, cada uno con su propio contexto). Para abaratarlo:
+
+- Pon un modelo más ligero en los subagentes: `export CLAUDE_CODE_SUBAGENT_MODEL=sonnet` (o el modelo que prefieras) antes de lanzar, o cambia `model:` en el encabezado de los agentes. Deja el modelo potente solo para el hilo del orquestador y el analista-arquitecto.
+- Fija siempre `--max-budget-usd` y `--max-turns`.
+- Parte los elementos grandes (más de 13 puntos) antes de correrlos.
+
+### Plugin engram en sesiones anidadas
+
+El plugin engram puede fallar en las sesiones anidadas (la de `claude -p` lanzada desde otra sesión) si falta `jq`: sus hooks lo usan para leer el evento. Instálalo (`winget install jqlang.jq`, `brew install jq`, `apt install jq`) o deshabilita engram en esa corrida; el ciclo sigue funcionando sin memoria, pero no se guardará el avance en engram.
+
+## GitHub CLI (`gh`) y el CI
+
+Un proyecto creado con DevSkills trae su CI en `.github/workflows/`, pero **solo corre cuando el repositorio tiene remoto** en GitHub. Crea el remoto privado desde el inicio y revisa el CI después de cada push, con `gh`:
+
+```bash
+winget install GitHub.cli        # Windows · macOS: brew install gh · Linux: https://github.com/cli/cli#installation
+gh auth login                    # GitHub.com → HTTPS → navegador (o con un token)
+gh auth status                   # comprueba la sesión
+
+gh repo create <organizacion>/<slug> --private --source . --remote origin --push
+gh run list --limit 3            # estado de las últimas corridas del CI
+gh run view <id> --log-failed    # solo el registro de lo que falló
+```
+
+Un CI en rojo es deuda: se corrige antes de seguir. Los PR de Dependabot fallarán mientras el CI de `main` esté en rojo: primero `main` en verde, luego `@dependabot rebase`, integra las menores y revisa aparte las versiones mayores. Los flujos usan `ubuntu-24.04` (no `ubuntu-latest`): subir esa imagen es un cambio a mano.
+
 ## Requisitos
 
 Corre `devskills doctor` para revisarlos todos.
@@ -119,6 +190,10 @@ Corre `devskills doctor` para revisarlos todos.
 | Node.js LTS | Presentación y mermaid-cli | <https://nodejs.org> |
 | mermaid-cli | Diagramas en los Word | En una carpeta local, ver [generadores](generadores.md) |
 | gitleaks | Búsqueda de secretos | `docker pull zricethezav/gitleaks:v8.21.2` |
+| semgrep (imagen) | Análisis estático igual que el CI | `docker pull semgrep/semgrep:1.178.0` (la versión de `semgrep==` en el `ci.yml` del proyecto) |
+| GitHub CLI (`gh`) | Remoto privado y revisión del CI | Ver "GitHub CLI (`gh`) y el CI" |
 | Plugin engram | Memoria entre sesiones | Como plugin de Claude Code |
+
+Para correr sin humano, ver "Uso no interactivo".
 
 Opcional: el plugin de Telegram, para trabajar desde el celular ([telegram](telegram.md)).

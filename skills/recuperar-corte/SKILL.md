@@ -34,6 +34,9 @@ metadata:
 - Si no se puede reanudar (contexto perdido), lanza un agente nuevo del mismo tipo con: el ID, la rama, el commit de respaldo, el `git diff` del trabajo previo, la lista exacta de lo que falta y la instrucción de **no rehacer** lo que ya existe.
 - Si el corte fue por límite de uso, espera a que se restablezca (o avisa al usuario por Telegram si el canal está activo con la hora estimada) antes de reanudar; no lances agentes en bucle.
 
+### Si la corrida es no interactiva (`claude -p`)
+Retoma la misma sesión con `claude -p "<instrucción>" --resume <id de sesión>`; el punto de control `wip` protege lo ya hecho. Detalle (`stream-json`, permisos, presupuesto, costo) en [docs/instalacion.md, sección "Uso no interactivo"](../../docs/instalacion.md#uso-no-interactivo).
+
 ### 4. Limpieza
 - Quita los contenedores, redes y volúmenes huérfanos **del prefijo del agente** y los procesos huérfanos que identificaste.
 - Si el `stash` era del agente y su contenido ya está respaldado en el commit, bórralo (`git stash drop`) y regístralo como incidente de proceso en el reporte.

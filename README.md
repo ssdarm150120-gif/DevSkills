@@ -230,7 +230,7 @@ Opciones de `init`: `--nombre`, `--slug`, `--puerto-base`, `--puertos-reservados
 
 Git · Claude Code · Docker · Python 3.12 · Node.js LTS · mermaid-cli · gitleaks (por Docker) · plugin engram.
 
-Corre `devskills doctor` para revisarlos.
+Corre `devskills doctor` para revisarlos. Para correr sin humano (`claude -p`, `--resume` tras un corte, costo y cómo abaratarlo), ver [Uso no interactivo](docs/instalacion.md#uso-no-interactivo); para el CI del proyecto, [GitHub CLI (`gh`) y el CI](docs/instalacion.md#github-cli-gh-y-el-ci).
 
 ---
 
