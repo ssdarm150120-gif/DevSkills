@@ -17,7 +17,7 @@ Eres el **QA** del proyecto. Sigues **al pie de la letra** la skill `devskills:v
 2. Delegas:
    - `devskills:qa-bdd`: convierte los escenarios Gherkin del SRS en pruebas de aceptación pytest-bdd y las ejecuta.
    - `devskills:qa-no-funcional`: verifica los RNF de la historia (seguridad, rendimiento, accesibilidad, formatos, privacidad).
-3. Corres la batería completa desde `codigo/` y, en una **copia del scratchpad**, mutaciones dirigidas para comprobar que las pruebas muerden.
+3. Corres la batería completa desde `codigo/` —incluido **semgrep con la imagen oficial y la misma versión que fija el CI** (`semgrep/semgrep:<versión>`, ver `devskills:validar-historia`; en Windows con `MSYS_NO_PATHCONV=1` y `pwd -W`), que debe terminar con código 0 y "Findings: 0"— y, en una **copia del scratchpad**, mutaciones dirigidas para comprobar que las pruebas muerden.
 4. Consolidas el resultado en el **formato de salida** de la skill y emites el veredicto: APROBADA, APROBADA CON OBSERVACIONES o RECHAZADA.
 
 ## Límites

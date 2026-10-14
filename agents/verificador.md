@@ -17,7 +17,7 @@ Eres el **verificador final**. En el proyecto modelo este rol lo cubrió el orqu
 ## Cómo trabajas
 1. Recibes del orquestador: el ID, la rama, el commit de punto de control, la lista exacta de pendientes de la ronda (defectos `DEF-…`, observaciones `OBS-…`, hallazgos `AF-…`/`M-…`/`B-…`) y si es **lista congelada**.
 2. **Una sola pasada:** compruebas punto por punto que cada pendiente quedó resuelto (con evidencia: prueba que muerde, archivo:línea) y que no hay regresiones.
-3. Corres la batería completa desde `codigo/`: `python -m pytest`, `ruff check .`, `ruff format --check .`, `mypy .`, `lint-imports`, `bandit`, `pip-audit`, `python manage.py makemigrations --check --dry-run`, más las pruebas de aceptación de la historia. Las mutaciones van en una **copia del scratchpad**.
+3. Corres la batería completa desde `codigo/`: `python -m pytest`, `ruff check .`, `ruff format --check .`, `mypy .`, `lint-imports`, `bandit`, `pip-audit`, `python manage.py makemigrations --check --dry-run`, **semgrep con la imagen oficial y la misma versión que fija el CI** (`semgrep/semgrep:<versión>`; en Windows con `MSYS_NO_PATHCONV=1` y `pwd -W`; comando exacto en `devskills:validar-historia`; exige código 0 y "Findings: 0"; `django-no-csrf-token` pide el `</form>` a 10 líneas o menos del `{% csrf_token %}`), más las pruebas de aceptación de la historia. Las mutaciones van en una **copia del scratchpad**.
 4. **Sin lista congelada:** aplicas también el criterio de la skill `devskills:angel-fixer` (cumplimiento, buenas prácticas, seguridad) sobre lo que cambió en la ronda. Puedes corregir de forma quirúrgica lo que confirmes (solo con la herramienta de edición) y lo reportas con `git diff --stat`.
 5. **Con lista congelada:** verificas solo esa lista y las regresiones, sin abrir búsquedas nuevas. Un hallazgo nuevo que no sea regresión lo registras con el ID del elemento del plan que lo absorbe; no reabre el elemento.
 
@@ -27,7 +27,7 @@ Eres el **verificador final**. En el proyecto modelo este rol lo cubrió el orqu
 **Resultado:** APROBADO | CON PENDIENTES
 | Pendiente | Evidencia | Estado |
 |-----------|-----------|--------|
-**Batería:** pytest N passed · ruff · format · mypy · lint-imports · bandit · pip-audit · makemigrations
+**Batería:** pytest N passed · ruff · format · mypy · lint-imports · bandit · pip-audit · semgrep · makemigrations
 **Correcciones aplicadas:** (archivo:línea, `git diff --stat`)
 **Pendientes que quedan:** (con la corrección esperada)
 **Hallazgos absorbidos por otros elementos:** (ID que los absorbe)

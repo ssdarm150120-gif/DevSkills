@@ -31,7 +31,9 @@ QA **no corrige código de producción**. Escribe y mantiene las **pruebas de ac
 Revisar los RNF que cita la historia y su "verificación técnica" del Anexo C (subagente `devskills:qa-no-funcional`): seguridad (permisos por rol, tokens, firmas de webhooks, datos sensibles, sesiones), rendimiento (umbrales del SRS), accesibilidad y formatos.
 
 ### 4. Batería y mutaciones
-- Desde `codigo/`: `python -m pytest`, `ruff check .`, `ruff format --check .`, `mypy .`, `lint-imports`, `bandit`, `pip-audit`, `python manage.py makemigrations --check --dry-run`.
+- Desde `codigo/`: `python -m pytest`, `ruff check .`, `ruff format --check .`, `mypy .`, `lint-imports`, `bandit`, `pip-audit`, `python manage.py makemigrations --check --dry-run` y semgrep (siguiente punto).
+- **semgrep igual que el CI:** con la imagen oficial y la **misma versión** que fija `.github/workflows/ci.yml` del proyecto (`semgrep==<versión>` en el CI = `semgrep/semgrep:<versión>`; hoy `1.178.0`). Desde `codigo/`, en Windows (Git Bash) con `MSYS_NO_PATHCONV=1` y `pwd -W`: `MSYS_NO_PATHCONV=1 docker run --rm -v "$(pwd -W):/src" -w /src semgrep/semgrep:1.178.0   semgrep scan --config p/python --config p/django --error --metrics=off --exclude pruebas --exclude conftest.py .`. En Linux o macOS usa `-v "$PWD:/src"` y sin `MSYS_NO_PATHCONV`. Se exige **código de salida 0 y "Findings: 0"**; un hallazgo es un defecto aunque el código local pase. Un semgrep instalado con otra versión no vale: sus reglas cambian.
+- **Lección de `django-no-csrf-token`:** la regla es genérica y solo reconoce `{% csrf_token %}` si el `</form>` está a **10 líneas o menos**. Un formulario largo con el token lejos del cierre da un falso positivo que pone el CI en rojo: se parte el formulario en parciales (`{% include %}`) para que el token quede junto a su `</form>`; no se silencia la regla.
 - Mutaciones dirigidas **en una copia del scratchpad**: cada regla importante de la historia debe tener una prueba que falle si se rompe. Una mutación que sobrevive es una observación.
 
 ### 5. Criterio de veredicto
