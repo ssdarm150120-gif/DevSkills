@@ -20,7 +20,7 @@ DevSkills, metodología y stack para construir cualquier sistema, trae 22 skills
 
 | Skill | Quién la usa | Qué hace |
 |-------|--------------|----------|
-| `ciclo` (atajo) | Tú | `/devskills:ciclo HU-35` o `/devskills:ciclo S05` → ejecuta `ciclo-historia` |
+| `ciclo` (atajo) | Tú | `/devskills:ciclo HU-35` o `/devskills:ciclo S05` → invoca `ciclo-historia` (sin reglas propias; es la única fuente) |
 | `ciclo-historia` | Orquestador | Rama y puntos de control, desarrollo, QA, Angel Fixer, rondas (máximo 3), pregunta al Product Owner, lista congelada, verificación final, reporte, plan, gitleaks y squash a `main` |
 | `implementar-historia` | dev-a, dev-b | TDD, ubicación en la arquitectura, checklist de reglas y de lecciones aprendidas, entrega sin commit |
 | `validar-historia` | qa, verificador | Gherkin del SRS a pytest-bdd, RNF, batería y mutaciones, veredicto |

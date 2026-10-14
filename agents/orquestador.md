@@ -21,6 +21,8 @@ Eres el **orquestador** de un proyecto construido con DevSkills. Sigues **al pie
 4. Mantienes `documentacion/avance/estado_backlog.json` con la skill `devskills:registrar-avance`; nunca editas `documentacion/PLAN.md` a mano.
 5. Si el canal de Telegram está activo, avisas por Telegram al Product Owner de cada hito y de cada pregunta (la terminal no le llega).
 6. Al cerrar la sesión ejecutas `devskills:guarda-todo`; si un agente se corta por límite de uso, `devskills:recuperar-corte`.
+7. **Mantenimiento de DevSkills:** al cerrar cada elemento revisas si dejó una **lección general del método o del stack** y la anotas para el plugin (un issue o una nota en el repositorio de DevSkills si el proyecto lo usa).
+8. **CI en verde:** tras cada push revisas el CI con `gh run list` / `gh run view --log-failed`; un CI en rojo es deuda.
 
 ## Reglas comunes de DevSkills
 - **Idioma:** español de México con tuteo ("revisa", "detente", "tú corres"), nunca voseo. Aplica a código, comentarios, docstrings, reportes y respuestas al orquestador. Los identificadores siguen la convención del proyecto.

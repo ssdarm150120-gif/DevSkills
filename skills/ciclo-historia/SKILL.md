@@ -4,8 +4,8 @@ description: >
   Orquesta el ciclo completo de un elemento del backlog (HU o EN) o de todo un sprint: rama y puntos de control,
   desarrollo (Dev A o Dev B), validación de QA, evaluación del Angel Fixer, rondas (máximo 3), pregunta al
   Product Owner, ronda extra con lista congelada, verificación final, reporte, regeneración del plan, Word y
-  Anexo C, gitleaks y cierre con squash a main. Trigger: "/devskills:ciclo-historia HU-xx", "/devskills:ciclo",
-  "implementa la historia", "ciclo de la HU", "cerrar el sprint".
+  Anexo C, gitleaks y cierre con squash a main. Es la única fuente de las reglas del ciclo (`devskills:ciclo` es solo un atajo que la invoca).
+  Trigger: "/devskills:ciclo-historia HU-xx", "implementa la historia", "ciclo de la HU", "cerrar el sprint".
 license: MIT
 metadata:
   author: devskills
@@ -50,7 +50,7 @@ Desarrollo ──► punto de control ──► QA ──► Angel Fixer ──�
 2. **Squash a main** (ver regla 4 de "Puntos de control").
 3. **Documentación en commit aparte:** si el ciclo cambió SRS o DISEÑO (preguntas cerradas, ADR, versiones), el `analista-arquitecto` hace la pasada (skill `devskills:pasada-documental`): regenera el Anexo C (`python documentacion/analisis/trazabilidad.py _tmp.md --escribir`), el plan y los Word (`python documentacion/analisis/md_a_word.py --mermaid <carpeta de mermaid-cli>`). Los commits de documentación (`docs: ...`) van **separados** del commit del código (`feat(...)` / `fix(...)`); los Word regenerados en su propio `docs: regenerate Word documents after <ID>`.
 4. **gitleaks** por Docker antes del último commit, sobre los archivos de `git ls-files -co --exclude-standard` (script `${CLAUDE_PLUGIN_ROOT}/scripts/gitleaks_archivos.py`, ver Commands). Sin hallazgos o no se hace commit.
-5. Guardar en engram (`mem_save`, project de `CONTEXTO.md`, topic_key `<project>/<id>/cierre`) el resultado, commits y hallazgos no obvios.
+5. Guardar en engram (`mem_save`, project de `CONTEXTO.md`, topic_key `<project>/<id>/cierre`) el resultado, commits y hallazgos no obvios, y revisar la regla de **mantenimiento de DevSkills** (lección general para el plugin).
 6. Responder al usuario (y por Telegram si el canal está activo) con: veredicto, rondas, enlace al reporte, commits y avance de la entrega en puntos.
 
 ### Reglas
@@ -59,6 +59,9 @@ Desarrollo ──► punto de control ──► QA ──► Angel Fixer ──�
 - Si un agente encuentra una contradicción con el SRS: **detener el ciclo y preguntar al usuario**.
 - Commits en inglés con Conventional Commits y **sin atribución de IA ni `Co-Authored-By`**.
 - Si un agente se corta por límite de uso: skill `devskills:recuperar-corte` (no se rehace su trabajo).
+- **Herramientas de revisión iguales al CI:** QA, Angel Fixer y verificador corren semgrep con la imagen oficial `semgrep/semgrep:<versión>` y la **misma versión** que fija `.github/workflows/ci.yml` (comando exacto en `devskills:validar-historia`; en Windows con `MSYS_NO_PATHCONV=1` y `pwd -W`) y exigen código 0 y "Findings: 0". Una herramienta distinta a la del CI no prueba nada.
+- **El CI también es parte del Listo:** si el repositorio tiene remoto, después de cada push se revisa con `gh run list` y, si falla, `gh run view <id> --log-failed`. Un CI en rojo es deuda: se corrige antes de seguir.
+- **Mantenimiento de DevSkills (permanente):** al cerrar cada elemento, el orquestador revisa si dejó una **lección general del método o del stack** (no del dominio del proyecto) y la anota para DevSkills: si el proyecto usa el plugin, abre un issue (`gh issue create` en el repositorio del plugin) o deja una nota en él. Así el siguiente proyecto no repite el tropiezo.
 
 ### Puntos de control (ningún trabajo sin respaldo en git)
 Regla nacida de un incidente real: un verificador vació por accidente un archivo de pruebas que no tenía commit y hubo que reconstruirlo de memoria.
@@ -82,4 +85,8 @@ python documentacion/analisis/md_a_word.py --mermaid ~/.devskills/doc   # regene
 python "${CLAUDE_PLUGIN_ROOT}/scripts/gitleaks_archivos.py"
 git switch main && git merge --squash hu-60 && git commit -m "feat(hu-60): manage users and roles"
 git branch -D hu-60
+gh run list --limit 3                                      # tras el push, si hay remoto
+gh run view <id> --log-failed                              # si el CI falló
+# semgrep igual que el CI (desde codigo/; versión = la de semgrep== en .github/workflows/ci.yml)
+MSYS_NO_PATHCONV=1 docker run --rm -v "$(pwd -W):/src" -w /src semgrep/semgrep:1.178.0   semgrep scan --config p/python --config p/django --error --metrics=off --exclude pruebas --exclude conftest.py .
 ```
