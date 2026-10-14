@@ -39,11 +39,15 @@ venv/Scripts/python -m pip install python-docx pillow      # en macOS/Linux: ven
 npm install @mermaid-js/mermaid-cli
 ```
 
-Para usar el Chrome que ya tienes en lugar de que puppeteer descargue otro: define `PUPPETEER_SKIP_DOWNLOAD=1` antes del `npm install` y crea `~/.devskills/doc/puppeteer.json`:
+Las herramientas viven siempre en la carpeta fija `~/.devskills/doc` (venv con `python-docx` y `pillow`, y mermaid-cli); `devskills doctor` busca ahí `mmdc`.
+
+Para usar el Chrome que ya tienes en lugar de que puppeteer descargue otro: define `PUPPETEER_SKIP_DOWNLOAD=1` antes del `npm install` y crea `~/.devskills/doc/puppeteer.json`. En Windows las barras invertidas **van escapadas** (`\\`): una ruta sin escapar rompe el JSON.
 
 ```json
-{ "executablePath": "<ruta a chrome o chromium>" }
+{ "executablePath": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" }
 ```
+
+En macOS y Linux basta la ruta normal (`"/usr/bin/chromium"`); en Windows también sirven las barras normales (`"C:/Program Files/Google/Chrome/Application/chrome.exe"`).
 
 Después:
 

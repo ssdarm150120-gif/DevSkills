@@ -40,6 +40,25 @@ Describe 'CLI devskills'
       The output should include 'Python 3.12'
       The output should include 'gitleaks'
     End
+
+    Describe 'doctor y mermaid-cli en la carpeta fija ~/.devskills/doc'
+      setup_mmdc() {
+        CASA_FALSA="$(mktemp -d)"
+        mkdir -p "$CASA_FALSA/.devskills/doc/node_modules/.bin"
+        : > "$CASA_FALSA/.devskills/doc/node_modules/.bin/mmdc"
+      }
+      cleanup_mmdc() { rm -rf "$CASA_FALSA"; }
+      BeforeEach 'setup_mmdc'
+      AfterEach 'cleanup_mmdc'
+
+      doctor_con_casa_falsa() { HOME="$CASA_FALSA" bash "$PROJECT_ROOT/bin/devskills" doctor; }
+
+      It 'detecta mermaid-cli instalado en ~/.devskills/doc'
+        When call doctor_con_casa_falsa
+        The status should be success
+        The output should include '✔ mermaid-cli'
+      End
+    End
   End
 
   Describe 'init'

@@ -2,6 +2,19 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado semántico.
 
+## [Sin publicar]
+
+### Agregado
+- `docs/instalacion.md`: "Uso no interactivo" (`claude -p`, `stream-json`, permisos acotados, presupuesto, respuestas del Product Owner en el prompt, `--resume` tras un corte, costo observado, `jq` para engram) y "GitHub CLI (`gh`) y el CI".
+- Lecciones del CRM en las skills y agentes: semgrep local con la imagen y la versión del CI, CI revisado con `gh` tras cada push, orden con Dependabot, y regla permanente de anotar lecciones para DevSkills al cerrar cada elemento.
+- Prueba ShellSpec de `devskills doctor` con mermaid-cli en `~/.devskills/doc` y prueba estática del `!reset` de Compose.
+
+### Cambiado
+- `ciclo` es solo un atajo de `ciclo-historia`, que queda como única fuente de las reglas.
+- Flujos de CI con `ubuntu-24.04` en lugar de `ubuntu-latest` (plantilla y CI del plugin).
+- `docker-compose.pruebas.yml`: `build: !reset null` en cada servicio y no en el ancla (Compose 2.38 pierde el `!reset` por la fusión `<<:`).
+- `docs/generadores.md`: `puppeteer.json` con barras invertidas escapadas para Windows.
+
 ## [1.0.0] - 2026-10-13
 
 Primera versión: la metodología, el equipo de agentes y el stack fijo con que se construyó un sistema real, generalizados para cualquier proyecto nuevo.
