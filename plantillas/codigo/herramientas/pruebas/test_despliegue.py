@@ -489,6 +489,23 @@ def test_compose_pruebas_documenta_la_imagen_local_y_no_repite_el_reinicio_del_b
     assert "la imagen del CI" not in readme  # el CI nunca la publica
 
 
+def test_compose_pruebas_pone_el_reset_de_build_en_cada_servicio_y_no_en_el_ancla() -> None:
+    """Compose 2.38 (runner de GitHub) pierde `!reset` si llega por la fusion `<<:` de un ancla."""
+    lineas = COMPOSE_PRUEBAS.read_text(encoding="utf-8").splitlines()
+    ancla = lineas.index("x-imagen-ya-construida: &imagen-ya-construida")
+    cuerpo_ancla = []
+    for linea in lineas[ancla + 1 :]:
+        if linea and not linea.startswith(" "):
+            break
+        cuerpo_ancla.append(linea)
+    assert not any("!reset" in linea for linea in cuerpo_ancla)
+    servicios = ("migrar", "web", "worker", "worker-outbox", "beat")
+    inicio = lineas.index("services:")
+    for nombre in servicios:
+        posicion = lineas.index(f"  {nombre}:", inicio)
+        assert "    build: !reset null" in lineas[posicion + 1 : posicion + 4]
+
+
 # --- Endurecimiento de los contenedores y healthcheck de nginx -------------
 
 

@@ -23,9 +23,11 @@
 
 name: {{SLUG}}-pruebas
 
+# `build: !reset null` NO va aqui sino en cada servicio: Docker Compose 2.38 (el del runner de
+# GitHub) pierde la etiqueta `!reset` cuando llega por la fusion `<<:` de un ancla y deja `build`
+# del Compose base, de modo que intentaria construir en lugar de usar la imagen.
 x-imagen-ya-construida: &imagen-ya-construida
   image: ${APP_IMAGEN:-{{SLUG}}:pruebas}
-  build: !reset null
   pull_policy: ${APP_PULL_POLICY:-missing}
 
 # Staging NO usa adaptadores falsos (los hereda del Compose de desarrollo, aqui se revierten).
@@ -37,15 +39,20 @@ x-adaptadores-reales: &adaptadores-reales
 services:
   migrar:
     <<: *imagen-ya-construida
+    build: !reset null
   web:
     <<: *imagen-ya-construida
+    build: !reset null
     environment: *adaptadores-reales
   worker:
     <<: *imagen-ya-construida
+    build: !reset null
     environment: *adaptadores-reales
   worker-outbox:
     <<: *imagen-ya-construida
+    build: !reset null
     environment: *adaptadores-reales
   beat:
     <<: *imagen-ya-construida
+    build: !reset null
     environment: *adaptadores-reales
