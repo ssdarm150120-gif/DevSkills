@@ -34,7 +34,7 @@ concurrency:
 
 jobs:
   desplegar:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     environment: pruebas
     # `packages: write` solo en este job (publica la imagen en GHCR).

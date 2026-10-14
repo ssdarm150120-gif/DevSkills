@@ -11,7 +11,12 @@
 #
 # Lo que NO cubre (se actualiza a mano, revisándolo junto con el PR semanal de actions):
 #   - las imágenes de herramientas del CI que viven en variables `env:` (trivy, hadolint);
-#   - `semgrep==...` (pipx) y `GITLEAKS_VERSION` en ci.yml.
+#   - `semgrep==...` (pipx) y `GITLEAKS_VERSION` en ci.yml (si cambias la de semgrep, cambia también
+#     la imagen `semgrep/semgrep:<versión>` que usan QA y el verificador en local);
+#   - la imagen del runner (`ubuntu-24.04`) de los flujos: se sube a mano.
+#
+# Al subir el repositorio, los PR de Dependabot fallarán mientras el CI de `main` esté en rojo:
+# primero `main` en verde, luego `@dependabot rebase`, integra las menores y revisa aparte las mayores.
 #
 # Saltos que NUNCA se aceptan automáticamente (requieren un elemento del plan propio):
 #   - versión mayor de cualquier imagen: postgres 16 -> 17 no arranca con el volumen de la 16,

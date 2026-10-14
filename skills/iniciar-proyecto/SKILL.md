@@ -67,6 +67,9 @@ No hace falta `.claude/`: el plugin aporta los agentes y las skills.
 1. El `analista-arquitecto` llena `documentacion/CONTEXTO.md` con lo del descubrimiento (módulos y asignación Dev A / Dev B quedan "por definir" hasta el DISEÑO).
 2. Vuelca el descubrimiento al SRS versión 0.1 (skill `devskills:redactar-srs`): sección 1 (problema, línea base, metas), 2 (actores, restricciones, supuestos) y 6 (preguntas abiertas).
 3. Commit `docs: discovery and SRS 0.1` y `mem_save` con el resumen del descubrimiento.
+4. **Repositorio remoto privado desde el inicio** (con el visto bueno del Product Owner): el CI de la plantilla (`.github/workflows/ci.yml`) solo corre cuando el repositorio tiene remoto, y un CI que nunca se ha ejecutado se rompe en el peor momento. Con GitHub CLI (`gh auth status`; instalación y autenticación en `docs/instalacion.md`): `gh repo create <organizacion>/<slug> --private --source . --remote origin --push`. Después de **cada push** revisa el CI: `gh run list --limit 3` y, si falla, `gh run view <id> --log-failed`. **Un CI en rojo es deuda**: se corrige antes de seguir con el siguiente elemento.
+5. **Dependabot:** al subir el repositorio abrirá PR de dependencias que fallarán mientras el CI de `main` esté en rojo. Orden: primero el CI de `main` en verde, luego `@dependabot rebase` en cada PR, integrar las **menores** y revisar aparte las **versiones mayores** (cada una es un elemento del plan; ver el comentario de `.github/dependabot.yml`).
+6. **Runner fijo:** los flujos usan `ubuntu-24.04` y no `ubuntu-latest`, para que GitHub no cambie la imagen por debajo del CI; subir de versión es un cambio a mano, probado y con su commit.
 
 ### Fase 4. Siguientes pasos (flujo completo)
 1. SRS hasta la línea base de requisitos: RF, RNF, Anexo A, Anexo B con Gherkin, Anexo C (`devskills:redactar-srs`).

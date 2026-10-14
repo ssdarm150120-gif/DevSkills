@@ -1,5 +1,9 @@
 name: CI
 
+# Los trabajos usan `ubuntu-24.04` y no `ubuntu-latest`: GitHub cambia `latest` de imagen sin avisar
+# (y con ella la version de Docker Compose, Python y las herramientas) y el CI puede ponerse rojo sin
+# que cambie nuestro codigo. Subir a otra imagen es un cambio a mano, con su commit; Dependabot no lo hace.
+
 on:
   push:
     branches: [main]
@@ -19,7 +23,7 @@ defaults:
 jobs:
   # Pasos 1, 2 y 4 de DISENO D.6.2: estilo, tipos, limites entre modulos y seguridad.
   calidad:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -63,7 +67,7 @@ jobs:
 
   # Paso 4 de D.6.2 (lo que no cubre `calidad`): semgrep (analisis estatico) y gitleaks (secretos).
   seguridad:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -92,7 +96,7 @@ jobs:
 
   # Paso 3 de D.6.2: pruebas unitarias y escenarios Gherkin (pytest-bdd) contra PostgreSQL 16 real.
   pruebas:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     services:
       postgres:
@@ -133,7 +137,7 @@ jobs:
   # Docker fijadas por version y digest, las mismas que se usan en la maquina del desarrollador
   # (README de codigo/). El despliegue a pruebas es un flujo aparte y manual: desplegar-pruebas.yml.
   imagen:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       IMAGEN: {{SLUG}}:ci

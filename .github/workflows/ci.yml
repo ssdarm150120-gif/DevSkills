@@ -16,7 +16,7 @@ permissions:
 jobs:
   lint:
     name: Lint (ShellCheck)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Instalar ShellCheck
@@ -28,7 +28,7 @@ jobs:
 
   manifiestos:
     name: Manifiestos del plugin
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Estructura del plugin
@@ -44,7 +44,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-24.04, macos-latest, windows-latest]
     defaults:
       run:
         shell: bash
@@ -70,7 +70,7 @@ jobs:
 
   secretos:
     name: Secretos (gitleaks)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: gitleaks
@@ -78,7 +78,7 @@ jobs:
 
   todo-en-verde:
     name: Todo en verde
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [lint, manifiestos, pruebas, secretos]
     if: always()
     steps:

@@ -220,7 +220,7 @@ docker run --rm -v "$PWD:/src" semgrep/semgrep:1.178.0 semgrep scan --config p/p
 docker run --rm -v "$PWD/..:/repo" zricethezav/gitleaks:v8.21.2 detect --source /repo --redact --no-banner
 ```
 
-En Git Bash sobre Windows antepone `MSYS_NO_PATHCONV=1` a los comandos con `-v`.
+En Git Bash sobre Windows antepone `MSYS_NO_PATHCONV=1` a los comandos con `-v` y usa `$(pwd -W)` en lugar de `$PWD` (por ejemplo, `-v "$(pwd -W):/src"`). La versión de semgrep es la misma de `semgrep==` en `.github/workflows/ci.yml`; debe terminar con código 0 y "Findings: 0". La regla `django-no-csrf-token` solo reconoce `{% csrf_token %}` con el `</form>` a 10 líneas o menos: los formularios largos se parten en parciales.
 
 ## Variables de entorno
 

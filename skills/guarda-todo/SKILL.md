@@ -23,6 +23,8 @@ Procedimiento (en este orden; no saltar pasos):
    - En la rama de un elemento (`hu-xx`/`en-xx`): punto de control `git add -A && git commit -m "wip(hu-xx): <qué quedó>"`.
    - En `main`: commits lógicos por tipo (`docs: …` separado de `feat/fix/chore: …`), en inglés, Conventional Commits, **sin atribución de IA**.
    - Nunca `git add` de `.env*`, `.venv/`, `.pgdata*/` ni de archivos que no reconoces: si aparece algo inesperado, pregunta.
+   - Si el repositorio tiene remoto y el usuario autoriza el push: después de subir, revisa el CI con `gh run list --limit 3` y, si falla, `gh run view <id> --log-failed`. Un CI en rojo es deuda: se anota en el resumen y se corrige antes de seguir. Sin remoto, recomienda crear el repositorio **privado** (`gh repo create <org>/<slug> --private --source . --remote origin`): el CI no corre hasta entonces.
+   - Dependabot: con el CI de `main` en verde, `@dependabot rebase` en sus PR, integra las menores y revisa aparte las versiones mayores; mientras `main` esté en rojo, no toques sus PR.
 2. **Exportar la transcripción** de esta sesión a `documentacion/sesiones/AAAA-MM-DD_<tema>.md`:
    - La transcripción de Claude Code está en `~/.claude/projects/<carpeta-del-proyecto-codificada>/<id-de-sesión>.jsonl` (la carpeta es la ruta de trabajo con `:`, `\` y `/` cambiados por `-`). Toma el `.jsonl` más reciente de esa carpeta o el de la sesión actual.
    - `python documentacion/analisis/exportar_sesion.py --ultima documentacion/sesiones/<archivo>.md "<título>"` (`--ultima` toma el `.jsonl` más reciente de la carpeta de trabajo actual; también puedes pasar la ruta de un `.jsonl`).
@@ -36,6 +38,7 @@ Procedimiento (en este orden; no saltar pasos):
 
 ```bash
 git status --short && git stash list
+gh run list --limit 3                                      # si hay remoto, tras el push
 python documentacion/analisis/exportar_sesion.py --ultima documentacion/sesiones/<AAAA-MM-DD_tema>.md "<título>"
 python "${CLAUDE_PLUGIN_ROOT}/scripts/gitleaks_archivos.py"
 git add documentacion/sesiones && git commit -m "docs: export session transcript <tema>"
