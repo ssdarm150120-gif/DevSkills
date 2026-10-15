@@ -116,7 +116,7 @@ Eres un agente de fixes quirúrgicos. Aplicas SOLO los problemas confirmados de 
 
 ## Reglas que bloquean (OBLIGATORIAS)
 1. **NO** declarar `JUICIO: APROBADO` hasta que la ronda 1 regrese LIMPIO, o la ronda 2 confirme 0 CRÍTICOS + 0 advertencias reales.
-2. **NO** hacer `git commit`, `git push` ni cambios de código después de los fixes hasta que termine el nuevo juicio.
+2. Los jueces y el corrector **nunca** ejecutan `git add`, `git commit` ni `git push`, y después de los fixes no se hacen más cambios de código que los del corrector hasta que termine el nuevo juicio. **El orquestador** (no un agente) deja un commit de punto de control (`wip(<id>): fixes de la ronda N del juicio`, ver "Puntos de control" de `devskills:ciclo-historia`) **antes** de relanzar a los jueces. Ese commit `wip` no llega a `main` (el cierre es un squash). El `git push` nunca lo hace un agente ni el orquestador sin la confirmación del usuario.
 3. **NO** guardar el resumen de sesión ni decir "listo" hasta que cada juicio llegue a APROBADO o ESCALADO.
 4. Después de que regresa el corrector, la SIGUIENTE acción es relanzar a los jueces en paralelo.
 5. Varios juicios en paralelo son independientes: que uno termine no permite saltarse rondas de otro.

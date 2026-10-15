@@ -119,7 +119,7 @@ Sé exhaustivo y adversarial. Asume que toda entrada del usuario llega a toda co
 
 ## Reglas que bloquean (OBLIGATORIAS)
 1. **NO** declarar `AUDITORÍA: APROBADA` hasta que los dos auditores regresen LIMPIO o la ronda 2 confirme 0 CRÍTICOS + 0 ALTOS.
-2. **NO** hacer `git commit` ni `git push` después de los fixes hasta que termine la re-auditoría.
+2. Los auditores y el Angel Fixer **nunca** ejecutan `git add`, `git commit` ni `git push`. Después de los fixes, **el orquestador** (no un agente) deja un commit de punto de control (`wip(<id>): fixes de la ronda N de GGA`, ver "Puntos de control" de `devskills:ciclo-historia`) **antes** de relanzar la re-auditoría, para que el `git diff` de lo corregido sea verificable y nada quede sin respaldo. Ese commit `wip` no llega a `main` (el cierre es un squash). El `git push` nunca lo hace un agente ni el orquestador sin la confirmación del usuario.
 3. **NO** decir "listo" hasta que la auditoría llegue a APROBADA o ESCALADA.
 4. **Esperar SIEMPRE** a los dos auditores antes de sintetizar.
 5. Las sospechas de seguridad se tratan como reales.
