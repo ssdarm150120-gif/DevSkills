@@ -65,6 +65,31 @@ fi
 MANIFIESTO="$SHARE_DIR/manifiesto.txt"
 MARCA="$SHARE_DIR/.devskills"
 
+# Las rutas se escriben dentro de las skills y del CLI instalados y en el manifiesto (una por línea).
+# Se rechazan las que no se pueden incrustar sin riesgo: saltos de línea o caracteres de control,
+# y `$`, comillas dobles y acento grave, que un shell interpretaría al correr los comandos de las skills.
+# Los caracteres especiales de sed (`&`, `\`, `#`) sí se admiten: se escapan al sustituir.
+validar_ruta() {
+  local nombre="$1" ruta="$2"
+  if [[ "$ruta" =~ [[:cntrl:]] ]]; then
+    echo -e "${ROJO}✘ $nombre lleva un salto de línea o un carácter de control; elige otra ruta.${NC}" >&2
+    exit 2
+  fi
+  if [[ "$ruta" == *'$'* || "$ruta" == *'"'* || "$ruta" == *'`'* ]]; then
+    echo -e "${ROJO}✘ $nombre ($ruta) lleva \$, comillas dobles o acento grave, que no se pueden incrustar con seguridad en las skills; elige otra ruta.${NC}" >&2
+    exit 2
+  fi
+}
+validar_ruta "La carpeta de la carga útil" "$SHARE_DIR"
+validar_ruta "La carpeta del CLI" "$BIN_DIR"
+validar_ruta "La carpeta de Claude" "$CLAUDE_DIR"
+validar_ruta "La carpeta de origen" "$ORIGEN"
+
+# Escapa un texto para usarlo como reemplazo de sed con `#` de delimitador.
+escapar_sed() {
+  printf '%s' "$1" | sed -e 's/[\\&#]/\\&/g'
+}
+
 # Ruta que entienden tanto Git Bash como los programas nativos de Windows.
 ruta_portable() {
   if [[ "$SO" == "windows" ]] && command -v cygpath >/dev/null 2>&1; then
@@ -146,6 +171,15 @@ if [[ ${#CHOQUES[@]} -gt 0 && "$FORZAR" != true ]]; then
   fi
 fi
 
+# El manifiesto anterior se lee ANTES de reemplazar la carga útil (vive dentro de ella): sin esta copia,
+# lo que la versión nueva ya no trae se quedaba instalado para siempre.
+MANIFIESTO_ANTERIOR=""
+if [[ -f "$MANIFIESTO" ]]; then
+  MANIFIESTO_ANTERIOR="$(mktemp)"
+  cp "$MANIFIESTO" "$MANIFIESTO_ANTERIOR"
+  trap 'rm -f "$MANIFIESTO_ANTERIOR"' EXIT
+fi
+
 # Carga útil: se reemplaza completa (es nuestra, lo garantiza la marca).
 rm -rf "$SHARE_DIR"
 mkdir -p "$SHARE_DIR"
@@ -159,17 +193,22 @@ if [[ -d "$ORIGEN/.git" ]]; then
   echo "$ORIGEN" >"$SHARE_DIR/.origen"
 fi
 SHARE_PORTABLE="$(ruta_portable "$SHARE_DIR")"
+SHARE_PORTABLE_SED="$(escapar_sed "$SHARE_PORTABLE")"
+# Para el CLI, la ruta va entre comillas simples (donde todo es literal; la comilla simple se cierra y se
+# escapa con `'\''`) dentro de una sustitución de comando: así admite hasta apóstrofos (O'Brien).
+COMILLA_SIMPLE="'\\''"
+SHARE_DIR_SED="$(escapar_sed "${SHARE_DIR//\'/$COMILLA_SIMPLE}")"
 
 # Adapta el contenido de un agente o una skill instalado fuera del sistema de plugins.
 adaptar() {
   local archivo="$1" nombre="$2" dir_skill="${3:-}"
   local expr=(
-    -e "s#\${CLAUDE_PLUGIN_ROOT}#$SHARE_PORTABLE#g"
+    -e "s#\${CLAUDE_PLUGIN_ROOT}#$SHARE_PORTABLE_SED#g"
     -e "s#devskills:\([a-z]\)#devskills-\1#g"
     -e "s#^name: $nombre\$#name: devskills-$nombre#"
   )
   if [[ -n "$dir_skill" ]]; then
-    expr+=(-e "s#\${CLAUDE_SKILL_DIR}#$SHARE_PORTABLE/skills/$dir_skill#g")
+    expr+=(-e "s#\${CLAUDE_SKILL_DIR}#$SHARE_PORTABLE_SED/skills/$dir_skill#g")
   fi
   sed "${expr[@]}" "$archivo"
 }
@@ -193,7 +232,7 @@ for entrada in "${PLAN[@]}"; do
       fi
       ;;
     cli)
-      sed -e "s#^DEVSKILLS_HOME=.*#DEVSKILLS_HOME=\"\${DEVSKILLS_HOME:-$SHARE_DIR}\"#" \
+      sed -e "s#^DEVSKILLS_HOME=.*#DEVSKILLS_HOME=\"\${DEVSKILLS_HOME:-\$(printf '%s' '$SHARE_DIR_SED')}\"#" \
           -e "s#^VERSION=.*#VERSION=\"\${DEVSKILLS_VERSION:-$VERSION}\"#" "$origen" >"$destino"
       chmod +x "$destino"
       ;;
@@ -201,10 +240,14 @@ for entrada in "${PLAN[@]}"; do
   ruta_portable "$destino" >>"$MANIFIESTO.nuevo"
 done
 
-# Quita lo que la instalación anterior puso y esta ya no trae.
-if [[ -f "$MANIFIESTO" ]]; then
+# Quita lo que la instalación anterior puso y esta ya no trae. Solo toca entradas con aspecto de
+# DevSkills (devskills-*, o el CLI): un manifiesto alterado no puede borrar archivos ajenos.
+if [[ -n "$MANIFIESTO_ANTERIOR" ]]; then
   while IFS= read -r viejo; do
     [[ -z "$viejo" ]] && continue
+    if [[ "$viejo" != *"/devskills-"* && "$(basename "$viejo")" != "devskills" && "$(basename "$viejo")" != "devskills.cmd" ]]; then
+      continue
+    fi
     if ! grep -Fxq -- "$viejo" "$MANIFIESTO.nuevo"; then
       rm -f "$viejo"
       dir="$(dirname "$viejo")"
@@ -212,7 +255,8 @@ if [[ -f "$MANIFIESTO" ]]; then
         dir="$(dirname "$dir")"
       done
     fi
-  done <"$MANIFIESTO"
+  done <"$MANIFIESTO_ANTERIOR"
+  rm -f "$MANIFIESTO_ANTERIOR"
 fi
 mv "$MANIFIESTO.nuevo" "$MANIFIESTO"
 

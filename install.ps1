@@ -29,6 +29,24 @@ $ShareDir = if ($env:DEVSKILLS_SHARE_DIR) { $env:DEVSKILLS_SHARE_DIR } else { Jo
 $Manifiesto = Join-Path $ShareDir 'manifiesto.txt'
 $Marca = Join-Path $ShareDir '.devskills'
 
+# Las rutas se escriben dentro de las skills y del CLI instalados y en el manifiesto (una por linea).
+# Se rechazan las que no se pueden incrustar sin riesgo: caracteres de control y `$`, comillas dobles o
+# acento grave, que un shell interpretaria al correr los comandos de las skills.
+function Validar-Ruta([string]$Nombre, [string]$Ruta) {
+    if ($Ruta -match '[\x00-\x1F\x7F]') {
+        [Console]::Error.WriteLine("$Nombre lleva un salto de linea o un caracter de control; elige otra ruta.")
+        exit 2
+    }
+    if ($Ruta.Contains('$') -or $Ruta.Contains('"') -or $Ruta.Contains('`')) {
+        [Console]::Error.WriteLine("$Nombre ($Ruta) lleva dolar, comillas dobles o acento grave, que no se pueden incrustar con seguridad en las skills; elige otra ruta.")
+        exit 2
+    }
+}
+Validar-Ruta 'La carpeta de la carga util' $ShareDir
+Validar-Ruta 'La carpeta del CLI' $BinDir
+Validar-Ruta 'La carpeta de Claude' $ClaudeDir
+Validar-Ruta 'La carpeta de origen' $Origen
+
 $Plugin = Get-Content -Raw -Encoding UTF8 (Join-Path $Origen '.claude-plugin\plugin.json') | ConvertFrom-Json
 $Version = $Plugin.version
 
@@ -126,7 +144,7 @@ foreach ($e in $Plan) {
         }
         'cli' {
             $texto = [IO.File]::ReadAllText($e.Origen, $Utf8SinBom) -replace "`r`n", "`n"
-            $texto = [regex]::Replace($texto, '(?m)^DEVSKILLS_HOME=.*$', ('DEVSKILLS_HOME="${DEVSKILLS_HOME:-' + $SharePortable + '}"'))
+            $texto = [regex]::Replace($texto, '(?m)^DEVSKILLS_HOME=.*$', ('DEVSKILLS_HOME="${DEVSKILLS_HOME:-$(printf ''%s'' ''' + $SharePortable.Replace("'", "'\''") + ''')}"'))
             $texto = [regex]::Replace($texto, '(?m)^VERSION=.*$', ('VERSION="${DEVSKILLS_VERSION:-' + $Version + '}"'))
             [IO.File]::WriteAllText($e.Destino, $texto, $Utf8SinBom)
         }
@@ -139,8 +157,18 @@ foreach ($e in $Plan) {
 }
 
 # Quita lo que la instalación anterior puso y esta ya no trae.
+# Solo toca entradas con aspecto de DevSkills (devskills-*, o el CLI): un manifiesto alterado no borra archivos ajenos.
 foreach ($viejo in $Propios) {
-    if ($Nuevos -notcontains $viejo -and (Test-Path -LiteralPath $viejo)) { [IO.File]::Delete($viejo) }
+    $nombreViejo = Split-Path -Leaf $viejo
+    if (-not (($viejo -like '*/devskills-*') -or $nombreViejo -eq 'devskills' -or $nombreViejo -eq 'devskills.cmd')) { continue }
+    if ($Nuevos -notcontains $viejo) {
+        if (Test-Path -LiteralPath $viejo) { [IO.File]::Delete($viejo) }
+        $dir = Split-Path -Parent $viejo
+        while ($dir -and ($dir -replace '\\', '/') -like '*/devskills-*' -and (Test-Path -LiteralPath $dir) -and -not (Get-ChildItem -Force -LiteralPath $dir)) {
+            [IO.Directory]::Delete($dir)
+            $dir = Split-Path -Parent $dir
+        }
+    }
 }
 [IO.File]::WriteAllText($Manifiesto, (($Nuevos -join "`n") + "`n"), $Utf8SinBom)
 

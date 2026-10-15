@@ -25,6 +25,9 @@ if (-not (Test-Path $Manifiesto) -or -not (Test-Path (Join-Path $ShareDir '.devs
 $quitados = 0
 foreach ($archivo in Get-Content -Encoding UTF8 $Manifiesto) {
     if (-not $archivo) { continue }
+    # Solo se quita lo que tiene aspecto de DevSkills: un manifiesto alterado no borra archivos ajenos.
+    $nombreArchivo = Split-Path -Leaf $archivo
+    if (-not ((($archivo -replace '\\', '/') -like '*/devskills-*') -or $nombreArchivo -eq 'devskills' -or $nombreArchivo -eq 'devskills.cmd')) { continue }
     if (Test-Path -PathType Leaf -LiteralPath $archivo) {
         [IO.File]::Delete($archivo)
         $quitados++

@@ -122,6 +122,81 @@ Describe 'install.sh y uninstall.sh'
     End
   End
 
+  Describe 'manifiesto: lo que la versión nueva ya no trae se quita'
+    It 'reinstalar con un agente y una skill quitados no deja huérfanos, y desinstalar deja todo limpio'
+      crear_origen_falso
+      instalar_falso --si >/dev/null
+      test -f "$HOME_TEMPORAL/.claude/agents/devskills-b.md"
+      test -f "$HOME_TEMPORAL/.claude/skills/devskills-s2/assets/x.txt"
+      rm -f "$ORIGEN_FALSO/agents/b.md"
+      rm -rf "$ORIGEN_FALSO/skills/s2"
+      instalar_falso --si >/dev/null
+      The path "$HOME_TEMPORAL/.claude/agents/devskills-a.md" should be file
+      The path "$HOME_TEMPORAL/.claude/skills/devskills-s1/SKILL.md" should be file
+      The path "$HOME_TEMPORAL/.claude/agents/devskills-b.md" should not be exist
+      The path "$HOME_TEMPORAL/.claude/skills/devskills-s2" should not be exist
+      The contents of file "$SHARE_TEMPORAL/manifiesto.txt" should not include 'devskills-b'
+      The contents of file "$SHARE_TEMPORAL/manifiesto.txt" should not include 'devskills-s2'
+    End
+
+    It 'tras quitar elementos, desinstalar no deja ningún archivo huérfano'
+      crear_origen_falso
+      instalar_falso --si >/dev/null
+      rm -f "$ORIGEN_FALSO/agents/b.md"
+      rm -rf "$ORIGEN_FALSO/skills/s2"
+      instalar_falso --si >/dev/null
+      desinstalar >/dev/null
+      The value "$(contar_archivos "$HOME_TEMPORAL/.claude")" should eq 0
+      The value "$(contar_archivos "$BIN_TEMPORAL")" should eq 0
+      The path "$SHARE_TEMPORAL" should not be exist
+    End
+
+    It 'un manifiesto alterado no puede hacer borrar archivos ajenos al desinstalar'
+      crear_origen_falso
+      instalar_falso --si >/dev/null
+      echo "importante" >"$HOME_TEMPORAL/ajeno.txt"
+      echo "$HOME_TEMPORAL/ajeno.txt" >>"$SHARE_TEMPORAL/manifiesto.txt"
+      desinstalar >/dev/null
+      The contents of file "$HOME_TEMPORAL/ajeno.txt" should eq "importante"
+    End
+  End
+
+  Describe 'rutas con caracteres especiales'
+    It 'una ruta con &, # y comilla simple se instala literal en las skills y el CLI'
+      crear_origen_falso
+      ESPECIAL="$HOME_TEMPORAL/sh&re#c'd"
+      instalar_falso_en "$ESPECIAL" --si >/dev/null
+      The contents of file "$HOME_TEMPORAL/.claude/skills/devskills-s1/SKILL.md" should include "sh&re#c'd/skills/s1"
+      The contents of file "$HOME_TEMPORAL/.claude/skills/devskills-s1/SKILL.md" should include "sh&re#c'd "
+      The contents of file "$BIN_TEMPORAL/devskills" should include "sh&re#c'\''d"
+    End
+
+    It 'el CLI instalado en esa ruta encuentra sus plantillas y crea un proyecto'
+      ESPECIAL="$HOME_TEMPORAL/sh&re#c'd"
+      instalar_en "$ESPECIAL" --si >/dev/null
+      When call bash "$BIN_TEMPORAL/devskills" init "$HOME_TEMPORAL/proyecto" --nombre "Demo" --slug demo --puerto-base 21000 --sin-git
+      The status should be success
+      The output should include 'Proyecto creado'
+      The path "$HOME_TEMPORAL/proyecto/codigo/manage.py" should be file
+    End
+
+    It 'se desinstala sin dejar nada desde esa ruta'
+      crear_origen_falso
+      ESPECIAL="$HOME_TEMPORAL/sh&re#c'd"
+      instalar_falso_en "$ESPECIAL" --si >/dev/null
+      desinstalar_de "$ESPECIAL" >/dev/null
+      The value "$(contar_archivos "$HOME_TEMPORAL/.claude")" should eq 0
+      The path "$ESPECIAL" should not be exist
+    End
+
+    It 'rechaza una ruta con $ sin instalar nada'
+      When call instalar_en "$HOME_TEMPORAL/sh\$re" --si
+      The status should eq 2
+      The stderr should include 'no se pueden incrustar'
+      The path "$BIN_TEMPORAL/devskills" should not be exist
+    End
+  End
+
   Describe 'desinstalación'
     It 'no deja ningún archivo'
       instalar --si >/dev/null

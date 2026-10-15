@@ -29,6 +29,46 @@ instalar() {
     bash "$PROJECT_ROOT/install.sh" "$@" </dev/null
 }
 
+# Instala en una carpeta de carga útil distinta (para rutas con caracteres especiales).
+instalar_en() {
+  local share="$1"
+  shift
+  HOME="$HOME_TEMPORAL" DEVSKILLS_BIN_DIR="$BIN_TEMPORAL" DEVSKILLS_SHARE_DIR="$share" CLAUDE_CONFIG_DIR="" \
+    bash "$PROJECT_ROOT/install.sh" "$@" </dev/null
+}
+
+desinstalar_de() {
+  HOME="$HOME_TEMPORAL" DEVSKILLS_SHARE_DIR="$1" bash "$PROJECT_ROOT/uninstall.sh" </dev/null
+}
+
+# Origen mínimo y falso (2 agentes, 2 skills) para probar reinstalaciones con elementos quitados.
+crear_origen_falso() {
+  ORIGEN_FALSO="$HOME_TEMPORAL/origen"
+  mkdir -p "$ORIGEN_FALSO/.claude-plugin" "$ORIGEN_FALSO/agents" "$ORIGEN_FALSO/skills/s1" "$ORIGEN_FALSO/skills/s2/assets" "$ORIGEN_FALSO/bin"
+  cp "$PROJECT_ROOT/install.sh" "$ORIGEN_FALSO/install.sh"
+  cp "$PROJECT_ROOT/bin/devskills" "$ORIGEN_FALSO/bin/devskills"
+  echo '{"version": "9.9.9"}' >"$ORIGEN_FALSO/.claude-plugin/plugin.json"
+  printf '%s\n' '---' 'name: a' '---' 'Agente a' >"$ORIGEN_FALSO/agents/a.md"
+  printf '%s\n' '---' 'name: b' '---' 'Agente b' >"$ORIGEN_FALSO/agents/b.md"
+  # shellcheck disable=SC2016  # ${...} son marcadores literales que el instalador sustituye
+  printf '%s\n' '---' 'name: s1' '---' 'Raiz: ${CLAUDE_PLUGIN_ROOT} Skill: ${CLAUDE_SKILL_DIR}' >"$ORIGEN_FALSO/skills/s1/SKILL.md"
+  printf '%s\n' '---' 'name: s2' '---' 'Skill dos' >"$ORIGEN_FALSO/skills/s2/SKILL.md"
+  echo "recurso" >"$ORIGEN_FALSO/skills/s2/assets/x.txt"
+  export ORIGEN_FALSO
+}
+
+instalar_falso_en() {
+  local share="$1"
+  shift
+  HOME="$HOME_TEMPORAL" DEVSKILLS_BIN_DIR="$BIN_TEMPORAL" DEVSKILLS_SHARE_DIR="$share" CLAUDE_CONFIG_DIR="" \
+    bash "$ORIGEN_FALSO/install.sh" "$@" </dev/null
+}
+
+instalar_falso() {
+  HOME="$HOME_TEMPORAL" DEVSKILLS_BIN_DIR="$BIN_TEMPORAL" DEVSKILLS_SHARE_DIR="$SHARE_TEMPORAL" CLAUDE_CONFIG_DIR="" \
+    bash "$ORIGEN_FALSO/install.sh" "$@" </dev/null
+}
+
 desinstalar() {
   HOME="$HOME_TEMPORAL" DEVSKILLS_SHARE_DIR="$SHARE_TEMPORAL" bash "$PROJECT_ROOT/uninstall.sh" </dev/null
 }

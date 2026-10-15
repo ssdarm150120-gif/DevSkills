@@ -44,6 +44,10 @@ fi
 quitados=0
 while IFS= read -r archivo; do
   [[ -z "$archivo" ]] && continue
+  # Solo se quita lo que tiene aspecto de DevSkills: un manifiesto alterado no borra archivos ajenos.
+  if [[ "$archivo" != *"/devskills-"* && "$(basename "$archivo")" != "devskills" && "$(basename "$archivo")" != "devskills.cmd" ]]; then
+    continue
+  fi
   if [[ -f "$archivo" ]]; then
     rm -f "$archivo"
     quitados=$((quitados + 1))
