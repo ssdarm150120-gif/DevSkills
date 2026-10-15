@@ -111,12 +111,7 @@ Como plugin: `/plugin uninstall devskills@devskills-local`.
 Sirve para correr un ciclo sin una persona frente a la terminal (un servidor, una prueba, un trabajo programado). Lo que sigue es lo que se comprobó en una prueba real con una historia pequeña.
 
 ```bash
-claude -p "<prompt con el ID y las respuestas del Product Owner>" \
-  --plugin-dir /ruta/a/DevSkills \
-  --output-format stream-json --verbose \
-  --permission-mode acceptEdits \
-  --allowedTools "Read,Edit,Write,Glob,Grep,Agent,Skill,Bash(git *),Bash(python *),Bash(docker *)" \
-  --max-turns 200 --max-budget-usd 25
+claude -p "<prompt con el ID y las respuestas del Product Owner>"   --plugin-dir /ruta/a/DevSkills   --output-format stream-json --verbose   --permission-mode acceptEdits   --allowedTools "Read,Edit,Write,Glob,Grep,Agent,Skill,Bash(git status*),Bash(git diff*),Bash(git log*),Bash(git show*),Bash(git add*),Bash(git commit*),Bash(git switch*),Bash(git merge --squash*),Bash(git restore*),Bash(python -m pytest*),Bash(python -m ruff*),Bash(python -m mypy*),Bash(lint-imports*),Bash(python manage.py*),Bash(python documentacion/analisis/*),Bash(gh run list*),Bash(gh run view*)"   --disallowedTools "Bash(git push*),Bash(git reset*),Bash(git clean*),Bash(git branch -D*),Bash(git remote*),Bash(git config*),Bash(gh issue*),Bash(gh pr*),Bash(gh repo*),Bash(gh release*),Bash(gh api*),Bash(gh workflow*),Bash(gh secret*),Bash(gh variable*),Bash(docker push*),Bash(docker login*),Bash(docker system prune*),Bash(docker volume prune*),Bash(docker compose down -v*),Bash(docker compose down --volumes*)"   --max-turns 200 --max-budget-usd 25
 ```
 
 | Qué | Para qué |
@@ -124,8 +119,24 @@ claude -p "<prompt con el ID y las respuestas del Product Owner>" \
 | `--plugin-dir <ruta a DevSkills>` | Carga el plugin desde el clon sin instalarlo. Si ya está instalado como plugin, no hace falta |
 | `--output-format stream-json --verbose` | Emite un evento JSON por línea: ves qué agentes (`devskills:dev-a`, `devskills:qa`…) y qué skills se invocan, y de ahí sacas el `session_id` |
 | `--permission-mode acceptEdits` | Acepta las ediciones de archivos; el resto de herramientas solo corre si está permitida |
-| `--allowedTools` | Lista **acotada**: solo lo que el ciclo necesita. Sin humano, una herramienta no permitida se rechaza y el agente se detiene; amplía la lista solo con lo que veas rechazado |
+| `--allowedTools` | Lista **acotada con patrones mínimos**: solo los subcomandos que el ciclo necesita. **No uses `Bash(git *)`, `Bash(python *)` ni `Bash(docker *)`**: `git *` permite `push`, `reset --hard` y `clean -fd`; `python *` ejecuta cualquier código; `docker *` permite borrar volúmenes o publicar imágenes. Sin humano, una herramienta no permitida se rechaza y el agente se detiene; amplía la lista solo con lo que veas rechazado y siempre con el subcomando exacto |
+| `--disallowedTools` | **Vetos explícitos**: las reglas de rechazo ganan a las de permiso, así que aunque un patrón permitido sea demasiado ancho, esto sigue bloqueado. El ciclo nunca necesita subir nada, tocar la configuración de git ni escribir en GitHub: eso lo decide una persona |
 | `--max-turns` y `--max-budget-usd` | Tope de turnos y de gasto: sin ellos un ciclo que se atora gasta sin límite. Ajusta los números al tamaño del elemento |
+
+Notas sobre la lista:
+
+- **La rama del elemento no se borra sola.** El cierre hace `git merge --squash` a `main`; borrar la rama requiere `git branch -D`, que está vetado. Bórrala tú después de revisar (`git branch -D hu-xx`).
+- **Sin `push` ni `gh` de escritura.** Subir a GitHub, abrir issues o PR y mezclar los PR de Dependabot se hace a mano, con tu aprobación, después de la corrida.
+- **Python:** los comandos se dan por módulo (`python -m pytest`, `python -m ruff`…) y por scripts conocidos; si usas un entorno virtual, permite también su ruta (`Bash(.venv/Scripts/python -m pytest*)` en Windows, `Bash(.venv/bin/python -m pytest*)` en Unix).
+- **Docker no hace falta** para desarrollar y probar (ver [Docker es opcional](#docker-es-opcional)); si tu corrida lo usa, permite solo `Bash(docker compose -p <slug>-*)`, nunca `Bash(docker *)`.
+
+### Corre en un entorno aislado
+
+Una corrida sin humano ejecuta código que escribió un modelo. Aunque las listas de arriba reduzcan el riesgo, el aislamiento es la defensa de fondo:
+
+- Trabaja en **una carpeta propia del proyecto** (un clon dedicado, sin otros repositorios ni secretos cerca), o mejor en una **máquina virtual o contenedor desechable**.
+- No dejes en esa máquina credenciales de GitHub con permiso de escritura ni claves de nube; usa un token de solo lectura si el ciclo necesita consultar el CI.
+- No montes tu carpeta de usuario ni tu `~/.ssh`. Revisa `git log` y `git diff` antes de subir nada.
 
 ### Las respuestas del Product Owner van en el prompt
 
