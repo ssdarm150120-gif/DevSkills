@@ -28,7 +28,7 @@ test-cli:
 	$(SHELLSPEC) spec/integration/cli_spec.sh
 
 lint:
-	shellcheck -x -e SC1090,SC1091 bin/devskills install.sh uninstall.sh
+	shellcheck -x -e SC1090,SC1091 bin/devskills install.sh uninstall.sh hooks/vetar_acciones_externas.sh
 	shellcheck -x -e SC1090,SC1091,SC2034,SC2154,SC2329 spec/spec_helper.sh
 
 validate:

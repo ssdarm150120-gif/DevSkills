@@ -46,6 +46,20 @@ def main() -> int:
         if "description:" not in cabecera or f"name: {nombre}" not in cabecera:
             raise SystemExit(f"agente con frontmatter incompleto: {nombre}")
 
+    ganchos = json.loads((RAIZ / "hooks/hooks.json").read_text(encoding="utf-8"))
+    comandos = [
+        gancho.get("command", "")
+        for eventos in ganchos.get("hooks", {}).values()
+        for grupo in eventos
+        for gancho in grupo.get("hooks", [])
+    ]
+    if not comandos:
+        raise SystemExit("hooks/hooks.json no declara ningún gancho")
+    for comando in comandos:
+        for ruta in re.findall(r"\$\{CLAUDE_PLUGIN_ROOT\}/([^\"\s]+)", comando):
+            if not (RAIZ / ruta).is_file():
+                raise SystemExit(f"el gancho apunta a un archivo que no existe: {ruta}")
+
     conocidos = skills | agentes
     rotas: set[str] = set()
     for archivo in [*RAIZ.glob("agents/*.md"), *RAIZ.glob("skills/**/*.md"), *RAIZ.glob("plantillas/**/*.md")]:
