@@ -87,6 +87,8 @@ Al copiar, el instalador adapta el contenido: `devskills:<nombre>` pasa a `devsk
 - Solo quita o borra entradas del manifiesto con aspecto de DevSkills (`devskills-*` o el CLI): un manifiesto alterado no puede hacer borrar archivos ajenos.
 - **Rutas con caracteres especiales:** `&`, `#`, `\` y la comilla simple (por ejemplo, una carpeta de usuario `O'Brien`) se instalan literales. Se **rechaza** (código 2, sin instalar nada) una ruta con saltos de línea o caracteres de control, `$`, comillas dobles o acento grave, porque las skills instaladas las incrustan en comandos de shell.
 
+**Qué no trae el instalador:** el hook de vetos para subagentes (`hooks/vetar_acciones_externas.sh`) pertenece al sistema de plugins de Claude Code y solo funciona instalado como plugin. Con el instalador, los vetos dependen de las reglas escritas en cada agente y de `--disallowedTools` en las corridas sin humano.
+
 Opciones: `--si` (`-Si`) no pregunta al reinstalar. Variables: `CLAUDE_CONFIG_DIR`, `DEVSKILLS_BIN_DIR`, `DEVSKILLS_SHARE_DIR`.
 
 ## Actualizar
