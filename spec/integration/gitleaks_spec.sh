@@ -57,11 +57,69 @@ Describe 'scripts/gitleaks_archivos.py'
     End
   End
 
-  It 'sin gitleaks ni Docker explica cómo instalarlo y no da el escaneo por bueno'
+  It 'sin gitleaks ni Docker sale con 2, explica cómo instalarlo y no lo confunde con un hallazgo'
     vacio="$TMP_G/vacio"
     mkdir -p "$vacio"
-    When run env PATH="$vacio" "$PYTHON_ABS" "$PROJECT_ROOT/scripts/gitleaks_archivos.py" --repo "$TMP_G/repo" --modo nativo
-    The status should be failure
+    When run env PATH="$vacio" LOCALAPPDATA="$vacio" "$PYTHON_ABS" "$PROJECT_ROOT/scripts/gitleaks_archivos.py" --repo "$TMP_G/repo"
+    The status should eq 2
+    The stderr should include 'HERRAMIENTA NO DISPONIBLE'
     The stderr should include 'winget install Gitleaks.Gitleaks'
+    The stderr should not include 'HAY HALLAZGOS'
+  End
+
+  It 'con --modo nativo y sin binario sale con 2'
+    vacio="$TMP_G/vacio"
+    mkdir -p "$vacio"
+    When run env PATH="$vacio" LOCALAPPDATA="$vacio" "$PYTHON_ABS" "$PROJECT_ROOT/scripts/gitleaks_archivos.py" --repo "$TMP_G/repo" --modo nativo
+    The status should eq 2
+    The stderr should include 'winget install Gitleaks.Gitleaks'
+    The stderr should not include 'HAY HALLAZGOS'
+  End
+
+  # Corre un fragmento de Python contra el módulo, con un entorno controlado.
+  buscar_con_local() {
+    PATH="$1" LOCALAPPDATA="$1" "$PYTHON_ABS" -c "
+import sys
+sys.path.insert(0, sys.argv[1])
+import gitleaks_archivos as g
+print(g.buscar_gitleaks())" "$PROJECT_ROOT/scripts"
+  }
+  modo_con_docker_caido() {
+    "$PYTHON_ABS" -c "
+import sys
+from unittest import mock
+sys.path.insert(0, sys.argv[1])
+import gitleaks_archivos as g
+caido = mock.Mock(returncode=1)
+with mock.patch.object(g, 'buscar_gitleaks', return_value=None), mock.patch.object(g.shutil, 'which', return_value='/usr/bin/docker'), mock.patch.object(g.subprocess, 'run', return_value=caido):
+    try:
+        g.elegir_modo('auto')
+    except SystemExit as e:
+        print('salida', e.code)" "$PROJECT_ROOT/scripts"
+  }
+
+  It 'encuentra el binario de winget aunque no esté en el PATH'
+    paquete="$TMP_G/local/Microsoft/WinGet/Packages/Gitleaks.Gitleaks_Fuente_abc"
+    mkdir -p "$paquete"
+    : >"$paquete/gitleaks.exe"
+    When call buscar_con_local "$TMP_G/local"
+    The status should be success
+    The output should include 'Gitleaks.Gitleaks_Fuente_abc'
+  End
+
+  It 'encuentra el binario en WinGet/Links'
+    mkdir -p "$TMP_G/local/Microsoft/WinGet/Links"
+    : >"$TMP_G/local/Microsoft/WinGet/Links/gitleaks.exe"
+    When call buscar_con_local "$TMP_G/local"
+    The status should be success
+    The output should include 'Links'
+  End
+
+  It 'con Docker instalado pero el demonio apagado sale con 2, no con 1'
+    When call modo_con_docker_caido
+    The status should be success
+    The output should include 'salida 2'
+    The stderr should include 'demonio está apagado'
+    The stderr should not include 'HAY HALLAZGOS'
   End
 End
