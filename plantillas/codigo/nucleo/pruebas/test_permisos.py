@@ -41,9 +41,10 @@ def test_solo_el_administrador_gestiona_usuarios() -> None:
     assert not puede(_actor(USUARIO), Capacidad.GESTIONAR_USUARIOS)
 
 
-def test_el_auditor_y_el_administrador_consultan_la_bitacora() -> None:
+def test_solo_el_rol_de_ejemplo_auditor_tiene_la_capacidad_de_ejemplo() -> None:
+    # El esqueleto no trae bitacora: la capacidad es un ejemplo y el administrador NO la anuncia.
     assert puede(_actor(AUDITOR), Capacidad.CONSULTAR_BITACORA)
-    assert puede(_actor(ADMINISTRADOR), Capacidad.CONSULTAR_BITACORA)
+    assert not puede(_actor(ADMINISTRADOR), Capacidad.CONSULTAR_BITACORA)
     assert not puede(_actor(USUARIO), Capacidad.CONSULTAR_BITACORA)
 
 

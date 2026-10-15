@@ -31,17 +31,20 @@ class Capacidad(StrEnum):
     """Una accion o cola que se concede por rol."""
 
     GESTIONAR_USUARIOS = "gestionar_usuarios"  # alta, edicion, roles y recuperacion del acceso
-    CONSULTAR_BITACORA = "consultar_bitacora"  # la consulta llega con el modulo `auditoria`
+    # EJEMPLO a reemplazar: el esqueleto NO trae bitacora (el modulo `auditoria` esta vacio y no
+    # hay pantalla). Existe para que la matriz tenga mas de una capacidad; solo el rol `auditor`.
+    CONSULTAR_BITACORA = "consultar_bitacora"
 
 
 # Lo que ve el usuario en su inicio: la capacidad dicha con palabras ("colas y acciones").
 DESCRIPCIONES: dict[Capacidad, str] = {
     Capacidad.GESTIONAR_USUARIOS: "Gestionar usuarios y roles",
-    Capacidad.CONSULTAR_BITACORA: "Consultar la bitácora de auditoría",
+    Capacidad.CONSULTAR_BITACORA: "Capacidad de ejemplo (aún sin pantalla): consultar el registro",
 }
 
 CAPACIDADES_POR_ROL: dict[str, frozenset[Capacidad]] = {
-    ADMINISTRADOR: frozenset({Capacidad.GESTIONAR_USUARIOS, Capacidad.CONSULTAR_BITACORA}),
+    ADMINISTRADOR: frozenset({Capacidad.GESTIONAR_USUARIOS}),
+    # Rol de EJEMPLO a reemplazar por los del SRS (README: "Reemplazar los roles de ejemplo").
     AUDITOR: frozenset({Capacidad.CONSULTAR_BITACORA}),
     # El rol de ejemplo `usuario` entra a la aplicacion y no tiene capacidades de administracion.
     USUARIO: frozenset(),

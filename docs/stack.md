@@ -13,7 +13,7 @@ Python 3.12 · Django 5 + Django REST Framework · PostgreSQL 16 · Redis · Cel
 | `configuracion/` | Settings por entorno (dev, pruebas, prod, migraciones) con validación del entorno al arrancar, `modulos.py` (mapa de módulos, dependencias y esquemas), seguridad (CSP, encabezados), salud, Celery, composición de adaptadores |
 | `nucleo/` | `Actor`, matriz de permisos central, puertos compartidos, reloj, y el outbox de eventos con despachador, reintentos, purga y filtro de datos sensibles |
 | `identidad/` | Usuarios, roles, ingreso con Argon2, bloqueo por cuenta, sesión con sello y tope, segundo factor TOTP cifrado, gestión de usuarios y aviso por reuso de código |
-| `auditoria/` | Módulo hexagonal vacío, listo para la bitácora y como modelo para copiar |
+| `auditoria/` | Molde: módulo hexagonal vacío (el esqueleto **no trae bitácora**) para copiar o retirar según el SRS |
 | `herramientas/` | Generador de contratos de import-linter, roles de PostgreSQL con mínimo privilegio, bases embebidas para desarrollo y pruebas, sonda de salud |
 | `despliegue/` | Dockerfile, Compose de desarrollo y de pruebas, nginx con TLS, pasos `certificado` y `migrar`, `.env.ejemplo` |
 
@@ -43,7 +43,7 @@ El `README.md` de `codigo/` de cada proyecto trae el detalle: variables de entor
 
 - **Docker Compose 2.38 (el del runner de GitHub) pierde `!reset` si llega por la fusión `<<:` de un ancla YAML.** En `despliegue/docker-compose.pruebas.yml`, `build: !reset null` va **directamente en cada servicio**, nunca dentro del ancla; en local con un Compose más nuevo el error no se ve y el CI sí lo muestra (intenta construir en lugar de usar la imagen). Una prueba estática del esqueleto lo vigila.
 - **Fija la imagen del runner:** `ubuntu-24.04` en lugar de `ubuntu-latest`; cambiarla es un cambio a mano.
-- **semgrep local = semgrep del CI:** misma versión, con la imagen oficial `semgrep/semgrep:<versión>` (la de `semgrep==` en `ci.yml`), código 0 y "Findings: 0". La regla `django-no-csrf-token` es genérica y solo reconoce `{% csrf_token %}` si el `</form>` está a 10 líneas o menos: los formularios largos se parten en parciales.
+- **semgrep local = semgrep del CI:** la misma versión (la de `semgrep==` en `ci.yml`), nativo en macOS y Linux, por WSL o Docker en Windows (opcionales), código 0 y "Findings: 0"; en el CI de GitHub siempre es obligatorio. Un hallazgo se corrige o se suprime en su línea con motivo (`# nosemgrep: <regla>`), nunca se excluye una carpeta; con gitleaks, igual: `gitleaks:allow` en la misma línea. La regla `django-no-csrf-token` es genérica y solo reconoce `{% csrf_token %}` si el `</form>` está a 10 líneas o menos: los formularios largos se parten en parciales.
 - **El CI se prueba temprano:** crea el remoto privado desde el inicio (con tu confirmación) y revisa cada push con `gh run list` (ver [instalación](instalacion.md#github-cli-gh-y-el-ci)).
 
 ## Verificación
@@ -57,11 +57,11 @@ lint-imports
 python manage.py makemigrations --check --dry-run
 ```
 
-semgrep, con la imagen oficial y la misma versión que el CI (en Git Bash de Windows, `MSYS_NO_PATHCONV=1` y `pwd -W`; en Linux o macOS, `$PWD`):
+semgrep, con la misma versión que el CI (nativo en macOS y Linux o por WSL; por Docker en Windows con `MSYS_NO_PATHCONV=1`, `pwd -W` y el montaje de solo lectura `:ro`):
 
 ```bash
-MSYS_NO_PATHCONV=1 docker run --rm -v "$(pwd -W):/src" -w /src semgrep/semgrep:1.178.0 \
-  semgrep scan --config p/python --config p/django --error --metrics=off --exclude pruebas --exclude conftest.py .
+pipx run --spec "semgrep==1.178.0" semgrep scan --config p/python --config p/django --error --metrics=off \
+  --exclude pruebas --exclude conftest.py .
 ```
 
-`bandit`, `pip-audit` y los escáneres por Docker están en la sección "Pruebas y calidad" del `README.md` de `codigo/`.
+`bandit`, `pip-audit`, gitleaks nativo y los escáneres de Docker (opcionales) están en la sección "Pruebas y calidad" del `README.md` de `codigo/`.

@@ -15,7 +15,7 @@ Para cada RNF de la historia aplicas la **verificación técnica** del Anexo C d
 |-------------|--------------|
 | Rendimiento | Medir la latencia o el p95 contra el umbral del SRS |
 | Autenticación | Bloqueo tras N intentos, segundo factor en roles sensibles, expiración y tope de sesión, sin oráculo de tiempo en el ingreso |
-| Integraciones | Webhook con firma inválida → rechazo y registro en la bitácora; un `INSERT` con un usuario de solo lectura debe fallar, **solo contra la base de pruebas** (el PostgreSQL embebido de `.pgdata_pruebas/` o la base efímera de la propia prueba), nunca contra la de desarrollo, un sistema fuente ni datos reales |
+| Integraciones | Webhook con firma inválida → rechazo y registro del intento (en el registro de eventos del proyecto, si el SRS lo pide); un `INSERT` con un usuario de solo lectura debe fallar, **solo contra la base de pruebas** (el PostgreSQL embebido de `.pgdata_pruebas/` o la base efímera de la propia prueba), nunca contra la de desarrollo, un sistema fuente ni datos reales |
 | Tokens y archivos | Entropía de tokens, detección de alteraciones por hash, permisos por rol |
 | Formatos | Fechas, números y monedas por localidad; UTC en la base |
 | Seguridad general | `pip-audit`, `bandit`, encabezados de seguridad y CSP, límite de peticiones en endpoints públicos |

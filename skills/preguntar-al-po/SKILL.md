@@ -32,7 +32,7 @@ metadata:
 HU-60 · Gestionar usuarios — 3 decisiones (ronda 1 de QA y Angel Fixer)
 
 D1. ¿El Administrador puede cambiar sus propios roles?
-  a) Sí, y queda en la bitácora (recomendada: no bloquea la operación y deja rastro)
+  a) Sí, y queda registrado (recomendada: no bloquea la operación y deja rastro)
   b) No, lo hace otro Administrador
 D2. …
 

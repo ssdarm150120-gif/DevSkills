@@ -20,6 +20,7 @@ from identidad.aplicacion.errores import ConflictoDeUsuario
 from identidad.pruebas.conftest import CONTRASENA
 from identidad.pruebas.conftest import entrar as _entrar
 from nucleo.actor import Actor
+from nucleo.permisos import DESCRIPCIONES, Capacidad
 
 pytestmark = pytest.mark.django_db
 
@@ -99,7 +100,7 @@ def _ana_ve_los_dos_roles(ctx: dict[str, Any]) -> None:
     ana = ctx["ana"]
     assert {r.codigo for r in ana.roles.all()} == {"auditor", "usuario"}
     pagina = _entrar(ana).get("/").content.decode()
-    assert "Consultar la bitácora de auditoría" in pagina  # la capacidad del Auditor
+    assert DESCRIPCIONES[Capacidad.CONSULTAR_BITACORA] in pagina  # capacidad de ejemplo del Auditor
     assert "Auditor" in pagina or "auditor" in pagina
     assert "Administrar usuarios" not in pagina
 

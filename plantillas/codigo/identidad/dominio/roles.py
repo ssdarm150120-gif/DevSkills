@@ -5,11 +5,12 @@ El catalogo es la fuente unica: la migracion de datos del esquema `identidad` lo
 prueba verifica que ambos coincidan. Los roles se identifican con una clave estable en minusculas;
 el nombre para mostrar es asunto de la interfaz.
 
-El esqueleto trae tres roles: `administrador` (gestiona usuarios y exige segundo factor), `auditor`
-(ejemplo de rol sensible: consulta la bitacora y exige segundo factor) y `usuario` (ejemplo de rol
-sin segundo factor). Cada proyecto agrega los roles de su SRS con una migracion de
-datos nueva (ver el README del codigo) y los suma aqui, en `nucleo.permisos` y en la prueba que
-verifica que coincidan.
+El esqueleto trae tres roles: `administrador` (gestiona usuarios y exige segundo factor) y dos
+roles de EJEMPLO que se reemplazan por los del SRS: `auditor` (ejemplo de rol sensible: exige
+segundo factor y tiene una capacidad de muestra; el esqueleto NO trae bitacora) y `usuario`
+(ejemplo de rol sin segundo factor). Cada proyecto agrega los roles de su SRS con una migracion
+de datos nueva y retira los de ejemplo (ver "Reemplazar los roles de ejemplo" en el README del
+codigo).
 """
 
 from collections.abc import Iterable

@@ -45,13 +45,13 @@ Delegar en el subagente que corresponda; si la historia cruza capas, empezar por
 ### Paso 3. Reglas que siempre se revisan antes de entregar
 - [ ] `dominio/` no importa Django, ORM ni librerías de red; nada fuera de la lista blanca.
 - [ ] Otro módulo se usa solo por `api_publica.py` o por eventos; cada módulo publica solo sus eventos.
-- [ ] Transiciones de estado por la tabla del dominio; evento emitido y registrado en la bitácora.
+- [ ] Transiciones de estado por la tabla del dominio; evento emitido (y registrado en la bitácora solo si el proyecto construyó una: el esqueleto no la trae).
 - [ ] Envíos externos por outbox, en la misma transacción, con clave de idempotencia.
 - [ ] Permisos verificados en el caso de uso con la matriz central y el `Actor` (incluidos filtros de propiedad: nadie ve lo de otro).
 - [ ] Sistemas de solo lectura: ningún puerto de escritura implementado; SQL siempre parametrizado.
 - [ ] Sin datos personales en logs ni en eventos; secretos por variables de entorno; nada de la empresa en constantes.
 - [ ] Tiempo con `Reloj` inyectado (UTC); dinero como monto + moneda.
-- [ ] `lint-imports`, `ruff check .`, `ruff format --check .`, `mypy .`, `pytest`, `bandit`, `pip-audit` y `makemigrations --check` en verde.
+- [ ] `lint-imports`, `ruff check .`, `ruff format --check .`, `mypy .`, `pytest`, `bandit`, `pip-audit` y `makemigrations --check` en verde, con el Python del entorno virtual del proyecto (`../.venv`, ver el README de `codigo/`): un `python` suelto puede ser otro intérprete sin las dependencias.
 
 ### Paso 3b. Lecciones aprendidas (checklist de incidentes reales)
 - [ ] **Transacciones propias:** un "un solo uso", un contador o un bloqueo que depende de que quien llama abra la transacción no es un control; el adaptador abre su transacción y su `select_for_update`.
@@ -69,6 +69,9 @@ Delegar en el subagente que corresponda; si la historia cruza capas, empezar por
 - [ ] **Archivos generados:** escribir con `newline="\n"` (en Windows se cuelan CRLF); `.gitattributes` con LF.
 - [ ] **Pruebas en paralelo:** recursos con nombre único por sesión de pytest (bases, carpetas temporales) y sin procesos huérfanos.
 - [ ] **Sin duplicados:** una sola fuente para cada permiso o regla (la matriz central), sin bloques duplicados en vistas.
+- [ ] **Marca de "visto" por ID, con doble comprobación:** para no procesar dos veces un mensaje, un webhook o un evento, guarda una marca por su identificador único y comprueba **dos veces**: una consulta previa (barata, evita trabajo) y una restricción `UNIQUE` al insertar la marca, dentro de la misma transacción que el efecto. La consulta sola pierde la carrera entre dos entregas simultáneas; la restricción sola convierte el duplicado en un error en lugar de un "ya visto". Prueba la concurrencia.
+- [ ] **Enmascara solo valores largos:** al ocultar un secreto o un dato en logs, transcripciones o salidas, sustituye solo valores de 8 caracteres o más. Un valor de 4 o menos coincide por accidente con cualquier texto (o, si "enseñas los últimos 4", lo revelas entero). Un valor corto no es un secreto: no lo trates como tal; si lo es, su lugar es una variable de entorno y nunca el texto.
+- [ ] **Falsos positivos de gitleaks:** se suprimen con `gitleaks:allow` **en la misma línea** y el motivo; nunca se excluye una carpeta o un archivo del escaneo (una exclusión esconde el siguiente secreto real). Con semgrep: se corrige, o `# nosemgrep: <regla>` en la línea con motivo; nunca `--exclude` nuevo.
 
 ### Paso 4. Entregar
 1. **No hacer commit:** el orquestador hace los puntos de control (`devskills:ciclo-historia`).

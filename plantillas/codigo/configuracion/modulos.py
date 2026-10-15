@@ -1,9 +1,10 @@
 """Mapa de modulos del monolito (DISENO D.1.2). Fuente unica para settings, migraciones y CI.
 
-El esqueleto trae `identidad` (usuarios, roles, ingreso y segundo factor) y `auditoria` (modulo
-hexagonal vacio, listo para la bitacora). Para agregar un modulo: crea su carpeta con la estructura
-hexagonal (copia la de `auditoria`), agregalo a `MODULOS_NEGOCIO`, declara sus dependencias en
-`DEPENDENCIAS` segun el DISENO (D.1.3) y regenera los contratos:
+El esqueleto trae `identidad` (usuarios, roles, ingreso y segundo factor) y `auditoria` (un
+molde: modulo hexagonal VACIO, sin bitacora; se retira o se llena segun el SRS). Para agregar un
+modulo: crea su carpeta con la estructura hexagonal (copia la de `auditoria`), agregalo a
+`MODULOS_NEGOCIO`, declara sus dependencias en `DEPENDENCIAS` segun el DISENO (D.1.3) y regenera
+los contratos:
 
     python -m herramientas.contratos_importlinter --escribir
 """
