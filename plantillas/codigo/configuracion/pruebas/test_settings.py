@@ -654,6 +654,27 @@ def test_wsgi_y_asgi_sin_settings_arrancan_con_prod_si_hay_secretos(punto_de_ent
     assert resultado.stdout.strip() == "configuracion.settings.prod"
 
 
+def test_dev_sin_redis_corre_celery_en_modo_local_y_cache_en_memoria(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Docker y Redis son opcionales en desarrollo: sin REDIS_URL no se apunta a ningun puerto 6379.
+    monkeypatch.setenv("DATABASE_URL", "postgres://u:c@localhost:55432/app")
+    monkeypatch.delenv("REDIS_URL", raising=False)
+    dev = _cargar_con_base("dev")
+    assert dev.CELERY_TASK_ALWAYS_EAGER is True
+    assert dev.CELERY_BROKER_URL == "memory://"
+    assert dev.CACHES["default"]["BACKEND"].endswith("LocMemCache")
+
+
+def test_dev_con_redis_usa_el_broker_y_la_cache_reales(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DATABASE_URL", "postgres://u:c@localhost:55432/app")
+    monkeypatch.setenv("REDIS_URL", "redis://redis:6379/0")
+    dev = _cargar_con_base("dev")
+    assert dev.CELERY_TASK_ALWAYS_EAGER is False
+    assert dev.CELERY_BROKER_URL == "redis://redis:6379/0"
+    assert dev.CACHES["default"]["BACKEND"].endswith("RedisCache")
+
+
 @pytest.mark.lento
 def test_importar_el_paquete_no_fija_los_settings_por_defecto() -> None:
     # `configuracion/__init__` importa Celery: un setdefault ahi le ganaria a wsgi/asgi.

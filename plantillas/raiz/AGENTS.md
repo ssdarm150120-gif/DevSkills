@@ -51,7 +51,8 @@ Desarrollo ──► punto de control ──► QA ──► Angel Fixer ──�
 
 - **Idioma:** español de México con tuteo. Commits en inglés, Conventional Commits, sin atribución de IA.
 - **Git:** cada elemento en su rama `hu-xx` o `en-xx`; commit de punto de control antes de cada revisión; solo el orquestador ejecuta comandos de git que cambian el árbol o la historia; nadie reconstruye archivos de memoria (`git restore`); cierre con `merge --squash` a `main`.
-- **Docker:** prefijo `{{SLUG}}` y puertos del host solo entre `{{PUERTO_BASE}}` y el `{{PUERTO_BASE}}` + 49; nunca los puertos reservados (`{{PUERTOS_RESERVADOS}}`).
+- **Docker (opcional):** se desarrolla y se prueba sin él. Si se usa: prefijo `{{SLUG}}` para el stack principal y `{{SLUG}}-<agente>` para cada agente; puertos del host solo entre `{{PUERTO_BASE}}` y el `{{PUERTO_BASE}}` + 49; nunca los puertos reservados (`{{PUERTOS_RESERVADOS}}`); nunca `down -v` ni `prune` sobre el stack principal.
+- **Hacia afuera:** nada de `git push`, `gh` de escritura, `docker push` ni borrar ramas con `-D` sin la confirmación explícita del usuario; los subagentes no los ejecutan nunca.
 - **Secretos:** nadie lee ni escribe `.env` ni `.env.*`.
 - **Memoria:** engram con `project` = `{{SLUG}}`.
 

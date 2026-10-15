@@ -8,17 +8,22 @@ archivo explica como levantarlo, probarlo y desplegarlo. **Todos los comandos se
 El esqueleto viene del plugin DevSkills y ya trae los cimientos probados: `configuracion` (settings por
 entorno con validacion, raiz de composicion), `nucleo` (actor, matriz de permisos, puertos, reloj y bus
 de eventos con outbox), `identidad` (usuarios, roles, ingreso, segundo factor, gestion de usuarios y
-aviso por reuso de un codigo), `auditoria` (modulo vacio, listo para la bitacora), `herramientas`
+aviso por reuso de un codigo), `auditoria` (un molde hexagonal vacio: no trae bitacora), `herramientas`
 (contratos de import-linter, roles de la base, bases embebidas) y `despliegue` (Compose, nginx con TLS,
 Dockerfile).
 
 ## Requisitos
 
+**Docker es opcional.** Se desarrolla y se prueba sin el: la base de datos es el PostgreSQL 16 embebido
+(`pgserver`) y Celery corre en modo local, sin Redis ni worker. Docker Compose solo hace falta para **desplegar**
+(o para reproducir el stack completo en tu maquina), y sus pruebas de despliegue se omiten solas si no esta.
+
 | Para | Hace falta |
 |------|------------|
-| Todo | Git y Python 3.12 (`python --version`) |
-| Compose, escaneres de seguridad | Docker Desktop (en Windows, con WSL2) y Docker Compose 2.24 o superior |
-| Desarrollo sin Docker | Nada mas: la base de datos la levanta `herramientas.base_local` |
+| Desarrollar y probar (la bateria completa) | Git y Python 3.12 (`python --version`). Nada mas |
+| Secretos (gitleaks) | El binario nativo (`winget install Gitleaks.Gitleaks`, `brew install gitleaks`, release de GitHub); Docker es la alternativa |
+| Analisis estatico (semgrep) | Nativo en macOS y Linux (`pipx install "semgrep==<version del CI>"`); en Windows, por WSL o por Docker, **opcionales**. En el CI de GitHub siempre corre |
+| Compose, imagen, hadolint y trivy | Docker Desktop (en Windows, con WSL2) y Docker Compose 2.24 o superior. Solo para desplegar |
 
 ```bash
 python -m venv ../.venv                      # el entorno virtual vive en la raiz del repositorio
@@ -28,9 +33,13 @@ pip install -r requirements-dev.txt          # dependencias, pruebas y herramien
 
 ## Reglas del host (Docker y puertos)
 
+*(Solo si usas Docker.)*
+
 - Los contenedores de este proyecto llevan el prefijo **`{{SLUG}}`** (nombre del proyecto de Compose:
   `{{SLUG}}-dev` y `{{SLUG}}-pruebas`). Para ver, detener o limpiar solo lo tuyo:
-  `docker ps --filter name={{SLUG}}`.
+  `docker ps --filter name={{SLUG}}`. Los agentes que usen Docker en una corrida de DevSkills llevan el prefijo
+  `{{SLUG}}-<agente>` (por ejemplo `{{SLUG}}-dev-a`) y **nunca** corren `docker compose down -v` ni `prune` sobre el
+  stack principal.
 - El proyecto solo publica puertos de **su rango propio**: {{PUERTO_BASE}} a {{PUERTO_FINAL}}. nginx usa
   `{{PUERTO_HTTP}}` (HTTP) y `{{PUERTO_HTTPS}}` (HTTPS), y solo en `127.0.0.1`.
 - **Nunca** se usan los puertos reservados del host: **{{PUERTOS_RESERVADOS}}** (por ejemplo, el
@@ -178,7 +187,7 @@ se cuentan. La ruta se compara sobre la URI ya normalizada.
 `python -m herramientas.roles_bd` es idempotente y concede tambien sobre lo que ya exista. Si alguna vez
 una migracion falla por permisos, vuelve a correr `docker compose run --rm migrar`.
 
-## Levantar la base local sin Docker
+## Desarrollar sin Docker (el camino por defecto)
 
 ```bash
 python -m herramientas.base_local            # imprime DATABASE_URL (PostgreSQL 16 embebido en ../.pgdata)
@@ -191,11 +200,21 @@ python -m herramientas.base_local --detener
 En desarrollo `DATABASE_URL` es obligatoria: ningun valor por defecto apunta a `localhost:5432`. Esa base
 usa `--auth=trust` y es **solo para tu maquina**.
 
+**Redis y Celery sin Docker.** Sin `REDIS_URL`, `settings.dev` pone Celery en **modo local** (`CELERY_TASK_ALWAYS_EAGER`:
+las tareas, incluido el despacho del outbox, se ejecutan en el mismo proceso, sin worker ni beat) y usa una cache en
+memoria. En las pruebas es igual (`settings.pruebas` con `fakeredis`). Que **no** cubre el modo local: los reintentos
+exponenciales y la purga periodica del outbox con un broker real; eso se prueba con Compose o en el despliegue de
+pruebas. Si ya tienes un Redis, define `REDIS_URL` y se usa el broker y la cache reales.
+
 ## Pruebas y calidad
 
 ```bash
-pytest -q                          # todo; usa su propio PostgreSQL embebido (../.pgdata_pruebas)
-pytest -q -m "not lento"           # sin las que lanzan procesos externos (lint-imports, Docker, pg)
+pytest -q                          # TODO, sin Docker; usa su propio PostgreSQL embebido (../.pgdata_pruebas)
+pytest -q -m "not lento"           # sin las que lanzan procesos externos (lint-imports, pg): mas rapido
+# En Windows el PostgreSQL embebido y los procesos hijos hacen lenta la bateria completa (varios minutos): ten
+# paciencia, o corre por modulos: pytest -q identidad  /  pytest -q nucleo  /  pytest -q herramientas
+# Las pruebas de Compose y del certificado necesitan Docker: sin el se OMITEN con el motivo a la vista, y en el CI
+# (REQUIERE_DOCKER=1) no se omiten nunca.
 ruff check . && ruff format --check .
 mypy && mypy .                     # estricto en */dominio y despues todo el codigo
 lint-imports                       # limites entre modulos
@@ -208,19 +227,63 @@ python manage.py check --deploy --fail-level WARNING        # con las variables 
 
 Dos sesiones de `pytest` a la vez no se pisan: cada una crea su base `test_<base>_<pid>_<azar>`.
 
-### Escaneres con Docker (los mismos del CI, sin instalar nada)
+### Escaneres de seguridad (los mismos del CI)
+
+**Secretos (gitleaks), sin Docker.** Desde la raiz del repositorio: el script del plugin escanea lo versionado y lo
+nuevo no ignorado con el binario nativo (o con Docker si no lo hay), o directamente:
+
+```bash
+gitleaks dir . --redact --no-banner          # nativo (winget install Gitleaks.Gitleaks | brew install gitleaks)
+docker run --rm -v "$PWD:/repo:ro" zricethezav/gitleaks:v8.21.2 dir /repo --redact --no-banner   # alternativa con Docker
+```
+
+Un falso positivo se suprime con un comentario `gitleaks:allow` **en esa misma linea** y el motivo; **nunca** se
+excluye una carpeta ni un archivo del escaneo.
+
+**Analisis estatico (semgrep).** La version es la misma de `semgrep==` en `.github/workflows/ci.yml`; debe terminar con
+codigo 0 y "Findings: 0".
+
+```bash
+# macOS y Linux: nativo
+pipx run --spec "semgrep==1.178.0" semgrep scan --config p/python --config p/django --error --metrics=off \
+  --exclude pruebas --exclude conftest.py .
+# Windows: por WSL (el mismo comando de arriba dentro de WSL) o, si prefieres, por Docker
+MSYS_NO_PATHCONV=1 docker run --rm -v "$(pwd -W):/src:ro" -w /src semgrep/semgrep:1.178.0 semgrep scan \
+  --config p/python --config p/django --error --metrics=off --exclude pruebas --exclude conftest.py .
+```
+
+El montaje es de **solo lectura** (`:ro`): semgrep no debe escribir en tu arbol. Un hallazgo se **corrige**, o se suprime
+con `# nosemgrep: <regla>` en esa linea y el motivo; **nunca** se excluye una carpeta nueva para que "pase". En Windows
+semgrep nativo no es una via soportada: usa WSL o Docker, o confia en el CI, donde es obligatorio. La regla
+`django-no-csrf-token` solo reconoce `{% csrf_token %}` con el `</form>` a 10 lineas o menos: los formularios largos se
+parten en parciales.
+
+**Imagen, Dockerfile y vulnerabilidades (solo si despliegas con Docker).**
 
 ```bash
 docker build -f despliegue/Dockerfile -t {{SLUG}}:dev .
 docker run --rm -i hadolint/hadolint:v2.15.1 < despliegue/Dockerfile
 docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.75.0 image \
   --exit-code 1 --severity CRITICAL,HIGH --ignore-unfixed --no-progress {{SLUG}}:dev
-docker run --rm -v "$PWD:/src" semgrep/semgrep:1.178.0 semgrep scan --config p/python --config p/django \
-  --error --metrics=off --exclude pruebas --exclude conftest.py /src
-docker run --rm -v "$PWD/..:/repo" zricethezav/gitleaks:v8.21.2 detect --source /repo --redact --no-banner
 ```
 
-En Git Bash sobre Windows antepone `MSYS_NO_PATHCONV=1` a los comandos con `-v` y usa `$(pwd -W)` en lugar de `$PWD` (por ejemplo, `-v "$(pwd -W):/src"`). La versión de semgrep es la misma de `semgrep==` en `.github/workflows/ci.yml`; debe terminar con código 0 y "Findings: 0". La regla `django-no-csrf-token` solo reconoce `{% csrf_token %}` con el `</form>` a 10 líneas o menos: los formularios largos se parten en parciales.
+En Git Bash sobre Windows antepone `MSYS_NO_PATHCONV=1` a los comandos con `-v` y usa `$(pwd -W)` en lugar de `$PWD`.
+
+### Dependencias reproducibles
+
+`requirements.txt` y `requirements-dev.txt` declaran **rangos**. Lo que de verdad se instala lo fija un lockfile con
+**hashes**, generado con `pip-tools` (ya esta en `requirements-dev.txt`) en la Entrega 0 y versionado:
+
+```bash
+pip-compile --generate-hashes --allow-unsafe --strip-extras -o requirements.lock requirements.txt requirements-dev.txt
+pip install --require-hashes -r requirements.lock     # en el CI, en la imagen y en cada maquina
+```
+
+Los hashes dependen de la plataforma: genera el lock en el sistema donde corre el CI (Linux) y, si tu equipo usa otro,
+regeneralo ahi tambien o mantén un lock por plataforma. Subir una dependencia es un cambio a proposito: edita el rango,
+vuelve a correr `pip-compile`, `pip-audit` y la bateria, y haz el commit del lock. La prueba
+`herramientas/pruebas/test_dependencias_reproducibles.py` exige versiones fijas y hashes en cada paquete en cuanto el
+lock existe. `package-lock.json` de la presentacion tambien se versiona y se instala con `npm ci`.
 
 ## Variables de entorno
 
@@ -263,14 +326,33 @@ borran esas tres lineas.
 ## Roles y permisos
 
 - **Catalogo de roles** (`identidad/dominio/roles.py`, sembrado por la migracion `0003_roles_iniciales`):
-  `administrador` (gestiona usuarios, exige segundo factor), `auditor` (ejemplo de rol sensible: consulta
-  la bitacora y exige segundo factor) y `usuario` (ejemplo de rol sin segundo factor). **Decision del
-  esqueleto:** se quitaron los roles propios del dominio del proyecto de referencia; cada proyecto agrega
-  los de su SRS (2.3 Clases de usuarios).
+  `administrador` (gestiona usuarios, exige segundo factor) y dos roles de **ejemplo** que se reemplazan:
+  `auditor` (rol sensible de muestra: exige segundo factor y tiene una capacidad de ejemplo; **el esqueleto
+  no trae bitacora**) y `usuario` (ejemplo de rol sin segundo factor). **Decision del esqueleto:** se
+  quitaron los roles propios del dominio del proyecto de referencia; cada proyecto agrega los de su SRS
+  (2.3 Clases de usuarios).
 - **Para agregar un rol:** (1) una migracion de datos nueva en `identidad/adaptadores/salida/migraciones/`
   con el mismo patron de `0003` (su reversa se detiene con un mensaje claro si alguien tiene el rol); (2) su
   codigo en `identidad/dominio/roles.py` (y en `ROLES_CON_SEGUNDO_FACTOR` si es sensible); (3) su codigo y
   sus capacidades en `nucleo/permisos.py`; (4) las pruebas de los tres lugares.
+### Reemplazar los roles de ejemplo
+
+Los roles `auditor` y `usuario` son datos de ejemplo, y las pruebas del esqueleto los usan como
+**fixtures** (unas 330 menciones en unos 25 archivos de `*/pruebas/`). Se reemplazan en la Entrega 0, en
+este orden, y cada paso deja la bateria en verde:
+
+1. **Agrega los roles del SRS** con los pasos de "Para agregar un rol" (migracion `0004_...`, codigo en
+   `identidad/dominio/roles.py`, capacidades en `nucleo/permisos.py`, pruebas).
+2. **Cambia los fixtures de las pruebas** a un rol tuyo: lista las menciones con
+   `rg -n "AUDITOR|\"auditor\"|USUARIO" --glob "*/pruebas/*.py"` y sustituye la constante por la de tu rol
+   (`sd '\bAUDITOR\b' 'SUPERVISOR'`). Corre `pytest -q` y `lint-imports` hasta que pase.
+3. **Retira los de ejemplo:** una migracion de datos nueva (`0005_retirar_roles_de_ejemplo.py`, con el patron de
+   `0003`; nunca se edita una migracion ya aplicada) que borra `auditor` y `usuario`, y quita sus constantes de
+   `CATALOGO_DE_ROLES`, `ROLES_CON_SEGUNDO_FACTOR` y `CAPACIDADES_POR_ROL`.
+4. **Retira la capacidad de ejemplo** `CONSULTAR_BITACORA` (y su texto en `DESCRIPCIONES`) si tu SRS no pide
+   bitacora; si la pide, es un elemento del plan que construye el modulo `auditoria` y la pantalla.
+5. Corre toda la bateria (seccion "Pruebas y calidad").
+
 - **Matriz de permisos** (`nucleo/permisos.py`): capacidades por rol, deniega por defecto, y los roles se
   suman. El permiso se verifica en el caso de uso (`puede(actor, capacidad)`), no solo en la vista.
 - **`Actor`** (`nucleo/actor.py`): id y roles, inmutable y validado (tambien al copiar o des-serializar).

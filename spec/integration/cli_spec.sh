@@ -39,6 +39,37 @@ Describe 'CLI devskills'
       The output should include 'git'
       The output should include 'Python 3.12'
       The output should include 'gitleaks'
+      The output should include 'Obligatorios'
+    End
+
+    Describe 'doctor trata Docker como opcional'
+      # Un `docker` falso que siempre falla simula una máquina sin Docker (o con Docker Desktop apagado).
+      setup_sin_docker() {
+        FALSOS="$(mktemp -d)"
+        printf '%s
+' '#!/usr/bin/env bash' 'exit 1' >"$FALSOS/docker"
+        chmod +x "$FALSOS/docker"
+      }
+      cleanup_sin_docker() { rm -rf "$FALSOS"; }
+      BeforeEach 'setup_sin_docker'
+      AfterEach 'cleanup_sin_docker'
+
+      doctor_sin_docker() { PATH="$FALSOS:$PATH" bash "$PROJECT_ROOT/bin/devskills" doctor; }
+
+      It 'sin Docker avisa que es opcional, explica qué se pierde y no falla'
+        When call doctor_sin_docker
+        The status should be success
+        The output should include 'Docker (cliente) (opcional)'
+        The output should include 'sigue desarrollando y probando sin Docker'
+        The output should not include 'Docker (cliente) — falta'
+      End
+
+      It 'Docker aparece en la sección de opcionales y no entre los obligatorios'
+        When call doctor_sin_docker
+        The status should be success
+        The output should include 'Opcionales (no bloquean'
+        The output should include 'gitleaks'
+      End
     End
 
     Describe 'doctor y mermaid-cli en la carpeta fija ~/.devskills/doc'

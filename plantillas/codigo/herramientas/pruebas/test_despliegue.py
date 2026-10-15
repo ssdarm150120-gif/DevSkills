@@ -5,6 +5,7 @@ resultado YA resuelto (anclas, variables y superposicion de archivos), asi que s
 Docker en la maquina (en el CI de GitHub si lo hay).
 """
 
+import functools
 import json
 import os
 import re
@@ -12,7 +13,7 @@ import secrets
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
 import pytest
 import yaml
@@ -275,9 +276,42 @@ def test_el_ci_construye_la_imagen_y_la_escanea_con_trivy_y_hadolint() -> None:
     assert re.search(r"hadolint/hadolint:v\d+\.\d+\.\d+@sha256:[0-9a-f]{64}", ci)
 
 
+def test_el_ci_exige_docker_para_las_pruebas_que_lo_necesitan() -> None:
+    # En una maquina sin Docker esas pruebas se omiten; en el CI no deben omitirse nunca.
+    assert re.search(r'^\s+REQUIERE_DOCKER: "1"\s*$', CI.read_text(encoding="utf-8"), re.MULTILINE)
+
+
 # --- Compose resuelto --------------------------------------------------------------------------
 
-DOCKER = shutil.which("docker")
+# SIN_DOCKER=1 simula una maquina sin Docker (el CI del plugin lo usa para probar ese camino).
+DOCKER = None if os.environ.get("SIN_DOCKER") == "1" else shutil.which("docker")
+# Docker es OPCIONAL para desarrollar y probar: sin el, estas pruebas se omiten con el motivo a la
+# vista. En el CI de GitHub (REQUIERE_DOCKER=1) NO se omiten en silencio: sin Docker, fallan.
+REQUIERE_DOCKER = os.environ.get("REQUIERE_DOCKER") == "1"
+
+
+def _sin_docker(motivo: str) -> NoReturn:
+    if REQUIERE_DOCKER:
+        pytest.fail(f"{motivo} (REQUIERE_DOCKER=1: en el CI no se omiten en silencio)")
+    pytest.skip(f"{motivo}. Docker es opcional para desarrollar; estas pruebas corren en el CI.")
+
+
+@functools.cache
+def _servicio_de_docker_responde() -> bool:
+    """El cliente existe Y el servicio contesta (Docker Desktop apagado cuenta como sin Docker)."""
+    if DOCKER is None:
+        return False
+    try:
+        resultado = subprocess.run(
+            [DOCKER, "info"],
+            capture_output=True,
+            stdin=subprocess.DEVNULL,
+            timeout=30,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return resultado.returncode == 0
 
 
 def _compose(tmp_path: Path, *archivos: str, extra: dict[str, str] | None = None) -> dict[str, Any]:
@@ -306,7 +340,7 @@ def _compose(tmp_path: Path, *archivos: str, extra: dict[str, str] | None = None
 @pytest.fixture
 def desarrollo(tmp_path: Path) -> dict[str, Any]:
     if DOCKER is None:
-        pytest.skip("Docker no esta instalado")
+        _sin_docker("Docker no esta instalado")
     return _compose(tmp_path, "docker-compose.yml")
 
 
@@ -421,7 +455,7 @@ def test_compose_pruebas_funciona_en_localhost_con_una_imagen_construida_localme
 ) -> None:
     """sin registro ni variables extra, usa la imagen local y no la descarga."""
     if DOCKER is None:
-        pytest.skip("Docker no esta instalado")
+        _sin_docker("Docker no esta instalado")
     pruebas = _compose(tmp_path, *ARCHIVOS_PRUEBAS)
     assert pruebas["name"] == f"{SLUG}-pruebas"
     for nombre in ("web", "worker", "worker-outbox", "beat", "migrar"):
@@ -436,7 +470,7 @@ def test_compose_pruebas_admite_una_imagen_de_registro_que_se_descarga_siempre(
     tmp_path: Path,
 ) -> None:
     if DOCKER is None:
-        pytest.skip("Docker no esta instalado")
+        _sin_docker("Docker no esta instalado")
     imagen = f"ghcr.io/ejemplo/{SLUG}:abc123"
     pruebas = _compose(
         tmp_path,
@@ -460,7 +494,7 @@ def test_compose_pruebas_resuelto_revierte_los_adaptadores_falsos_en_la_aplicaci
     no el YAML crudo: es lo que de verdad recibirán `web` y `worker` en staging.
     """
     if DOCKER is None:
-        pytest.skip("Docker no esta instalado")
+        _sin_docker("Docker no esta instalado")
     base = _compose(tmp_path, "docker-compose.yml")
     pruebas = _compose(tmp_path, *ARCHIVOS_PRUEBAS)
     for nombre in ("web", "worker", "worker-outbox", "beat"):
@@ -589,13 +623,13 @@ _SAN_ESPERADO_DE_LOCALHOST = ["DNS:localhost", "IP Address:127.0.0.1", "IP Addre
 
 
 def _docker() -> str:
-    docker = shutil.which("docker")
-    if docker is None:
-        pytest.fail(
+    if not _servicio_de_docker_responde():
+        _sin_docker(
             "Estas pruebas ejecutan generar_certificado.sh en la imagen `alpine/openssl` del "
-            "Compose y necesitan Docker; no se omiten en silencio. Instala Docker."
+            "Compose y necesitan Docker instalado y con el servicio en marcha"
         )
-    return docker
+    assert DOCKER is not None
+    return DOCKER
 
 
 @pytest.fixture(scope="session")
@@ -922,7 +956,7 @@ def test_el_compose_pasa_el_nombre_de_la_aplicacion_que_sirve_de_emisor_del_segu
     None
 ):
     compose = (DESPLIEGUE / "docker-compose.yml").read_text(encoding="utf-8")
-    assert re.search(r"APP_NOMBRE_APLICACION: \$\{APP_NOMBRE_APLICACION:-[^}]+\}", compose)
+    assert re.search(r'APP_NOMBRE_APLICACION: "?\$\{APP_NOMBRE_APLICACION:-[^}]+\}"?', compose)
     assert "APP_NOMBRE_APLICACION:?" not in compose  # opcional
 
 

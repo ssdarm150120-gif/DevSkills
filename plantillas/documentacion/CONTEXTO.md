@@ -12,7 +12,7 @@ DISEÑO, y lo actualiza en cada pasada documental. Nada de secretos ni datos per
 | Proyecto | {{NOMBRE_PROYECTO}} |
 | Slug (carpetas, Docker, engram) | `{{SLUG}}` |
 | Proyecto de engram (`mem_save` / `mem_search`) | `{{SLUG}}` |
-| Prefijo de Docker (contenedores, redes, volúmenes, proyecto de Compose) | `{{SLUG}}` |
+| Prefijo de Docker del stack principal (solo si usas Docker, que es opcional) | `{{SLUG}}` (los agentes usan `{{SLUG}}-<agente>`) |
 | Rango de puertos del host | `{{PUERTO_BASE}}` a `{{PUERTO_BASE}} + 49` |
 | Puertos reservados del host (nunca usarlos ni apuntar a ellos por defecto) | {{PUERTOS_RESERVADOS}} |
 | Idioma | Español de México con tuteo (documentos, código, reportes y respuestas) |
@@ -64,7 +64,7 @@ Habilitadores con dueño fijo: <!-- p. ej. EN-01 y EN-02 van a dev-a -->
 ## Entorno local
 
 - El proyecto **nunca** apunta por defecto a un puerto reservado del host ({{PUERTOS_RESERVADOS}}).
-- Contenedores, redes y volúmenes con el prefijo `{{SLUG}}`; puertos publicados solo dentro del rango `{{PUERTO_BASE}}` a `{{PUERTO_BASE}} + 49`.
+- Docker es **opcional** (desarrollo y pruebas con PostgreSQL embebido y Celery local). Si se usa: el stack principal lleva el prefijo `{{SLUG}}`, cada agente `{{SLUG}}-<agente>`, y los puertos publicados van solo dentro del rango `{{PUERTO_BASE}}` a `{{PUERTO_BASE}} + 49`. Sobre el stack principal nadie corre `down -v` ni `prune`.
 - <!-- cómo se levanta la base de desarrollo y la de pruebas (ver codigo/README.md) -->
 
 ## Decisiones vigentes del Product Owner que afectan el trabajo diario

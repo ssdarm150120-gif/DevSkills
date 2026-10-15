@@ -1,4 +1,10 @@
-"""Desarrollo local (Docker Compose o servicios locales). Los valores por defecto son SOLO dev."""
+"""Desarrollo local (sin Docker, o con Docker Compose). Los valores por defecto son SOLO dev.
+
+Docker NO es requisito: la base sale del PostgreSQL embebido (`python -m herramientas.base_local`)
+y, sin `REDIS_URL`, Celery corre en modo local (las tareas se ejecutan en el mismo proceso, sin
+worker) y la cache y las sesiones viven en la memoria del proceso. Con `REDIS_URL` (por ejemplo, el
+Redis de Compose) se usan el broker y la cache reales, como en produccion.
+"""
 
 from configuracion import adaptadores, entorno
 from configuracion.settings.base import *
@@ -21,14 +27,25 @@ DATABASES = {
     )
 }
 
-CELERY_BROKER_URL = entorno.texto("REDIS_URL", "redis://localhost:6379/0")
-CACHES = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": CELERY_BROKER_URL,
-        "KEY_PREFIX": "app",
+# Redis es OPCIONAL en desarrollo. Sin `REDIS_URL` no se apunta a ningun `localhost:6379` por
+# accidente: Celery corre en modo local (eager, broker en memoria) y la cache es local al proceso.
+# Los envios del outbox se despachan en la misma peticion; no hay worker ni beat, y para probar los
+# reintentos reales se usa Compose.
+_REDIS_URL = entorno.texto("REDIS_URL", "")
+if _REDIS_URL:
+    CELERY_BROKER_URL = _REDIS_URL
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": CELERY_BROKER_URL,
+            "KEY_PREFIX": "app",
+        }
     }
-}
+else:
+    CELERY_BROKER_URL = "memory://"
+    CELERY_TASK_ALWAYS_EAGER = True
+    CELERY_TASK_EAGER_PROPAGATES = True
+    CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
 
 # Adaptadores de los puertos compartidos (DISENO D.1.4, D.6.2): en desarrollo, los sistemas externos
 # van simulados por defecto. Cada puerto se cambia con su variable `APP_ADAPTADOR_<PUERTO>`.

@@ -114,6 +114,9 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgres://app:app@localhost:5432/app
+      # Docker es opcional en la maquina del desarrollador (las pruebas que lo necesitan se omiten ahi),
+      # pero en el CI SIEMPRE hay Docker: sin esta variable un Docker roto pasaria en silencio.
+      REQUIERE_DOCKER: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

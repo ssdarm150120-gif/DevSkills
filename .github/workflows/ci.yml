@@ -18,7 +18,9 @@ jobs:
     name: Lint (ShellCheck)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Instalar ShellCheck
         run: sudo apt-get install -y shellcheck
       - name: ShellCheck
@@ -30,12 +32,14 @@ jobs:
     name: Manifiestos del plugin
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Estructura del plugin
         run: python3 scripts/validar_plugin.py
       - name: Validar con Claude Code
         run: |
-          npm install --global @anthropic-ai/claude-code
+          npm install --global @anthropic-ai/claude-code@2.1.300
           claude plugin validate .
 
   pruebas:
@@ -49,8 +53,10 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
       - name: Instalar ShellSpec
@@ -72,14 +78,57 @@ jobs:
     name: Secretos (gitleaks)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: gitleaks
         run: docker run --rm -v "$PWD:/repo:ro" zricethezav/gitleaks:v8.21.2 dir /repo --no-banner --redact
+
+  # Genera un proyecto nuevo con `devskills init` y corre su calidad y su bateria SIN Docker (SIN_DOCKER=1 hace
+  # que las pruebas de Compose y del certificado se omitan, como en una maquina sin Docker): prueba que lo que
+  # el plugin entrega a un proyecto funciona de verdad, no solo que los instaladores copian archivos.
+  esqueleto:
+    name: Proyecto nuevo sin Docker (ruff, mypy, lint-imports, pytest)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      SIN_DOCKER: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Identidad de git para el primer commit
+        run: |
+          git config --global user.name "Pruebas"
+          git config --global user.email "pruebas@example.invalid"
+      - name: Crear el proyecto con devskills init
+        run: bin/devskills init "$RUNNER_TEMP/proyecto" --nombre "Proyecto CI" --slug proyecto-ci --puerto-base 21000
+      - name: Instalar las dependencias del proyecto
+        working-directory: ${{ runner.temp }}/proyecto/codigo
+        run: |
+          python -m venv "$RUNNER_TEMP/proyecto/.venv"
+          "$RUNNER_TEMP/proyecto/.venv/bin/pip" install -r requirements-dev.txt
+      - name: Calidad (ruff, mypy, lint-imports)
+        working-directory: ${{ runner.temp }}/proyecto/codigo
+        run: |
+          . "$RUNNER_TEMP/proyecto/.venv/bin/activate"
+          ruff check . && ruff format --check .
+          mypy && mypy .
+          lint-imports
+          python -m herramientas.contratos_importlinter | diff - .importlinter
+      - name: Bateria completa (pytest) sin Docker
+        working-directory: ${{ runner.temp }}/proyecto/codigo
+        run: |
+          . "$RUNNER_TEMP/proyecto/.venv/bin/activate"
+          pytest -q
 
   todo-en-verde:
     name: Todo en verde
     runs-on: ubuntu-24.04
-    needs: [lint, manifiestos, pruebas, secretos]
+    needs: [lint, manifiestos, pruebas, secretos, esqueleto]
     if: always()
     steps:
       - name: Revisar resultados
@@ -87,7 +136,8 @@ jobs:
           if [[ "${{ needs.lint.result }}" != "success" ]] || \
              [[ "${{ needs.manifiestos.result }}" != "success" ]] || \
              [[ "${{ needs.pruebas.result }}" != "success" ]] || \
-             [[ "${{ needs.secretos.result }}" != "success" ]]; then
+             [[ "${{ needs.secretos.result }}" != "success" ]] || \
+             [[ "${{ needs.esqueleto.result }}" != "success" ]]; then
             echo "Algo falló."
             exit 1
           fi
