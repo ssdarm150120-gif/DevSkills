@@ -69,6 +69,13 @@ def main() -> int:
     if rotas:
         raise SystemExit("referencias a skills o agentes que no existen:\n  " + "\n  ".join(sorted(rotas)))
 
+    # Los permisos amplios (Bash(git *), Bash(python *), Bash(docker *)) solo pueden aparecer para advertir que NO se usen.
+    amplios = ("Bash(git *)", "Bash(python *)", "Bash(docker *)", "Bash(gh *)")
+    for archivo in [*RAIZ.glob("docs/*.md"), *RAIZ.glob("skills/**/*.md"), *RAIZ.glob("agents/*.md"), RAIZ / "README.md"]:
+        for numero, linea in enumerate(archivo.read_text(encoding="utf-8").splitlines(), 1):
+            if any(patron in linea for patron in amplios) and "No uses" not in linea:
+                raise SystemExit(f"permiso demasiado amplio recomendado en {archivo.relative_to(RAIZ)}:{numero}")
+
     print(f"plugin {plugin['version']}: {len(agentes)} agentes, {len(skills)} skills, referencias correctas")
     return 0
 

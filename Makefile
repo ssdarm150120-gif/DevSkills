@@ -12,7 +12,7 @@ help:
 	@echo "  test-cli      Pruebas del CLI devskills"
 	@echo "  lint          ShellCheck sobre el CLI, los instaladores y las pruebas"
 	@echo "  validate      Valida el plugin y el marketplace (claude plugin validate)"
-	@echo "  gitleaks      Busca secretos con gitleaks por Docker"
+	@echo "  gitleaks      Busca secretos con gitleaks (nativo; Docker como alternativa)"
 	@echo "  install       Instala DevSkills en tu usuario (install.sh)"
 	@echo "  uninstall     Quita lo instalado (uninstall.sh)"
 	@echo "  check         lint + validate + test"

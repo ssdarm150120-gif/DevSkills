@@ -139,7 +139,7 @@ Notas sobre la lista:
 - **La rama del elemento no se borra sola.** El cierre hace `git merge --squash` a `main`; borrar la rama requiere `git branch -D`, que está vetado. Bórrala tú después de revisar (`git branch -D hu-xx`).
 - **Sin `push` ni `gh` de escritura.** Subir a GitHub, abrir issues o PR y mezclar los PR de Dependabot se hace a mano, con tu aprobación, después de la corrida.
 - **Python:** los comandos se dan por módulo (`python -m pytest`, `python -m ruff`…) y por scripts conocidos; si usas un entorno virtual, permite también su ruta (`Bash(.venv/Scripts/python -m pytest*)` en Windows, `Bash(.venv/bin/python -m pytest*)` en Unix).
-- **Docker no hace falta** para desarrollar y probar (ver [Docker es opcional](#docker-es-opcional)); si tu corrida lo usa, permite solo `Bash(docker compose -p <slug>-*)`, nunca `Bash(docker *)`.
+- **Docker no hace falta** para desarrollar y probar (ver [Docker es opcional](#docker-es-opcional)); si tu corrida lo usa, permite solo `Bash(docker compose -p <slug>-*)`. No uses `Bash(docker *)`.
 
 ### Corre en un entorno aislado
 
@@ -199,6 +199,15 @@ gh run view <id> --log-failed    # solo el registro de lo que falló
 
 Un CI en rojo es deuda: se corrige antes de seguir. Los PR de Dependabot fallarán mientras el CI de `main` esté en rojo: primero `main` en verde, luego `@dependabot rebase`, integra las menores y revisa aparte las versiones mayores. **Cada `@dependabot rebase` y cada merge es una acción hacia afuera:** el agente los lista y los propone, y solo ejecuta los que apruebas. Los flujos usan `ubuntu-24.04` (no `ubuntu-latest`): subir esa imagen es un cambio a mano.
 
+## Windows en un equipo de dominio: Git Bash puede ir lento
+
+En equipos Windows unidos a un dominio, cada arranque de `sh.exe` (Git Bash) puede consultar al controlador de dominio (Netlogon) y, fuera de la red corporativa o sin VPN, esperar su tiempo de espera. Un `sh -c true` que debería tardar milisegundos tarda segundos, y todo lo que lanza muchos procesos se vuelve lentísimo: la suite de ShellSpec de DevSkills (27 ejemplos) tarda **unos 5 minutos** en una máquina así, con más tiempo de sistema que de usuario, y el pytest de un proyecto con PostgreSQL embebido, varios minutos. No es un fallo del plugin:
+
+- Mide con `time sh -c true`; más de unos 100 ms por arranque indica este problema.
+- Conéctate a la red corporativa o a la VPN antes de correr suites largas, o córrelas en WSL o en el CI.
+- Corre una sola prueba con `shellspec spec/integration/cli_spec.sh:LÍNEA` y deja la suite completa para el CI; en pytest, por módulos (`pytest -q nucleo`).
+- No subas los tiempos de espera ni reintentes en bucle: empeora la lentitud.
+
 ## Requisitos
 
 Corre `devskills doctor` para revisarlos todos.
@@ -207,14 +216,34 @@ Corre `devskills doctor` para revisarlos todos.
 |-----------|----------|-----------------|
 | Git | Todo | <https://git-scm.com/downloads> |
 | Claude Code | Agentes y skills | <https://code.claude.com> |
-| Docker | Compose del proyecto, gitleaks | Docker Desktop o Docker Engine |
 | Python 3.12 | Esqueleto y generadores | `winget install Python.Python.3.12` · `brew install python@3.12` |
+| gitleaks | Búsqueda de secretos antes de cada commit | Nativo: `winget install Gitleaks.Gitleaks` · `brew install gitleaks` · release de <https://github.com/gitleaks/gitleaks/releases>. Alternativa: `docker pull zricethezav/gitleaks:v8.21.2` |
+
+**Opcionales** (`devskills doctor` los avisa sin bloquear y dice qué pierdes):
+
+| Requisito | Para qué | Cómo instalarlo |
+|-----------|----------|-----------------|
+| Docker | Levantar el stack con Compose y construir la imagen en tu máquina | Docker Desktop o Docker Engine. Ver [Docker es opcional](#docker-es-opcional) |
+| semgrep | Análisis estático igual que el CI, en tu máquina | macOS y Linux: `pipx install semgrep==1.178.0` (la versión de `semgrep==` en el `ci.yml` del proyecto); Windows: WSL o Docker (`docker pull semgrep/semgrep:1.178.0`). En el CI de GitHub es obligatorio |
 | Node.js LTS | Presentación y mermaid-cli | <https://nodejs.org> |
-| mermaid-cli | Diagramas en los Word | En una carpeta local, ver [generadores](generadores.md) |
-| gitleaks | Búsqueda de secretos | `docker pull zricethezav/gitleaks:v8.21.2` |
-| semgrep (imagen) | Análisis estático igual que el CI | `docker pull semgrep/semgrep:1.178.0` (la versión de `semgrep==` en el `ci.yml` del proyecto) |
+| mermaid-cli | Diagramas en los Word | En una carpeta local con versión fija, ver [generadores](generadores.md) |
 | GitHub CLI (`gh`) | Remoto privado y revisión del CI | Ver "GitHub CLI (`gh`) y el CI" |
 | Plugin engram | Memoria entre sesiones | Como plugin de Claude Code |
+
+### Docker es opcional
+
+Docker **no es un requisito** para usar DevSkills ni para desarrollar o probar un proyecto. El stack sigue siendo el mismo (Django, PostgreSQL, Redis, Celery, nginx) y **Docker Compose es la forma de desplegarlo**, pero:
+
+| Qué | Sin Docker | Con Docker |
+|-----|-----------|------------|
+| Base de datos de desarrollo y de pruebas | PostgreSQL 16 embebido (`pgserver`), ya soportado por el esqueleto | El `postgres` del Compose |
+| Celery y Redis | Modo local (eager) y caché en memoria; sin worker ni beat | `worker`, `worker-outbox`, `beat` y `redis` reales |
+| Batería de pruebas (`pytest`) | Completa; las pruebas de Compose y del certificado se omiten con el motivo a la vista | Completa, sin omisiones |
+| Secretos (gitleaks) | Binario nativo | Imagen de Docker |
+| semgrep | Nativo en macOS y Linux; en Windows, WSL o Docker | Imagen de Docker |
+| Desplegar, construir la imagen, hadolint y trivy | No aplica en tu máquina | Sí |
+
+Qué se pierde sin Docker: levantar el stack completo en tu máquina (nginx con TLS, worker y beat reales) y probar ahí los reintentos del outbox; todo eso se prueba en el CI de GitHub, donde Docker **siempre** está y las pruebas que lo necesitan no se pueden omitir (`REQUIERE_DOCKER=1`). `devskills doctor` trata Docker como opcional: lo avisa, no lo cuenta como error y explica qué pierdes.
 
 Para correr sin humano, ver "Uso no interactivo".
 

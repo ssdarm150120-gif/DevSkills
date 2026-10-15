@@ -73,7 +73,8 @@ Cada decisión queda escrita con quién la tomó: en el SRS, en el reporte de av
 ### Idioma, secretos y entorno
 - Todo en español de México con tuteo. Commits en inglés, Conventional Commits, sin atribución de IA.
 - Nadie lee ni escribe `.env` ni `.env.*`.
-- Docker con prefijo y rango de puertos propios por agente, nunca en puertos reservados del host, y limpieza al terminar.
+- Docker es **opcional**: se desarrolla y se prueba sin él (PostgreSQL embebido y Celery local); Compose solo hace falta para desplegar. Si lo usas, el prefijo es `<slug>-<agente>` y la limpieza es solo de lo tuyo. Nunca en puertos reservados del host.
+- Nada sale del equipo sin la confirmación explícita del usuario: `git push`, `gh` de escritura, merges de Dependabot, publicar una lección en el repositorio de DevSkills.
 - Nada de la organización escrito en el código: va en configuración.
 
 ## Documentos de un proyecto

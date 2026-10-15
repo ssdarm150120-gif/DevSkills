@@ -38,7 +38,9 @@ Todo lo que no se pueda responder queda como pregunta `P-nn` abierta para el SRS
 **El método no presupone un dominio.** No des por hecho clientes, ventas, canales de mensajería ni sistemas externos: pregunta por los actores, los procesos y las integraciones **si las hay**. Sirve igual para un sistema de inventarios (almacenistas, entradas y salidas, conteos), una plataforma escolar (docentes, alumnos, calificaciones) o una app interna de recursos humanos (colaboradores, vacaciones, autorizaciones).
 
 ### Fase 2. Crear la carpeta del proyecto
-Ejecuta el script del plugin (Python 3.12, solo librería estándar):
+**Si la carpeta ya existe** (el usuario corrió `devskills init` antes y la sesión está abierta en ella: hay `documentacion/CONTEXTO.md` y el commit `chore: bootstrap project from devskills`), **salta esta fase**: usa su nombre, slug y rango de puertos (están en `CONTEXTO.md`) y confirma con el Product Owner solo si el descubrimiento los cambia. El orden del método es descubrimiento primero; `devskills init` por su cuenta es el atajo de quien ya conoce esos datos.
+
+En cualquier otro caso, ejecuta el script del plugin (Python 3.12, solo librería estándar), con lo que salió del descubrimiento:
 
 ```bash
 python "${CLAUDE_SKILL_DIR}/scripts/crear_proyecto.py" --destino <ruta-del-proyecto> --nombre "<Nombre del sistema>" --slug <slug> --puerto-base <N> --puertos-reservados 5432 --autor "<Autor>"

@@ -48,7 +48,7 @@ Desarrollo ──► punto de control ──► QA ──► Angel Fixer ──�
 ### 3. Cerrar
 1. Lanzar o ejecutar `devskills:registrar-avance`: reporte `documentacion/avance/S{NN}/{ID}.md`, estado oficial `Listo`, índice y **regeneración del plan y del tablero** (`python documentacion/analisis/plan_sprints.py`; el elemento queda **tachado**).
 2. **Squash a main** (ver regla 4 de "Puntos de control").
-3. **Documentación en commit aparte:** si el ciclo cambió SRS o DISEÑO (preguntas cerradas, ADR, versiones), el `analista-arquitecto` hace la pasada (skill `devskills:pasada-documental`): regenera el Anexo C (`python documentacion/analisis/trazabilidad.py _tmp.md --escribir`), el plan y los Word (`python documentacion/analisis/md_a_word.py --mermaid <carpeta de mermaid-cli>`). Los commits de documentación (`docs: ...`) van **separados** del commit del código (`feat(...)` / `fix(...)`); los Word regenerados en su propio `docs: regenerate Word documents after <ID>`.
+3. **Documentación en commit aparte:** si el ciclo cambió SRS o DISEÑO (preguntas cerradas, ADR, versiones), el `analista-arquitecto` hace la pasada (skill `devskills:pasada-documental`): regenera el Anexo C (`python documentacion/analisis/trazabilidad.py _tmp.md --escribir`), el plan y los Word (`"$PYDOC" documentacion/analisis/md_a_word.py --mermaid <carpeta de mermaid-cli>`). Los commits de documentación (`docs: ...`) van **separados** del commit del código (`feat(...)` / `fix(...)`); los Word regenerados en su propio `docs: regenerate Word documents after <ID>`.
 4. **gitleaks antes de cualquier commit de cierre y antes de cualquier push**, sobre los archivos de `git ls-files -co --exclude-standard` (script `${CLAUDE_PLUGIN_ROOT}/scripts/gitleaks_archivos.py`: gitleaks nativo, con Docker como alternativa; ver Commands). Sin hallazgos no hay commit ni push. Un falso positivo se suprime con `gitleaks:allow` en esa misma línea y su motivo; nunca se excluye una carpeta.
 5. Guardar en engram (`mem_save`, project de `CONTEXTO.md`, topic_key `<project>/<id>/cierre`) el resultado, commits y hallazgos no obvios, y revisar la regla de **mantenimiento de DevSkills** (lección general para el plugin, solo como borrador local).
 6. Responder al usuario (y por Telegram si el canal está activo) con: veredicto, rondas, enlace al reporte, commits y avance de la entrega en puntos.
@@ -59,7 +59,7 @@ Desarrollo ──► punto de control ──► QA ──► Angel Fixer ──�
 - Si un agente encuentra una contradicción con el SRS: **detener el ciclo y preguntar al usuario**.
 - Commits en inglés con Conventional Commits y **sin atribución de IA ni `Co-Authored-By`**.
 - Si un agente se corta por límite de uso: skill `devskills:recuperar-corte` (no se rehace su trabajo).
-- **Herramientas de revisión iguales al CI:** QA, Angel Fixer y verificador corren semgrep con la imagen oficial `semgrep/semgrep:<versión>` y la **misma versión** que fija `.github/workflows/ci.yml` (comando exacto en `devskills:validar-historia`; en Windows con `MSYS_NO_PATHCONV=1` y `pwd -W`) y exigen código 0 y "Findings: 0". Una herramienta distinta a la del CI no prueba nada.
+- **Herramientas de revisión iguales al CI:** QA, Angel Fixer y verificador corren semgrep con la **misma versión** que fija `.github/workflows/ci.yml` (nativo en macOS y Linux; en Windows por WSL o Docker, opcionales; comando exacto en `devskills:validar-historia`) y exigen código 0 y "Findings: 0". Una herramienta distinta a la del CI no prueba nada. Si la máquina no tiene ninguna de las tres vías, el semgrep del CI de GitHub (siempre obligatorio) es el que cuenta: el orquestador lo deja listado como verificación pendiente y el elemento no se da por Listo hasta que ese job esté en verde (después de un push que el usuario autorice) o el usuario acepte explícitamente cerrar sin él.
 - **Nada hacia afuera sin confirmación explícita del usuario:** `git push`, `gh` que escriba (crear repositorio, issues, PR, comentarios), merges de Dependabot y cualquier publicación se **proponen** con el comando exacto y se ejecutan solo con un "sí" del usuario en esta conversación (y con gitleaks limpio). En una corrida sin humano no se ejecutan: se dejan listados en el reporte para la persona.
 - **El CI también es parte del Listo:** si el repositorio tiene remoto, después de cada push (autorizado) se revisa con `gh run list` y, si falla, `gh run view <id> --log-failed` (ambos son de lectura). Un CI en rojo es deuda: se corrige antes de seguir.
 - **Mantenimiento de DevSkills (permanente):** al cerrar cada elemento, el orquestador revisa si dejó una **lección general del método o del stack** (no del dominio del proyecto). Si la hay, la redacta como **borrador local** (`documentacion/avance/lecciones_devskills.md`, sin nombres, datos, rutas ni código del proyecto: solo el tropiezo, la causa y la regla) y se la **enseña al usuario**. Solo si él lo aprueba se publica como issue en el repositorio del plugin (`gh issue create`, con el texto exacto que aprobó); sin aprobación se queda en el borrador. Así el siguiente proyecto no repite el tropiezo y ningún dato del proyecto sale sin permiso.
@@ -82,7 +82,7 @@ git add -A -- codigo .github documentacion/avance && git commit -m "wip(hu-60): 
 git status --short                                         # debe quedar vacío
 python documentacion/analisis/plan_sprints.py              # regenera PLAN.md y el tablero (tacha lo Listo)
 python documentacion/analisis/trazabilidad.py _tmp.md --escribir
-python documentacion/analisis/md_a_word.py --mermaid ~/.devskills/doc   # regenera los Word (ver devskills:pasada-documental)
+"$PYDOC" documentacion/analisis/md_a_word.py --mermaid ~/.devskills/doc   # regenera los Word (ver devskills:pasada-documental)
 # gitleaks (nativo; Docker como alternativa) sobre `git ls-files -co --exclude-standard`, ANTES de cualquier commit de cierre o push
 python "${CLAUDE_PLUGIN_ROOT}/scripts/gitleaks_archivos.py"
 git switch main && git merge --squash hu-60 && git commit -m "feat(hu-60): manage users and roles"
@@ -90,6 +90,7 @@ git branch -D hu-60                                        # solo el orquestador
 # Solo con la aprobación explícita del usuario: git push; después, lectura del CI
 gh run list --limit 3                                      # tras el push autorizado, si hay remoto
 gh run view <id> --log-failed                              # si el CI falló
-# semgrep igual que el CI (desde codigo/; versión = la de semgrep== en .github/workflows/ci.yml)
-MSYS_NO_PATHCONV=1 docker run --rm -v "$(pwd -W):/src" -w /src semgrep/semgrep:1.178.0   semgrep scan --config p/python --config p/django --error --metrics=off --exclude pruebas --exclude conftest.py .
+# semgrep igual que el CI (desde codigo/; versión = la de semgrep== en .github/workflows/ci.yml), con montaje de solo lectura
+pipx run --spec "semgrep==1.178.0" semgrep scan --config p/python --config p/django --error --metrics=off --exclude pruebas --exclude conftest.py .   # macOS/Linux/WSL
+MSYS_NO_PATHCONV=1 docker run --rm -v "$(pwd -W):/src:ro" -w /src semgrep/semgrep:1.178.0 semgrep scan --config p/python --config p/django --error --metrics=off --exclude pruebas --exclude conftest.py .   # alternativa con Docker
 ```

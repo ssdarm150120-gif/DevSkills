@@ -120,11 +120,17 @@ El instalador copia los agentes y las skills a `~/.claude` con el prefijo `devsk
 ## 🚀 Inicio rápido
 
 ```bash
-devskills doctor                                   # revisa git, Docker, Python 3.12, Node, mermaid-cli, engram y gitleaks
+devskills doctor                                   # obligatorios: git, Python 3.12, Claude Code, gitleaks · opcionales: Docker, semgrep, Node, mermaid-cli, gh, engram
+# Dos caminos al mismo resultado (el descubrimiento va ANTES de fijar nombre, slug y puertos):
+#  A) Recomendado, dentro de Claude Code, desde una carpeta cualquiera:
+#       /devskills:nuevo-proyecto   descubrimiento con el Product Owner y, con sus respuestas, crea la carpeta del
+#                                   proyecto (el mismo `devskills init` por debajo), CONTEXTO y SRS 0.1
+#  B) Manual, si ya sabes el nombre y los puertos:
 devskills init ~/proyectos/mi-sistema --nombre "Mi sistema" --puerto-base 21000   # estructura + esqueleto + primer commit
 cd ~/proyectos/mi-sistema && claude                # abre Claude Code en el proyecto
 # Dentro de Claude Code:
-#   /devskills:nuevo-proyecto     descubrimiento con el Product Owner, CONTEXTO y SRS 0.1
+#   /devskills:nuevo-proyecto     detecta la carpeta ya creada, salta ese paso y hace el descubrimiento con el
+#                                 Product Owner, el CONTEXTO y el SRS 0.1
 #   (el analista-arquitecto redacta el SRS, el DISEÑO y el PLAN)
 #   /devskills:ciclo EN-01        desarrollo → QA → Angel Fixer → Listo
 #   /devskills:guarda-todo        commit, transcripción, gitleaks y memoria al cerrar la sesión
@@ -228,7 +234,9 @@ Opciones de `init`: `--nombre`, `--slug`, `--puerto-base`, `--puertos-reservados
 
 ## ✅ Requisitos
 
-Git · Claude Code · Docker · Python 3.12 · Node.js LTS · mermaid-cli · gitleaks (por Docker) · plugin engram.
+**Obligatorios:** Git · Claude Code · Python 3.12 · gitleaks (binario nativo; Docker es la alternativa).
+
+**Opcionales:** Docker (solo para desplegar o reproducir el stack completo; **no hace falta para desarrollar ni probar**) · semgrep local (nativo en macOS y Linux, WSL o Docker en Windows; en el CI de GitHub siempre corre) · Node.js LTS y mermaid-cli (presentación y diagramas de los Word) · GitHub CLI · plugin engram.
 
 Corre `devskills doctor` para revisarlos. Para correr sin humano (`claude -p`, `--resume` tras un corte, costo y cómo abaratarlo), ver [Uso no interactivo](docs/instalacion.md#uso-no-interactivo); para el CI del proyecto, [GitHub CLI (`gh`) y el CI](docs/instalacion.md#github-cli-gh-y-el-ci).
 
@@ -243,6 +251,10 @@ Corre `devskills doctor` para revisarlos. Para correr sin humano (`claude -p`, `
 **¿Sirve para un repositorio que ya tiene código?** `devskills init` es para proyectos nuevos. En uno existente puedes usar los agentes, las skills y los generadores, adaptando la estructura a mano.
 
 **¿Qué diferencia hay entre el plugin y el instalador?** Solo los nombres: `devskills:ciclo` con el plugin, `devskills-ciclo` con el instalador. El contenido es el mismo.
+
+**¿Necesito Docker?** No. Se desarrolla y se prueba sin él: la base es un PostgreSQL embebido, Celery corre en modo local y gitleaks y semgrep tienen versión nativa (semgrep en Windows, por WSL o Docker; en el CI de GitHub siempre corre). Docker Compose es la forma de **desplegar**. `devskills doctor` lo avisa como opcional y dice qué pierdes sin él. Detalle en [Docker es opcional](docs/instalacion.md#docker-es-opcional).
+
+**¿Un agente puede subir mi código o escribir en GitHub?** No sin que lo confirmes: `git push`, `gh` de escritura, merges de Dependabot y publicar lecciones en el repositorio de DevSkills se proponen y se ejecutan solo con tu "sí". Además, un hook del plugin bloquea esos comandos a los subagentes, y en corridas sin humano hay [permisos mínimos y vetos explícitos](docs/instalacion.md#uso-no-interactivo).
 
 **¿Necesito Telegram?** No. Es opcional, para dirigir al orquestador desde el celular.
 

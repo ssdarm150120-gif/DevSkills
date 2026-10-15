@@ -61,13 +61,14 @@ Si algo no está en el SRS, **no se implementa**: se reporta como pregunta al Pr
 
 ### Definición de Listo y de Terminado
 - **Listo para empezar (DoR):** la historia tiene RF trazados, criterios Gherkin y ningún pendiente `P-nn` abierto que la afecte (SRS B.0, PLAN).
-- **Terminado (DoD):** escenarios Gherkin automatizados y en verde, `import-linter` y análisis de seguridad en verde, RNF aplicables verificados, QA **APROBADA sin observaciones abiertas**, Angel Fixer **sin hallazgos abiertos de ninguna severidad**, verificación final aprobada y avance registrado.
+- **Terminado (DoD) — esta es la única definición del método** (el SRS B.0 y el PLAN la referencian y solo agregan criterios propios del proyecto): escenarios Gherkin automatizados y en verde, `import-linter` y análisis de seguridad en verde, RNF aplicables verificados, QA **APROBADA sin observaciones abiertas**, Angel Fixer **sin hallazgos abiertos de ninguna severidad**, verificación final aprobada y avance registrado.
 - **Política de cero deuda (decisión del usuario):** no se registra deuda técnica. Todo hallazgo (CRÍTICO, ALTO, MEDIO o BAJO) y toda observación de QA se corrige antes de tachar. Lo que pertenece a otro elemento del plan **no es deuda**: se anota con el ID que lo cubre.
 
 ### Entorno local
 - El sistema **nunca** apunta por defecto a un puerto reservado del host (por ejemplo `localhost:5432`, donde puede haber otro PostgreSQL). En **dev**, `DATABASE_URL` es obligatoria: `python -m herramientas.base_local` levanta un PostgreSQL 16 embebido (en `.pgdata/` en la raíz del proyecto) e imprime la URL. En **pruebas**, sin `DATABASE_URL`, `conftest.py` levanta **otro** PostgreSQL embebido en `.pgdata_pruebas/`, separado del de dev para que correr pytest no lo apague.
-- Docker: cada agente usa solo el prefijo y el rango de puertos que le asigna el orquestador (base en `CONTEXTO.md`) y limpia al terminar.
+- **Docker es opcional.** Se desarrolla y se prueba sin él: PostgreSQL embebido (`pgserver`) y Celery en modo local, sin Redis. Docker Compose solo hace falta para desplegar (o para reproducir el stack completo). Si un agente lo usa, lleva el prefijo `<slug>-<agente>` y el subrango que le asigna el orquestador (base en `CONTEXTO.md`), limpia solo lo suyo y nunca corre `down -v` ni `prune` sobre el stack principal. Las pruebas de Compose se omiten solas sin Docker y corren siempre en el CI.
 - Nadie lee ni escribe `.env` ni `.env.*`; los cambios a `.env.ejemplo` se entregan como texto al Product Owner.
+- **Dependencias:** las versiones de lo que se instala están fijas (lock con hashes de pip-tools en `codigo/`, `package-lock.json` con `npm ci`, mermaid-cli y los Word con versión exacta); subirlas es un cambio a propósito.
 
 ## Commands
 

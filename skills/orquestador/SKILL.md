@@ -70,5 +70,5 @@ metadata:
 - Español de México con tuteo en todo.
 - Cero deuda técnica: todo hallazgo se corrige antes de tachar, salvo lo que pertenece a otro elemento (con su ID).
 - Rondas máximo 3; luego, pregunta al Product Owner; ronda extra solo con lista congelada.
-- Docker con prefijo y rango de puertos propios por agente; nunca puertos reservados del host; limpieza al terminar.
+- Docker es **opcional**: se desarrolla y se prueba sin él (PostgreSQL embebido y Celery local); Compose solo hace falta para desplegar. Si lo usas, el prefijo es `<slug>-<agente>` y la limpieza es solo de lo tuyo. Nunca puertos reservados del host.
 - Nadie lee `.env` ni `.env.*`; los cambios a `.env.ejemplo` se entregan como texto al Product Owner.

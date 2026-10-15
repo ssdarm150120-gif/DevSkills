@@ -13,7 +13,7 @@ Gracias por querer mejorar DevSkills. Este documento explica el flujo y los est�
 ```bash
 git clone https://github.com/ssdarm150120-gif/DevSkills.git
 cd DevSkills
-bin/devskills doctor        # revisa git, Docker, Python 3.12, Node, mermaid-cli, engram y gitleaks
+bin/devskills doctor        # obligatorios: git, Python 3.12, Claude Code, gitleaks; opcionales: Docker, semgrep, Node, mermaid-cli, gh, engram
 ```
 
 Para las pruebas hace falta [ShellSpec](https://shellspec.info) 0.28 o superior y, para el lint, ShellCheck. Si no quieres instalar ShellSpec de forma global, clónalo en cualquier carpeta y pásalo a `make`:
@@ -33,7 +33,7 @@ En Windows las pruebas se corren en **Git Bash** (con `TMPDIR=/tmp` si tu `TMP` 
 | `make validate` | `claude plugin validate .` (manifiestos del plugin y del marketplace) |
 | `python scripts/validar_plugin.py` | Frontmatter de agentes y skills y referencias `devskills:<nombre>` |
 | `make test` | Instalador (HOME temporal, idempotencia, desinstalación) y CLI (`init`, `doctor`, `version`) |
-| `make gitleaks` | Secretos, con gitleaks por Docker |
+| `make gitleaks` | Secretos, con gitleaks nativo (Docker como alternativa) |
 
 Si tocas `plantillas/codigo`, genera un proyecto (`bin/devskills init <carpeta> --slug demo --puerto-base 19100`) y corre desde `codigo/`: `pytest`, `ruff check .`, `ruff format --check .`, `mypy .`, `lint-imports`, `bandit`, `pip-audit` y `python manage.py makemigrations --check --dry-run`. Si tocas un generador, córrelo en un proyecto de ejemplo y comprueba que el archivo generado abre.
 

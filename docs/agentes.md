@@ -54,7 +54,8 @@ Cada agente trae al final el mismo bloque de reglas:
 - Español de México con tuteo.
 - Cargar `proyecto-contexto` y leer `documentacion/CONTEXTO.md` antes de trabajar.
 - No leer ni escribir `.env` ni `.env.*`.
-- Docker solo con el prefijo y el rango de puertos asignados; nunca en puertos reservados del host; limpieza al terminar.
+- Docker es opcional (se desarrolla y se prueba sin él). Si se usa: solo con el prefijo `<slug>-<agente>` y el rango de puertos asignados; nunca en puertos reservados del host; limpieza al terminar solo de lo propio; nunca `down -v` ni `prune` sobre el stack principal.
+- Vetos explícitos hacia afuera: ningún agente ejecuta `git push`, `git branch -D`, `gh` de escritura ni `docker push`; un hook del plugin los bloquea a los subagentes y el orquestador solo los ejecuta con la confirmación explícita del usuario.
 - Guardar en engram decisiones y hallazgos no obvios.
 - Cero deuda.
 
