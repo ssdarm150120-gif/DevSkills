@@ -2,6 +2,7 @@
 
 import ipaddress
 import os
+import re
 from typing import Any
 from urllib.parse import parse_qsl, unquote, urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -138,6 +139,57 @@ def zona_horaria(nombre: str, *, variable: str) -> str:
         raise ImproperlyConfigured(
             f"{variable}: zona horaria desconocida, legada o ambigua: {nombre!r} "
             "(usa UTC o una zona Area/Ciudad como America/Mexico_City)"
+        )
+    return limpio
+
+
+HSTS_MINIMO_SEGUNDOS = 31536000  # un ano: lo que exige la precarga de HSTS
+_MODOS_SSL_CON_CIFRADO = frozenset({"require", "verify-ca", "verify-full"})
+
+
+def debilidades_de_transporte(*, redireccion_https: bool, hsts_segundos: int) -> list[str]:
+    """Que ajustes de transporte debilitan la configuracion de produccion (lista vacia: ninguno)."""
+    debilidades: list[str] = []
+    if not redireccion_https:
+        debilidades.append("SECURE_SSL_REDIRECT esta apagado (nada redirige HTTP a HTTPS)")
+    if hsts_segundos < HSTS_MINIMO_SEGUNDOS:
+        debilidades.append(
+            f"HSTS_SEGUNDOS={hsts_segundos} es menor a un ano ({HSTS_MINIMO_SEGUNDOS})"
+        )
+    return debilidades
+
+
+def exigir_tls_en_datos(base: dict[str, Any], url_redis: str) -> None:
+    """Falla si la base o Redis viajan sin cifrar (`APP_EXIGIR_TLS_DATOS=true`).
+
+    La base debe pedir `sslmode=require`, `verify-ca` o `verify-full` en `DATABASE_URL`, y Redis
+    debe usar el esquema `rediss://`. Se recomienda `verify-full`: `require` cifra pero no
+    comprueba que el servidor sea quien dice ser.
+    """
+    modo = str(base.get("OPTIONS", {}).get("sslmode", "")).lower()
+    if modo not in _MODOS_SSL_CON_CIFRADO:
+        raise ImproperlyConfigured(
+            "APP_EXIGIR_TLS_DATOS exige TLS hacia la base: agrega ?sslmode=verify-full (o "
+            f"verify-ca / require) a DATABASE_URL; sslmode actual: {modo or 'sin definir'}"
+        )
+    if not url_redis.lower().startswith("rediss://"):
+        raise ImproperlyConfigured(
+            "APP_EXIGIR_TLS_DATOS exige TLS hacia Redis: REDIS_URL debe usar el esquema rediss://"
+        )
+
+
+_PATRON_IDIOMA = re.compile(r"[a-z]{2,3}(-[a-z0-9]{2,8})*")
+
+
+def idioma(valor: str, *, variable: str) -> str:
+    """Valida un codigo de idioma de Django (`es`, `en`, `pt-br`) y lo devuelve en minusculas.
+
+    Falla al arrancar: un codigo mal escrito haria que Django use el ingles sin avisar.
+    """
+    limpio = valor.strip().lower().replace("_", "-")
+    if not _PATRON_IDIOMA.fullmatch(limpio):
+        raise ImproperlyConfigured(
+            f"{variable}: idioma invalido: {valor!r} (usa un codigo como es, en o es-mx)"
         )
     return limpio
 

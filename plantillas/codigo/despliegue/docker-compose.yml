@@ -50,10 +50,14 @@ x-entorno-app: &entorno-app
   APP_NOMBRE_APLICACION: "${APP_NOMBRE_APLICACION:-{{NOMBRE_PROYECTO}}}"
   # Zona horaria con la que se muestran las fechas (se guardan en UTC). Vacia: UTC.
   APP_ZONA_HORARIA: ${APP_ZONA_HORARIA:-}
+  # Idioma de la interfaz y de los mensajes de Django (es, en, es-mx...). Vacio: el del proyecto.
+  APP_IDIOMA: ${APP_IDIOMA:-}
   SECURE_SSL_REDIRECT: "true"
   HSTS_SEGUNDOS: ${HSTS_SEGUNDOS:-31536000}
   HSTS_SUBDOMINIOS: ${HSTS_SUBDOMINIOS:-true}
   HSTS_PRELOAD: ${HSTS_PRELOAD:-true}
+  # TLS exigido hacia la base y Redis (sslmode y rediss://). Apagado: la red interna de Docker va en claro.
+  APP_EXIGIR_TLS_DATOS: ${APP_EXIGIR_TLS_DATOS:-false}
   DATABASE_URL: postgres://app_web:${APP_WEB_PASSWORD:?define APP_WEB_PASSWORD en .env}@postgres:5432/app
   REDIS_URL: redis://:${REDIS_PASSWORD:?define REDIS_PASSWORD en .env}@redis:6379/0
   # Adaptadores de los puertos (DISENO D.1.4, D.6.2): en DESARROLLO, los sistemas externos van
@@ -146,6 +150,8 @@ services:
       DATABASE_MIGRACIONES_URL: postgres://app_migraciones:${APP_MIGRACIONES_PASSWORD:?define APP_MIGRACIONES_PASSWORD en .env}@postgres:5432/app
       APP_MIGRACIONES_PASSWORD: ${APP_MIGRACIONES_PASSWORD}
       APP_WEB_PASSWORD: ${APP_WEB_PASSWORD:?define APP_WEB_PASSWORD en .env}
+      # Solo para VALIDAR su fortaleza antes de migrar (roles_bd no la usa para nada mas).
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?define REDIS_PASSWORD en .env}
     depends_on:
       postgres:
         condition: service_healthy

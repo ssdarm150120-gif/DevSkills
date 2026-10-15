@@ -1,6 +1,8 @@
 """Produccion y staging. Todo secreto sale del entorno; si falta, falla al arrancar."""
 
 import os
+import ssl
+import warnings
 
 from django.core.exceptions import ImproperlyConfigured
 
@@ -52,6 +54,18 @@ DATABASES = {
 DATABASES["default"]["CONN_MAX_AGE"] = 60
 
 CELERY_BROKER_URL = entorno.sin_marcador_de_ejemplo("REDIS_URL", entorno.requerida("REDIS_URL"))
+
+# TLS hacia la base y hacia Redis. La base entra por `DATABASE_URL` (`?sslmode=verify-full`) y
+# Redis por `REDIS_URL` con esquema `rediss://`. Con `APP_EXIGIR_TLS_DATOS=true` la aplicacion se
+# niega a arrancar si alguno de los dos viaja en claro. Por defecto no se exige: el Compose del
+# proyecto los comunica por una red interna de Docker; con una base o un Redis administrados (otro
+# host) SI debe exigirse. Ver el README del codigo, seccion "TLS hacia la base y Redis".
+if entorno.booleana("APP_EXIGIR_TLS_DATOS", False):
+    entorno.exigir_tls_en_datos(DATABASES["default"], CELERY_BROKER_URL)
+if CELERY_BROKER_URL.lower().startswith("rediss://"):
+    # `rediss://` cifra el canal; Celery pide ademas verificar el certificado del servidor.
+    CELERY_BROKER_USE_SSL = {"ssl_cert_reqs": ssl.CERT_REQUIRED}
+    CELERY_REDIS_BACKEND_USE_SSL = {"ssl_cert_reqs": ssl.CERT_REQUIRED}
 # Sesiones en Redis: se pierden si Redis se reinicia sin persistencia, y el usuario vuelve
 # a ingresar. El prefijo `app` separa sus claves de las de Celery.
 CACHES = {
@@ -79,6 +93,24 @@ SECURE_SSL_REDIRECT = entorno.booleana("SECURE_SSL_REDIRECT", True)
 SECURE_HSTS_SECONDS = entorno.entero("HSTS_SEGUNDOS", 31536000, minimo=1)
 SECURE_HSTS_INCLUDE_SUBDOMAINS = entorno.booleana("HSTS_SUBDOMINIOS", True)
 SECURE_HSTS_PRELOAD = entorno.booleana("HSTS_PRELOAD", True)
+# Un transporte debil solo se admite si TODOS los hosts son de la propia maquina (desarrollo con
+# Compose en localhost); en un servidor real la aplicacion se niega a arrancar.
+_debilidades_de_transporte = entorno.debilidades_de_transporte(
+    redireccion_https=SECURE_SSL_REDIRECT, hsts_segundos=SECURE_HSTS_SECONDS
+)
+if _debilidades_de_transporte:
+    _detalle = "; ".join(_debilidades_de_transporte)
+    if set(ALLOWED_HOSTS) <= adaptadores.HOSTS_DE_LA_MAQUINA:
+        warnings.warn(
+            f"Transporte debilitado, valido solo en la propia maquina: {_detalle}",
+            RuntimeWarning,
+            stacklevel=1,
+        )
+    else:
+        raise ImproperlyConfigured(
+            f"Transporte inseguro en un servidor real: {_detalle}. "
+            f"Deja SECURE_SSL_REDIRECT en true y HSTS_SEGUNDOS >= {entorno.HSTS_MINIMO_SEGUNDOS}"
+        )
 SESSION_COOKIE_SECURE = True
 # Prefijo `__Host-`: el navegador solo acepta la cookie si es Secure, de Path=/ y sin Domain,
 # asi un subdominio no puede fijarla ni pisarla.

@@ -15,6 +15,8 @@ from django.contrib.auth.hashers import (
 )
 from django.contrib.auth.password_validation import CommonPasswordValidator
 
+from identidad.dominio.contrasena import LONGITUD_MAXIMA
+
 
 @lru_cache(maxsize=1)
 def lista_de_contrasenas_filtradas() -> frozenset[str]:
@@ -33,9 +35,15 @@ class ServicioContrasenasDjango:
         self.filtradas = lista_de_contrasenas_filtradas()
 
     def hashear(self, contrasena: str) -> str:
+        if len(contrasena) > LONGITUD_MAXIMA:
+            raise ValueError("La contraseña pasa del largo máximo y no se hashea")
         return make_password(contrasena)
 
     def verificar(self, contrasena: str, hash_contrasena: str) -> bool:
+        # Una entrada que ninguna contraseña valida puede igualar NO llega a Argon2. La ficticia
+        # aplica el mismo corte, asi que existir o no el correo no cambia el tiempo de respuesta.
+        if len(contrasena) > LONGITUD_MAXIMA:
+            return False
         return check_password(contrasena, hash_contrasena)
 
     def requiere_rehash(self, hash_contrasena: str) -> bool:
@@ -48,6 +56,8 @@ class ServicioContrasenasDjango:
         )
 
     def verificar_ficticia(self, contrasena: str) -> None:
+        if len(contrasena) > LONGITUD_MAXIMA:
+            return
         check_password(contrasena, hash_ficticio())
 
     def generar_temporal(self) -> str:

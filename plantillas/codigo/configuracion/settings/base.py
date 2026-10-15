@@ -5,7 +5,7 @@ from pathlib import Path
 
 from celery.schedules import crontab
 
-from configuracion import entorno
+from configuracion import entorno, localizacion
 from configuracion.modulos import APPS_PROPIAS, MIGRATION_MODULES
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent  # .../codigo
@@ -59,8 +59,12 @@ MIGRATION_MODULES = dict(MIGRATION_MODULES)
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# Fechas en UTC; la zona horaria se aplica solo al mostrar.
-LANGUAGE_CODE = "es-mx"
+# Fechas en UTC; la zona horaria se aplica solo al mostrar. El idioma y la zona salen del entorno
+# (`APP_IDIOMA`, `APP_ZONA_HORARIA`); sus valores por defecto viven en `localizacion.py`, neutrales
+# (`es` y `UTC`), y `devskills init --idioma ... --zona ...` los fija para el proyecto.
+LANGUAGE_CODE = entorno.idioma(
+    entorno.texto("APP_IDIOMA", localizacion.IDIOMA_PREDETERMINADO), variable="APP_IDIOMA"
+)
 TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True
@@ -98,7 +102,7 @@ APP_LLAVE_SEGUNDO_FACTOR = entorno.texto(
 # Zona horaria con la que se muestran fechas y horas a los usuarios (se guarda en UTC y la zona se
 # aplica solo al mostrar). Es configuracion y no codigo; se valida al arrancar.
 APP_ZONA_HORARIA = entorno.zona_horaria(
-    entorno.texto("APP_ZONA_HORARIA", "UTC"), variable="APP_ZONA_HORARIA"
+    entorno.texto("APP_ZONA_HORARIA", localizacion.ZONA_PREDETERMINADA), variable="APP_ZONA_HORARIA"
 )
 CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
 

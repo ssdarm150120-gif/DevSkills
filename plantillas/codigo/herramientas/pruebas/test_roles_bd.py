@@ -231,6 +231,23 @@ def test_aprovisionar_rechaza_claves_debiles_o_de_ejemplo(
         aprovisionar("postgres://x@h.invalid/d", clave_migraciones, clave_app)
 
 
+@pytest.mark.parametrize("clave", ["corta", "CAMBIAR_clave_de_redis_de_ejemplo"])
+def test_aprovisionar_rechaza_una_clave_de_redis_debil_o_de_ejemplo(clave: str) -> None:
+    with pytest.raises(ErrorDeRoles, match="REDIS_PASSWORD"):
+        aprovisionar("postgres://x@h.invalid/d", CLAVE_MIGRACIONES, CLAVE_APP, clave_redis=clave)
+
+
+def test_main_rechaza_una_clave_de_redis_debil(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("DATABASE_ADMIN_URL", "postgres://x@h.invalid/d")
+    monkeypatch.setenv("APP_MIGRACIONES_PASSWORD", CLAVE_MIGRACIONES)
+    monkeypatch.setenv("APP_WEB_PASSWORD", CLAVE_APP)
+    monkeypatch.setenv("REDIS_PASSWORD", "corta")
+    assert roles_bd.main() == 2
+    assert "REDIS_PASSWORD" in capsys.readouterr().err
+
+
 def test_aprovisionar_rechaza_una_url_de_administracion_de_ejemplo() -> None:
     with pytest.raises(ErrorDeRoles, match="DATABASE_ADMIN_URL"):
         aprovisionar(

@@ -960,6 +960,19 @@ def test_el_compose_pasa_el_nombre_de_la_aplicacion_que_sirve_de_emisor_del_segu
     assert "APP_NOMBRE_APLICACION:?" not in compose  # opcional
 
 
+def test_el_compose_pasa_el_idioma_y_la_exigencia_de_tls_a_la_aplicacion() -> None:
+    compose = yaml.safe_load((DESPLIEGUE / "docker-compose.yml").read_text(encoding="utf-8"))
+    entorno_app = compose["x-entorno-app"]
+    assert entorno_app["APP_IDIOMA"] == "${APP_IDIOMA:-}"  # vacia: el idioma del proyecto
+    assert entorno_app["APP_EXIGIR_TLS_DATOS"] == "${APP_EXIGIR_TLS_DATOS:-false}"
+
+
+def test_migrar_recibe_la_clave_de_redis_solo_para_validarla() -> None:
+    compose = yaml.safe_load((DESPLIEGUE / "docker-compose.yml").read_text(encoding="utf-8"))
+    entorno_migrar = compose["services"]["migrar"]["environment"]
+    assert "REDIS_PASSWORD:?" in entorno_migrar["REDIS_PASSWORD"]
+
+
 def test_el_compose_pasa_la_zona_horaria_a_la_aplicacion() -> None:
     """Sin esto el README prometeria una variable que el contenedor nunca recibe."""
     compose = yaml.safe_load((DESPLIEGUE / "docker-compose.yml").read_text(encoding="utf-8"))

@@ -2,7 +2,7 @@
 
 import pytest
 
-from identidad.dominio.contrasena import LONGITUD_MINIMA, validar_contrasena
+from identidad.dominio.contrasena import LONGITUD_MAXIMA, LONGITUD_MINIMA, validar_contrasena
 
 FILTRADAS = frozenset({"contrasena1234", "qwertyuiopas"})
 
@@ -49,3 +49,17 @@ def test_los_espacios_de_los_bordes_no_cuentan_para_la_longitud() -> None:
 def test_un_valor_que_no_es_texto_se_rechaza() -> None:
     with pytest.raises(TypeError):
         validar_contrasena(None, FILTRADAS)  # type: ignore[arg-type]
+
+
+def test_la_longitud_maxima_es_de_128_caracteres() -> None:
+    assert LONGITUD_MAXIMA == 128
+
+
+def test_exactamente_128_caracteres_es_valida() -> None:
+    assert validar_contrasena("a1" * 64, FILTRADAS) == ()
+
+
+def test_con_129_caracteres_se_rechaza_por_larga() -> None:
+    assert validar_contrasena("a" * 129, FILTRADAS) == (
+        "La contraseña no puede pasar de 128 caracteres",
+    )

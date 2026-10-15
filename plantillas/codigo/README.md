@@ -134,6 +134,21 @@ echo | openssl s_client -connect localhost:{{PUERTO_HTTPS}} -servername localhos
 # esperado: "alert handshake failure" y "Cipher is (NONE)"
 ```
 
+### TLS hacia la base y Redis
+
+En el Compose, `web`, `worker`, PostgreSQL y Redis hablan por una red interna de Docker sin salida y sin
+cifrar: es aceptable ahi. Con una base o un Redis **administrados** (otro host, otra red) el trafico
+debe ir cifrado, y el proyecto lo exige con una variable:
+
+1. `DATABASE_URL=postgres://app_web:clave@host:5432/app?sslmode=verify-full` (con `sslmode=verify-ca` o
+   `require` tambien cifra, pero `verify-full` ademas comprueba que el servidor es quien dice ser; el
+   certificado raiz va en `sslrootcert=/ruta/ca.pem` en la misma URL).
+2. `REDIS_URL=rediss://:clave@host:6380/0` (dos `s`). Celery recibe `ssl_cert_reqs=CERT_REQUIRED`.
+3. `APP_EXIGIR_TLS_DATOS=true`. Con ella, `settings.prod` se niega a arrancar si falta cualquiera de las dos.
+
+En el Compose esas dos URLs estan fijas a los servicios internos: al apuntar a servicios externos se
+reemplazan en `x-entorno-app` (y se quitan los servicios `postgres` y `redis`).
+
 ### Certificado TLS (autofirmado, solo desarrollo y pruebas)
 
 `docker compose up` lo genera solo, una vez, en el volumen `certificados` (nunca en el repositorio):
@@ -300,13 +315,16 @@ Las lee `configuracion/entorno.py`; la lista completa y comentada esta en `despl
 | `APP_LIMITE_INGRESO`, `APP_RAFAGA_INGRESO` | Compose | Limite de POST por IP en `/ingresar` (opcionales; `180r/m` y `40`). Los lee nginx, no Django |
 | `APP_NOMBRE_APLICACION` | dev y prod | Nombre que se muestra en la interfaz y **emisor** en la aplicacion de codigos del segundo factor |
 | `APP_SESION_DURACION_MAXIMA_HORAS` | dev y prod | Tope absoluto de la sesion desde el ingreso (12 por defecto; ademas rigen las 3 horas de inactividad) |
-| `APP_ZONA_HORARIA` | dev y prod | Zona horaria con la que se muestran las fechas (se guardan en UTC): `UTC` o `Area/Ciudad`. Un nombre mal escrito, legado o ambiguo (`US/Eastern`, `EST5EDT`, `posixrules`, `Etc/...`) impide el arranque |
+| `APP_ZONA_HORARIA` | dev y prod | Zona horaria con la que se muestran las fechas (se guardan en UTC): `UTC` o `Area/Ciudad`. Un nombre mal escrito, legado o ambiguo (`US/Eastern`, `EST5EDT`, `posixrules`, `Etc/...`) impide el arranque. Sin la variable rige `ZONA_PREDETERMINADA` de `configuracion/localizacion.py` (`UTC`; `devskills init --zona` la fija) |
+| `APP_IDIOMA` | dev y prod | Idioma de la interfaz y de los mensajes de Django (`es`, `en`, `es-mx`, `pt-br`...). Un codigo mal escrito impide el arranque. Sin la variable rige `IDIOMA_PREDETERMINADO` de `configuracion/localizacion.py` (`es`; `devskills init --idioma` lo fija) |
+| `APP_EXIGIR_TLS_DATOS` | prod | `true` obliga a `DATABASE_URL` con `?sslmode=verify-full` (o `verify-ca` / `require`) y a `REDIS_URL` con `rediss://`; si no, no arranca. Ver "TLS hacia la base y Redis" |
 | `APP_NOMBRE_CELERY` | dev y prod | Nombre de la app de Celery (`app` por defecto) |
 | `ALLOWED_HOSTS` | prod | Ver la regla de abajo |
-| `REDIS_URL` | prod | Con clave: `redis://:clave@redis:6379/0` |
+| `REDIS_URL` | prod | Con clave: `redis://:clave@redis:6379/0`; con TLS, `rediss://` |
+| `REDIS_PASSWORD` | Compose | Clave de Redis. El paso `migrar` la **valida** (16 caracteres o mas, sin `CAMBIAR`) antes de levantar nada |
 | `CONFIAR_EN_PROXY_TLS` | prod | `true` solo detras de nginx; por defecto `false` |
-| `SECURE_SSL_REDIRECT` | prod | `true` por defecto |
-| `HSTS_SEGUNDOS`, `HSTS_SUBDOMINIOS`, `HSTS_PRELOAD` | prod | Por defecto 31536000, `true`, `true`. En `localhost` se acortan (ver abajo) |
+| `SECURE_SSL_REDIRECT` | prod | `true` por defecto. Apagarlo en un servidor real **impide el arranque**; en `localhost` solo avisa |
+| `HSTS_SEGUNDOS`, `HSTS_SUBDOMINIOS`, `HSTS_PRELOAD` | prod | Por defecto 31536000 (un ano), `true`, `true`. Un HSTS menor a un ano **impide el arranque** en un servidor real; en `localhost` se acorta y solo avisa (ver abajo) |
 | `APP_ADAPTADOR_<PUERTO>` | dev y prod | Uno por cada puerto elegible que declares en `configuracion/adaptadores.py`: `falso` (dev) o el real. **Prod rechaza `falso`** |
 | `APP_PERMITIR_ADAPTADORES_FALSOS` | solo Compose de desarrollo | Deja a `settings.prod` aceptar los falsos, **solo** si `ALLOWED_HOSTS` son de la propia maquina |
 
@@ -321,7 +339,17 @@ este en la Public Suffix List completa, **incluidos sus sufijos privados** (`.gi
 
 **HSTS en `localhost`.** El navegador recuerda HSTS por dominio y por **todos** sus puertos. Por eso
 `.env.ejemplo` trae `HSTS_SEGUNDOS=300` y sin `includeSubDomains` ni `preload`. En pruebas y produccion se
-borran esas tres lineas.
+borran esas tres lineas. `settings.prod` aplica la regla: con **todos** los `ALLOWED_HOSTS` de la propia
+maquina un HSTS menor a un ano o `SECURE_SSL_REDIRECT=false` solo emiten un `RuntimeWarning`; con
+cualquier otro host la aplicacion se niega a arrancar.
+
+**Idioma y zona horaria.** Salen del entorno (`APP_IDIOMA`, `APP_ZONA_HORARIA`) y, sin variable, de
+`configuracion/localizacion.py`, que trae valores neutrales (`es` y `UTC`).
+`devskills init <ruta> --idioma pt-br --zona America/Sao_Paulo` reescribe esos dos valores por defecto al
+crear el proyecto.
+
+**Contrasenas.** Entre 12 y 128 caracteres. El tope existe porque el formulario de ingreso lee la
+contrasena completa antes de Argon2; el adaptador ni siquiera la hashea si lo pasa.
 
 ## Roles y permisos
 

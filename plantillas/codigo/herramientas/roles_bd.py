@@ -15,6 +15,9 @@ repetirse despues (tambien concede sobre lo que ya exista):
     python -m herramientas.roles_bd
 
 Variables: `DATABASE_ADMIN_URL`, `APP_MIGRACIONES_PASSWORD`, `APP_WEB_PASSWORD` y, si se quiere,
+`REDIS_PASSWORD` (no se usa para nada en la base: solo se VALIDA, con el mismo rigor que las claves
+de los roles, para que el paso `migrar` falle antes de levantar un Redis con una clave debil) y,
+si se quiere,
 `APP_ROL_MIGRACIONES` y `APP_ROL_WEB` (por defecto `app_migraciones` y `app_web`). Con un
 PostgreSQL administrado (RDS, Azure) esto lo hace el equipo de TI o la infraestructura como codigo.
 """
@@ -85,17 +88,21 @@ def aprovisionar(
     *,
     rol_migraciones: str = ROL_MIGRACIONES,
     rol_app: str = ROL_WEB,
+    clave_redis: str | None = None,
 ) -> None:
-    """Crea (o actualiza) los dos roles y reparte los privilegios en la base de `url_admin`."""
-    _validar(
-        rol_migraciones,
-        rol_app,
-        {
-            "DATABASE_ADMIN_URL": url_admin,
-            "APP_MIGRACIONES_PASSWORD": clave_migraciones,
-            "APP_WEB_PASSWORD": clave_app,
-        },
-    )
+    """Crea (o actualiza) los dos roles y reparte los privilegios en la base de `url_admin`.
+
+    Si se pasa `clave_redis`, solo se valida (largo y marcador de ejemplo); no se escribe en ningun
+    lado.
+    """
+    claves = {
+        "DATABASE_ADMIN_URL": url_admin,
+        "APP_MIGRACIONES_PASSWORD": clave_migraciones,
+        "APP_WEB_PASSWORD": clave_app,
+    }
+    if clave_redis is not None:
+        claves["REDIS_PASSWORD"] = clave_redis
+    _validar(rol_migraciones, rol_app, claves)
     migraciones, app = sql.Identifier(rol_migraciones), sql.Identifier(rol_app)
     with psycopg.connect(url_admin) as conexion:
         (nombre_base,) = conexion.execute("SELECT current_database()").fetchone() or ("",)
@@ -188,6 +195,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             variables["APP_WEB_PASSWORD"],
             rol_migraciones=rol_migraciones,
             rol_app=rol_app,
+            clave_redis=os.environ.get("REDIS_PASSWORD", "").strip() or None,
         )
     except ErrorDeRoles as error:
         print(f"roles_bd: {error}", file=sys.stderr)

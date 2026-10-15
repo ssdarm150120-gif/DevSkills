@@ -2,21 +2,25 @@ import ast
 import importlib
 import os
 import re
+import ssl
 import subprocess
 import sys
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 from types import ModuleType
+from typing import Any
 
 import pytest
 from django.core.exceptions import ImproperlyConfigured
-from django.test import Client, override_settings
+from django.test import Client, RequestFactory, override_settings
 
+from configuracion import localizacion
 from configuracion.entorno import (
     LLAVE_HUELLA_DE_DESARROLLO,
     LLAVE_SEGUNDO_FACTOR_DE_DESARROLLO,
 )
+from identidad.adaptadores.entrada.contexto import contexto_de_la_aplicacion
 
 CODIGO = Path(__file__).resolve().parent.parent.parent
 DIRECTORIO_SETTINGS = CODIGO / "configuracion" / "settings"
@@ -139,6 +143,35 @@ def test_la_zona_horaria_por_defecto_es_utc_y_se_cambia_por_variable(
     assert _cargar_con_base("prod").APP_ZONA_HORARIA == "America/Mexico_City"
     entorno_prod.setenv("APP_ZONA_HORARIA", "")  # vacia, como la pasa el Compose por defecto
     assert _cargar_con_base("prod").APP_ZONA_HORARIA == "UTC"
+
+
+def test_el_idioma_por_defecto_es_neutral_y_se_cambia_por_variable(
+    entorno_prod: pytest.MonkeyPatch,
+) -> None:
+    assert localizacion.IDIOMA_PREDETERMINADO == "es"
+    assert localizacion.ZONA_PREDETERMINADA == "UTC"
+    assert _cargar_con_base("prod").LANGUAGE_CODE == "es"
+    entorno_prod.setenv("APP_IDIOMA", "en")
+    assert _cargar_con_base("prod").LANGUAGE_CODE == "en"
+    entorno_prod.setenv("APP_IDIOMA", "ES_mx")
+    assert _cargar_con_base("prod").LANGUAGE_CODE == "es-mx"
+    entorno_prod.setenv("APP_IDIOMA", "")  # vacia, como la pasa el Compose por defecto
+    assert _cargar_con_base("prod").LANGUAGE_CODE == "es"
+
+
+@pytest.mark.parametrize("valor", ["español", "e", "es mx", "es--mx", "123"])
+def test_el_arranque_falla_si_el_idioma_es_invalido(
+    entorno_prod: pytest.MonkeyPatch, valor: str
+) -> None:
+    entorno_prod.setenv("APP_IDIOMA", valor)
+    with pytest.raises(ImproperlyConfigured, match="APP_IDIOMA"):
+        _cargar_con_base("prod")
+
+
+def test_la_etiqueta_lang_de_las_paginas_sigue_al_idioma_configurado(settings: Any) -> None:
+    settings.LANGUAGE_CODE = "pt-br"
+    contexto = contexto_de_la_aplicacion(RequestFactory().get("/"))
+    assert contexto["idioma_html"] == "pt-br"
 
 
 @pytest.mark.parametrize("valor", ["posixrules", "Etc/GMT+5", "EST5EDT", "US/Eastern"])
@@ -715,14 +748,78 @@ def test_prod_por_defecto_usa_hsts_de_produccion(entorno_prod: pytest.MonkeyPatc
     assert prod.SECURE_HSTS_PRELOAD is True
 
 
-def test_prod_acepta_un_hsts_corto_para_desarrollo_local(entorno_prod: pytest.MonkeyPatch) -> None:
+def test_prod_acepta_un_hsts_corto_solo_en_la_propia_maquina_y_lo_advierte(
+    entorno_prod: pytest.MonkeyPatch,
+) -> None:
+    entorno_prod.setenv("ALLOWED_HOSTS", "localhost")
     entorno_prod.setenv("HSTS_SEGUNDOS", "300")
     entorno_prod.setenv("HSTS_SUBDOMINIOS", "false")
     entorno_prod.setenv("HSTS_PRELOAD", "false")
-    prod = _cargar_prod()
+    with pytest.warns(RuntimeWarning, match="HSTS_SEGUNDOS=300"):
+        prod = _cargar_prod()
     assert prod.SECURE_HSTS_SECONDS == 300
     assert prod.SECURE_HSTS_INCLUDE_SUBDOMAINS is False
     assert prod.SECURE_HSTS_PRELOAD is False
+
+
+def test_prod_rechaza_un_hsts_menor_a_un_ano_en_un_servidor_real(
+    entorno_prod: pytest.MonkeyPatch,
+) -> None:
+    entorno_prod.setenv("HSTS_SEGUNDOS", "1")
+    with pytest.raises(ImproperlyConfigured, match=r"Transporte inseguro.*HSTS_SEGUNDOS=1"):
+        _cargar_prod()
+
+
+def test_prod_rechaza_apagar_la_redireccion_a_https_en_un_servidor_real(
+    entorno_prod: pytest.MonkeyPatch,
+) -> None:
+    entorno_prod.setenv("SECURE_SSL_REDIRECT", "false")
+    with pytest.raises(ImproperlyConfigured, match=r"Transporte inseguro.*SECURE_SSL_REDIRECT"):
+        _cargar_prod()
+
+
+def test_prod_advierte_si_se_apaga_la_redireccion_en_la_propia_maquina(
+    entorno_prod: pytest.MonkeyPatch,
+) -> None:
+    entorno_prod.setenv("ALLOWED_HOSTS", "localhost")
+    entorno_prod.setenv("SECURE_SSL_REDIRECT", "false")
+    with pytest.warns(RuntimeWarning, match="SECURE_SSL_REDIRECT"):
+        assert _cargar_prod().SECURE_SSL_REDIRECT is False
+
+
+def test_prod_no_exige_tls_a_los_datos_por_defecto(entorno_prod: pytest.MonkeyPatch) -> None:
+    prod = _cargar_prod()
+    assert not hasattr(prod, "CELERY_BROKER_USE_SSL")
+
+
+def test_prod_con_tls_exigido_acepta_base_y_redis_cifrados(
+    entorno_prod: pytest.MonkeyPatch,
+) -> None:
+    entorno_prod.setenv("APP_EXIGIR_TLS_DATOS", "true")
+    entorno_prod.setenv("DATABASE_URL", "postgres://app:clave@db:5432/app?sslmode=verify-full")
+    entorno_prod.setenv("REDIS_URL", "rediss://:clave@redis:6379/0")
+    prod = _cargar_prod()
+    assert prod.DATABASES["default"]["OPTIONS"]["sslmode"] == "verify-full"
+    assert prod.CELERY_BROKER_USE_SSL == {"ssl_cert_reqs": ssl.CERT_REQUIRED}
+
+
+@pytest.mark.parametrize(
+    ("base", "redis", "esperado"),
+    [
+        ("postgres://app:clave@db:5432/app", "rediss://redis:6379/0", "sslmode"),
+        ("postgres://app:clave@db:5432/app?sslmode=disable", "rediss://redis:6379/0", "sslmode"),
+        ("postgres://app:clave@db:5432/app?sslmode=prefer", "rediss://redis:6379/0", "sslmode"),
+        ("postgres://app:clave@db:5432/app?sslmode=require", "redis://redis:6379/0", "rediss://"),
+    ],
+)
+def test_prod_con_tls_exigido_rechaza_datos_sin_cifrar(
+    entorno_prod: pytest.MonkeyPatch, base: str, redis: str, esperado: str
+) -> None:
+    entorno_prod.setenv("APP_EXIGIR_TLS_DATOS", "true")
+    entorno_prod.setenv("DATABASE_URL", base)
+    entorno_prod.setenv("REDIS_URL", redis)
+    with pytest.raises(ImproperlyConfigured, match=esperado):
+        _cargar_prod()
 
 
 @pytest.mark.parametrize("valor", ["0", "-1", "mucho", "1.5"])
