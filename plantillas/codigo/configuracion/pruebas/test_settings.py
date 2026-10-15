@@ -135,28 +135,28 @@ def test_prod_sin_ninguna_variable_no_arranca(monkeypatch: pytest.MonkeyPatch) -
         _cargar_prod()
 
 
-def test_la_zona_horaria_por_defecto_es_utc_y_se_cambia_por_variable(
+def test_la_zona_horaria_por_defecto_sale_de_localizacion_y_se_cambia_por_variable(
     entorno_prod: pytest.MonkeyPatch,
 ) -> None:
-    assert _cargar_con_base("prod").APP_ZONA_HORARIA == "UTC"
+    # `devskills init --zona ...` reescribe el valor por defecto de `localizacion.py`.
+    assert _cargar_con_base("prod").APP_ZONA_HORARIA == localizacion.ZONA_PREDETERMINADA
     entorno_prod.setenv("APP_ZONA_HORARIA", "America/Mexico_City")
     assert _cargar_con_base("prod").APP_ZONA_HORARIA == "America/Mexico_City"
     entorno_prod.setenv("APP_ZONA_HORARIA", "")  # vacia, como la pasa el Compose por defecto
-    assert _cargar_con_base("prod").APP_ZONA_HORARIA == "UTC"
+    assert _cargar_con_base("prod").APP_ZONA_HORARIA == localizacion.ZONA_PREDETERMINADA
 
 
-def test_el_idioma_por_defecto_es_neutral_y_se_cambia_por_variable(
+def test_el_idioma_por_defecto_sale_de_localizacion_y_se_cambia_por_variable(
     entorno_prod: pytest.MonkeyPatch,
 ) -> None:
-    assert localizacion.IDIOMA_PREDETERMINADO == "es"
-    assert localizacion.ZONA_PREDETERMINADA == "UTC"
-    assert _cargar_con_base("prod").LANGUAGE_CODE == "es"
+    # `devskills init --idioma ...` reescribe el valor por defecto de `localizacion.py`.
+    assert _cargar_con_base("prod").LANGUAGE_CODE == localizacion.IDIOMA_PREDETERMINADO
     entorno_prod.setenv("APP_IDIOMA", "en")
     assert _cargar_con_base("prod").LANGUAGE_CODE == "en"
     entorno_prod.setenv("APP_IDIOMA", "ES_mx")
     assert _cargar_con_base("prod").LANGUAGE_CODE == "es-mx"
     entorno_prod.setenv("APP_IDIOMA", "")  # vacia, como la pasa el Compose por defecto
-    assert _cargar_con_base("prod").LANGUAGE_CODE == "es"
+    assert _cargar_con_base("prod").LANGUAGE_CODE == localizacion.IDIOMA_PREDETERMINADO
 
 
 @pytest.mark.parametrize("valor", ["español", "e", "es mx", "es--mx", "123"])
