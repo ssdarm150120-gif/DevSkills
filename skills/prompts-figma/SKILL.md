@@ -67,7 +67,7 @@ Cada punto del prompt de correcciones cita qué está mal y cómo queda. Al fina
 ## Commands
 
 ```bash
-python documentacion/analisis/md_a_word.py --solo prompts_figma   # Word de los prompts
+"$PYDOC" documentacion/analisis/md_a_word.py --solo prompts_figma   # Word de los prompts
 ```
 
 ## Resources

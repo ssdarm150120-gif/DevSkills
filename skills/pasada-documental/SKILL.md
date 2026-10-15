@@ -81,8 +81,8 @@ Por cada punto: **qué existe hoy** (con IDs), **impacto** en SRS, DISEÑO y PLA
 ```bash
 python documentacion/analisis/trazabilidad.py _tmp.md --escribir   # Anexo C (borra _tmp.md al terminar)
 python documentacion/analisis/plan_sprints.py                      # PLAN.md (P.2.2) y plan_sprints.html
-python documentacion/analisis/md_a_word.py --mermaid <carpeta_mermaid_cli>   # todos los Word
-python documentacion/analisis/md_a_word.py --solo SRS              # solo un documento
+"$PYDOC" documentacion/analisis/md_a_word.py --mermaid <carpeta_mermaid_cli>   # todos los Word
+"$PYDOC" documentacion/analisis/md_a_word.py --solo SRS              # solo un documento
 ```
 
 ### Instalar las dependencias de los Word (una vez, sin tocar nada global)
@@ -91,13 +91,13 @@ Van en una carpeta del usuario, fuera del repositorio (ningún archivo nuevo va 
 mkdir -p ~/.devskills/doc && cd ~/.devskills/doc
 # Python: un entorno propio de la documentación (no el entorno del código)
 python -m venv venv
-venv/Scripts/python -m pip install python-docx pillow      # en Linux o macOS: venv/bin/python
+venv/Scripts/python -m pip install python-docx==1.2.0 pillow==12.3.0      # en Linux o macOS: venv/bin/python
 # mermaid-cli: con su propio package.json (sin él, npm instala en la primera carpeta superior que tenga uno)
 npm init -y
-npm install @mermaid-js/mermaid-cli
+npm install --save-exact @mermaid-js/mermaid-cli@12.0.0      # versión fija a propósito: no uses un npm install sin versión
 ```
 - Para usar el Chrome ya instalado en lugar de descargar otro, define `PUPPETEER_SKIP_DOWNLOAD=1` antes de `npm install` y crea `~/.devskills/doc/puppeteer.json` con `{"executablePath": "<ruta a chrome>"}`.
-- Ejecuta el script con ese Python y pasa la carpeta: `~/.devskills/doc/venv/Scripts/python documentacion/analisis/md_a_word.py --mermaid ~/.devskills/doc`.
+- `md_a_word.py` necesita `python-docx` y `pillow`, que viven en ese entorno y no en el del código ni en el del sistema. Por eso todos los comandos de los Word usan `"$PYDOC"`, el Python de ese entorno: `PYDOC=~/.devskills/doc/venv/Scripts/python` (en Linux o macOS, `~/.devskills/doc/venv/bin/python`). Pasa también la carpeta: `"$PYDOC" documentacion/analisis/md_a_word.py --mermaid ~/.devskills/doc`. Los demás generadores (`plan_sprints.py`, `trazabilidad.py`, `exportar_sesion.py`) usan solo la biblioteca estándar y corren con el Python del sistema.
 - Sin mermaid-cli el script funciona igual: avisa y deja los diagramas como bloque de código.
 - Los PNG de los diagramas se guardan en caché en `documentacion/word/_diagramas/`.
 

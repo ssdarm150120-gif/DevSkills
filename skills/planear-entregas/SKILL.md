@@ -91,7 +91,7 @@ Cada cambio del plan sube la versión de `PLAN.md` y agrega una fila a su histor
 
 ```bash
 python documentacion/analisis/plan_sprints.py      # regenera PLAN.md (P.2.2) y documentacion/plan_sprints.html
-python documentacion/analisis/md_a_word.py --solo PLAN
+"$PYDOC" documentacion/analisis/md_a_word.py --solo PLAN
 ```
 
 ## Resources

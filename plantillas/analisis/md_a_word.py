@@ -7,7 +7,7 @@ EVALUACION_ALTERNATIVAS.md y cualquier otro .md de primer nivel de documentacion
 plantillas sin llenar, que tienen `<!--` en el título).
 Los .md son la fuente de verdad: si cambia un requisito, se edita el .md y se regenera el Word.
 
-- `--mermaid CARPETA`: carpeta donde instalaste mermaid-cli (`npm install @mermaid-js/mermaid-cli`),
+- `--mermaid CARPETA`: carpeta donde instalaste mermaid-cli (`npm install --save-exact @mermaid-js/mermaid-cli@12.0.0`),
   con `node_modules/.bin/mmdc` y, si hace falta, un `puppeteer.json` (por ejemplo, para usar el Chrome
   local). Sin esta opción se usa `mmdc` si está en el PATH. Sin mermaid-cli, los diagramas quedan
   como bloque de código y el script lo avisa. Los PNG se guardan en caché en `word/_diagramas/`.
@@ -15,7 +15,7 @@ Los .md son la fuente de verdad: si cambia un requisito, se edita el .md y se re
 - `--proyecto NOMBRE`: nombre del proyecto para la portada, el encabezado y los archivos. Por defecto
   se lee del segundo encabezado del SRS (`## <Nombre del proyecto>`).
 
-Requiere python-docx y Pillow (`pip install python-docx pillow`), con el Python del sistema o un
+Requiere python-docx y Pillow (`pip install python-docx==1.2.0 pillow==12.3.0`), con el Python del sistema o un
 entorno propio de la documentación, no el entorno del código.
 """
 import argparse, hashlib, re, shutil, subprocess, pathlib, sys, unicodedata

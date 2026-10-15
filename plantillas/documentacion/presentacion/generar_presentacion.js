@@ -1,7 +1,7 @@
 // Presentación del proyecto (pptxgenjs, deck estructurado). La genera la skill devskills:generar-presentacion.
 //
 // Uso (desde documentacion/presentacion/):
-//   npm install            (una sola vez: instala las dependencias de package.json en ./node_modules)
+//   npm ci                 (una sola vez: instala lo que fija package-lock.json en ./node_modules)
 //   node generar_presentacion.js [datos_presentacion.json] [salida.pptx]
 //
 // Todo el contenido sale de datos_presentacion.json (lo llena el analista a partir del SRS y del PLAN).

@@ -52,9 +52,9 @@ Todo el contenido vive en `documentacion/presentacion/datos_presentacion.json`. 
 `documentacion/presentacion/package.json` declara `pptxgenjs`, `react`, `react-dom`, `react-icons` y `sharp`. Se instalan **en esa carpeta**:
 ```bash
 cd documentacion/presentacion
-npm install
+npm ci
 ```
-`node_modules/` y `package-lock.json` de esa carpeta no se versionan (deben estar en `.gitignore`). Si prefieres no instalar dentro del proyecto, instala las mismas dependencias en otra carpeta y ejecuta con `NODE_PATH` apuntando a su `node_modules`.
+`npm ci` instala exactamente lo que fija `package-lock.json`, que **sí se versiona** (`node_modules/` queda en `.gitignore`); no uses `npm install` salvo para subir una dependencia a propósito (con `npm audit` y commit del lock). Si prefieres no instalar dentro del proyecto, instala las mismas dependencias en otra carpeta y ejecuta con `NODE_PATH` apuntando a su `node_modules`.
 
 ### 4. Generar y verificar
 1. Regenera el plan (`python documentacion/analisis/plan_sprints.py`) para que la diapositiva `plan` tenga las fechas vigentes.
@@ -66,7 +66,7 @@ npm install
 
 ```bash
 cd documentacion/presentacion
-npm install                                   # una sola vez
+npm ci                                        # una sola vez (respeta package-lock.json)
 node generar_presentacion.js                  # usa datos_presentacion.json
 node generar_presentacion.js otros_datos.json Otra_Salida.pptx
 ```

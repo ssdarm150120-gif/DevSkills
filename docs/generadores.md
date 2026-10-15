@@ -6,8 +6,8 @@ DevSkills es una metodología y un stack para construir cualquier sistema. Cada 
 |--------|---------|-------|--------------|
 | `PLAN.md` (sección generada) y tablero `plan_sprints.html` | `python documentacion/analisis/plan_sprints.py` | `planear-entregas`, `registrar-avance`, `pasada-documental` | Python 3.12 |
 | Anexo C de trazabilidad del SRS | `python documentacion/analisis/trazabilidad.py _tmp.md --escribir` | `redactar-srs`, `pasada-documental` | Python 3.12 |
-| Documentos Word con diagramas | `python documentacion/analisis/md_a_word.py --mermaid ~/.devskills/doc` | `pasada-documental` | `python-docx`, `pillow`, mermaid-cli |
-| Presentación `.pptx` | `cd documentacion/presentacion && npm install && node generar_presentacion.js` | `generar-presentacion` | Node.js |
+| Documentos Word con diagramas | `"$PYDOC" documentacion/analisis/md_a_word.py --mermaid ~/.devskills/doc` | `pasada-documental` | `python-docx`, `pillow`, mermaid-cli |
+| Presentación `.pptx` | `cd documentacion/presentacion && npm ci && node generar_presentacion.js` | `generar-presentacion` | Node.js |
 | Transcripción de la sesión | `python documentacion/analisis/exportar_sesion.py --ultima documentacion/sesiones/<archivo>.md "<título>"` | `guarda-todo` | Python 3.12 |
 | Prompts de Figma Make | (plantilla) `documentacion/ui/prompts_figma_make.md` | `prompts-figma` | — |
 | Evaluación de alternativas | (plantilla) `documentacion/EVALUACION_ALTERNATIVAS.md` | `evaluacion-alternativas` | — |
@@ -35,11 +35,12 @@ DevSkills es una metodología y un stack para construir cualquier sistema. Cada 
 ```bash
 mkdir -p ~/.devskills/doc && cd ~/.devskills/doc
 python -m venv venv
-venv/Scripts/python -m pip install python-docx pillow      # en macOS/Linux: venv/bin/python
-npm install @mermaid-js/mermaid-cli
+venv/Scripts/python -m pip install python-docx==1.2.0 pillow==12.3.0      # en macOS/Linux: venv/bin/python
+npm init -y
+npm install --save-exact @mermaid-js/mermaid-cli@12.0.0
 ```
 
-Las herramientas viven siempre en la carpeta fija `~/.devskills/doc` (venv con `python-docx` y `pillow`, y mermaid-cli); `devskills doctor` busca ahí `mmdc`.
+Las versiones van **fijas** (python-docx 1.2.0, pillow 12.3.0, mermaid-cli 12.0.0) para que el mismo documento salga igual en cualquier máquina; sube de versión a propósito, con su commit, y no con un `npm install` suelto. `$PYDOC` en los comandos de los Word es el Python de ese entorno (`~/.devskills/doc/venv/Scripts/python`; en macOS y Linux, `venv/bin/python`). Las herramientas viven siempre en la carpeta fija `~/.devskills/doc` (venv con `python-docx` y `pillow`, y mermaid-cli); `devskills doctor` busca ahí `mmdc`.
 
 Para usar el Chrome que ya tienes en lugar de que puppeteer descargue otro: define `PUPPETEER_SKIP_DOWNLOAD=1` antes del `npm install` y crea `~/.devskills/doc/puppeteer.json`. En Windows las barras invertidas **van escapadas** (`\\`): una ruta sin escapar rompe el JSON.
 
@@ -58,7 +59,7 @@ Después:
 ## Presentación
 
 - **Datos:** `documentacion/presentacion/datos_presentacion.json` (título, problema, línea base, solución, metas, plan, riesgos, lo que se necesita). La diapositiva del plan toma las fechas de `PLAN.md`.
-- **Dependencia:** Node.js; `npm install` dentro de `documentacion/presentacion/` instala `pptxgenjs` en su `node_modules/` local (ignorado por git).
+- **Dependencia:** Node.js; `npm ci` dentro de `documentacion/presentacion/` instala `pptxgenjs` y lo demás **exactamente** como dice `package-lock.json` (que sí se versiona; `node_modules/` queda ignorado por git). Para subir una dependencia a propósito: `npm install <paquete>@<versión>`, `npm audit` y commit del lock.
 - **Salida:** `<Proyecto>_Propuesta_v<versión>.pptx` junto al generador, o la ruta que pases como segundo argumento. No se edita el `.pptx` a mano: se cambia el JSON, se sube la versión y se regenera.
 
 ## Transcripción de la sesión

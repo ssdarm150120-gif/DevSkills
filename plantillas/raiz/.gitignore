@@ -25,8 +25,8 @@ htmlcov/
 documentacion/analisis/datos/
 
 # Generador de la presentación (Node): dependencias locales
+# (package-lock.json SI se versiona: fija las versiones y los hashes de lo que se instala con `npm ci`)
 documentacion/presentacion/node_modules/
-documentacion/presentacion/package-lock.json
 node_modules/
 
 # Residuos de pruebas manuales con curl (pueden contener cookies de sesión)

@@ -52,7 +52,7 @@ Producto a evaluar: $producto
 ## Commands
 
 ```bash
-python documentacion/analisis/md_a_word.py --solo EVALUACION   # Word del manifiesto (una plantilla sin llenar se omite)
+"$PYDOC" documentacion/analisis/md_a_word.py --solo EVALUACION   # Word del manifiesto (una plantilla sin llenar se omite)
 ```
 
 ## Resources
