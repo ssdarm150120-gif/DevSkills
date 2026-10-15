@@ -19,7 +19,7 @@
       "tipo": "tarjetas", "seccion": "El problema", "titulo": "<El problema en una frase>",
       "tarjetas": [
         ["FiCalendar", "<Momento 1>", "<Qué pasa hoy>"],
-        ["FiTruck", "<Momento 2>", "<Qué pasa hoy>"],
+        ["FiCircle", "<Momento 2>", "<Qué pasa hoy>"],
         ["FiAlertTriangle", "<Momento crítico>", "<Dónde duele>"]
       ],
       "resaltar": 2,
@@ -80,7 +80,7 @@
         ["FiClock", "<Regla 1>", "<Explicación>"],
         ["FiLock", "<Regla 2>", "<Explicación>"],
         ["FiKey", "<Regla 3>", "<Explicación>"],
-        ["FiPackage", "<Regla 4>", "<Explicación>"]
+        ["FiSquare", "<Regla 4>", "<Explicación>"]
       ],
       "notas": "<Las reglas de negocio que no se negocian.>"
     },

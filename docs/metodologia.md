@@ -31,7 +31,7 @@ DevSkills es una metodología y un stack para construir **cualquier sistema**, n
 
 ```
 Desarrollo ──► punto de control ──► QA ──► Angel Fixer ──► ¿Listo? ──sí──► Verificación final ──► Cierre
-     ▲                                                        │
+     ▲                                                        │            (solo si hubo correcciones)
      └──────── no (defectos, observaciones o cualquier hallazgo) ◄┘
 ```
 
@@ -40,8 +40,8 @@ Desarrollo ──► punto de control ──► QA ──► Angel Fixer ──�
 3. **QA.** Convierte el Gherkin del SRS en pruebas de aceptación, verifica los RNF y emite un veredicto.
 4. **Angel Fixer.** Evalúa cumplimiento, buenas prácticas y seguridad. Corrige solo lo CRÍTICO y ALTO que confirma.
 5. **Rondas.** Cualquier hallazgo vuelve al desarrollador con la lista exacta. Máximo 3 rondas.
-6. **Verificación final.** Una sola pasada confirma que todo quedó corregido y sin regresiones.
-7. **Cierre.** Reporte, estado oficial, plan y tablero regenerados, squash a `main`, documentación en commits aparte, gitleaks.
+6. **Verificación final, solo si hubo correcciones** (ronda 2 o 3, ronda extra o fixes del Angel Fixer). Una sola pasada confirma que todo quedó corregido y sin regresiones. Si QA aprobó y el Angel Fixer cerró sin hallazgos ni fixes en la primera ronda, no hay nada corregido que confirmar y se pasa directo al cierre.
+7. **Cierre, en este orden.** (1) En la rama: reporte, `estado_backlog.json`, índice y plan y tablero regenerados, en un punto de control. (2) gitleaks (código 0; el 2 significa que la herramienta no está disponible). (3) Squash a `main` en **un solo commit** que lleva el código **y** el reporte, el estado, el índice y el `PLAN.md`: `main` nunca muestra un elemento tachado sin su evidencia. (4) Solo si cambió SRS o DISEÑO: Anexo C, plan y Word en commits `docs:` aparte sobre `main`, cada uno tras gitleaks. (5) Engram y respuesta; un `push`, solo con la confirmación del usuario y después de todo lo anterior.
 
 ## Reglas que no se negocian
 
@@ -60,9 +60,12 @@ Ningún trabajo sin respaldo en git:
 4. Al cerrar, la rama entra a `main` como un solo commit (`merge --squash`).
 5. Los revisores no ejecutan en el repositorio nada que escriba archivos de código; las mutaciones van en una copia.
 6. Quien dañe un archivo se detiene, lo restaura y lo reporta.
-7. Solo el orquestador ejecuta comandos de git que cambian el árbol o la historia.
+7. Solo el orquestador ejecuta comandos de git que cambian el árbol o la historia, también en `gga` y `judgment-day`: sus auditores, jueces y correctores no hacen `add`, `commit` ni `push`; el orquestador deja el punto de control después de los fixes y antes de relanzar la revisión.
+8. **Herramientas locales = CI; un CI en rojo es deuda.** QA, Angel Fixer y verificador corren semgrep con la misma versión que fija el CI y exigen código 0 y "Findings: 0"; si la máquina no puede, el job del CI de GitHub es el que cuenta y el elemento no es Listo hasta que esté en verde. Tras cada push autorizado se revisa con `gh run list`; un CI en rojo se corrige antes de seguir.
 
 Las reglas 1 a 6 nacieron de un verificador que vació por accidente un archivo de pruebas sin commit; la 7, de un desarrollador que corrió `git stash` a media ronda.
+
+**`main` no lleva commits `wip:`.** Viven en la rama del elemento y el `merge --squash` los elimina: en `main` solo entra el commit del elemento (más los `docs:` aparte). Si un `wip:` llegó a `main` en un historial ya publicado, se documenta y se deja: no se reescribe el historial publicado.
 
 ### Quién decide qué
 - **Negocio** (alcance, reglas, riesgos, prioridades): el Product Owner. Se le pregunta con decisiones numeradas y una opción recomendada, y se espera su respuesta.

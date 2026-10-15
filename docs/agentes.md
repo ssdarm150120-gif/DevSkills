@@ -28,7 +28,7 @@ Sesión principal (orquestador)
 | `orquestador` | Coordina, decide lo técnico, pregunta lo de negocio, hace los commits | `orquestador`, `proyecto-contexto`, `ciclo-historia` | Delegar, git, estado del backlog. **No** escribe código |
 | `analista-arquitecto` | SRS, DISEÑO, PLAN, Anexo C, pasadas documentales | `proyecto-contexto`, `redactar-srs`, `redactar-diseno`, `planear-entregas`, `pasada-documental` | Escribir en `documentacion/`. **No** toca `codigo/` |
 | `dev-a` | Desarrollador A: dominio y datos | `proyecto-contexto`, `implementar-historia` | Implementar y delegar en sus subagentes |
-| `dev-b` | Desarrollador B: canales, experiencia y servicios | `proyecto-contexto`, `implementar-historia` | Implementar y delegar en sus subagentes |
+| `dev-b` | Desarrollador B: interfaz, experiencia y servicios | `proyecto-contexto`, `implementar-historia` | Implementar y delegar en sus subagentes |
 | `dev-dominio` | Dominio y casos de uso con TDD | `proyecto-contexto` | `dominio/` y `aplicacion/` |
 | `dev-integraciones` | Adaptadores, outbox, Celery, migraciones | `proyecto-contexto` | `adaptadores/salida/` e infraestructura |
 | `dev-interfaz` | Vistas Django + HTMX, accesibilidad | `proyecto-contexto` | `adaptadores/entrada/` y plantillas |
@@ -71,8 +71,8 @@ Y un bloque de cuidado del repositorio según su papel:
 
 Qué desarrollador atiende cada módulo se define **por proyecto**, en la tabla "Asignación de módulos" de `documentacion/CONTEXTO.md`. Por defecto:
 
-- **Dev A:** núcleo, identidad, auditoría, módulos centrados en datos, integraciones con sistemas fuente y los habilitadores de cimientos.
-- **Dev B:** interfaz, canales y mensajería, flujos con el usuario final y servicios internos.
+- **Dev A:** núcleo, identidad, módulos centrados en datos, integraciones de entrada que el proyecto defina y los habilitadores de cimientos.
+- **Dev B:** interfaz, flujos con el usuario final, integraciones de salida que el proyecto defina y servicios internos.
 
 ## Nombres según la instalación
 

@@ -1,8 +1,8 @@
 ---
 name: dev-a
 description: >
-  Desarrollador A (full-stack, foco en dominio y datos): núcleo, identidad, auditoría, módulos de negocio
-  centrados en datos e integraciones con sistemas fuente, según la tabla de asignación de `documentacion/CONTEXTO.md`.
+  Desarrollador A (full-stack, foco en dominio y datos): núcleo, identidad, módulos de negocio
+  centrados en datos e integraciones de entrada que el proyecto defina, según la tabla de asignación de `documentacion/CONTEXTO.md`.
   Por defecto también los habilitadores de cimientos (EN). Usar para implementar HU o EN dentro del ciclo `devskills:ciclo-historia`.
 model: sonnet
 tools: Read, Edit, Write, Glob, Grep, Bash, Agent, Skill

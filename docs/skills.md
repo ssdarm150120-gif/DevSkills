@@ -11,7 +11,7 @@ DevSkills, metodología y stack para construir cualquier sistema, trae 22 skills
 | `redactar-srs` | analista-arquitecto | SRS ISO/IEC/IEEE 29148 en orden estricto: problema y línea base, RF/RNF, preguntas `P-nn`, Anexo A, Anexo B con Gherkin, Anexo C generado |
 | `redactar-diseno` | analista-arquitecto | DISEÑO IEEE 1016, D.1 a D.6, con ADR. Un cambio que afecte requisitos va primero al SRS |
 | `planear-entregas` | analista-arquitecto | Entregas, sprints, puntos (Fibonacci, partir más de 13), velocidad y recalibración; carga `plan_entregas.json` y regenera `PLAN.md` y el tablero |
-| `pasada-documental` (atajo) | analista-arquitecto | Sube versión de SRS/DISEÑO con historial, registra preguntas y quién decidió, regenera Anexo C, plan, tablero y Word, y deja un commit `docs:` aparte |
+| `pasada-documental` | analista-arquitecto | Sube versión de SRS/DISEÑO con historial, registra preguntas y quién decidió, regenera Anexo C, plan, tablero y Word, y deja un commit `docs:` aparte |
 | `evaluacion-alternativas` | analista-arquitecto | Comprar o construir: manifiesto de evaluación con opciones, criterios ponderados y su ADR |
 | `prompts-figma` | analista-arquitecto | Prompts de Figma Make derivados del SRS y el PLAN: sistema de diseño, pantallas, actualización y correcciones |
 | `generar-presentacion` | analista-arquitecto | Presentación `.pptx` para la dirección a partir de `datos_presentacion.json` |
@@ -41,7 +41,7 @@ DevSkills, metodología y stack para construir cualquier sistema, trae 22 skills
 | `orquestador` | Reglas de la sesión principal: delegar, decidir lo técnico, preguntar lo de negocio, puntos de control, estado, engram, Telegram |
 | `proyecto-contexto` | Reglas comunes (arquitectura fija, convenciones, DoR, DoD, cero deuda, entorno) y la orden de leer `documentacion/CONTEXTO.md` |
 | `preguntar-al-po` | Decisiones numeradas con opción recomendada; terminal (`AskUserQuestion`) o Telegram; esperar; registrar quién decidió |
-| `guarda-todo` (atajo) | Commit, transcripción con `exportar_sesion.py`, gitleaks, commit y resumen en engram |
+| `guarda-todo` | Commit, transcripción con `exportar_sesion.py`, gitleaks, commit y resumen en engram |
 | `recuperar-corte` | Diagnóstico, commit de respaldo, reanudar al mismo agente con `SendMessage` sin rehacer, y limpieza |
 
 ## Equivalencias con el proyecto modelo

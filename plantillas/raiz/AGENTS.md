@@ -19,11 +19,11 @@ Ningún archivo nuevo va en la raíz: lo que se lee va a `documentacion/` y lo q
 ```
 Sesión principal (orquestador) ── /devskills:ciclo <ID | SNN>
 ├── analista-arquitecto ..... SRS (ISO/IEC/IEEE 29148), DISEÑO (IEEE 1016), PLAN, Anexo C, pasadas documentales
-├── dev-a ................... Dev A: dominio y datos (núcleo, identidad, módulos de datos, integraciones fuente)
+├── dev-a ................... Dev A: dominio y datos (núcleo, identidad, módulos de datos, integraciones de entrada)
 │   ├── dev-dominio ............... dominio, máquinas de estado, casos de uso (TDD)
 │   ├── dev-integraciones ......... adaptadores, outbox, Celery, migraciones
 │   └── dev-interfaz .............. pantallas de sus módulos
-├── dev-b ................... Dev B: canales, experiencia y servicios
+├── dev-b ................... Dev B: interfaz, experiencia y servicios
 │   ├── dev-interfaz .............. Django + HTMX, accesibilidad, modo claro y oscuro
 │   ├── dev-servicios ............. servicios internos separados
 │   ├── dev-dominio
@@ -40,7 +40,7 @@ La profundidad máxima es de 2 niveles debajo de la sesión principal, dentro de
 ## Ciclo de calidad por elemento del backlog
 
 ```
-Desarrollo ──► punto de control ──► QA ──► Angel Fixer ──► ¿Listo? ──sí──► Verificación final ──► Reporte + tachado en el plan
+Desarrollo ──► punto de control ──► QA ──► Angel Fixer ──► ¿Listo? ──sí──► Verificación final (solo si hubo correcciones) ──► Reporte + tachado en el plan
      ▲                                                        │
      └──────────────── no (máximo 3 rondas) ◄─────────────────┘ ──► después de 3 rondas: pregunta al Product Owner
 ```
@@ -52,6 +52,9 @@ Desarrollo ──► punto de control ──► QA ──► Angel Fixer ──�
 - **Idioma:** español de México con tuteo. Commits en inglés, Conventional Commits, sin atribución de IA.
 - **Git:** cada elemento en su rama `hu-xx` o `en-xx`; commit de punto de control antes de cada revisión; solo el orquestador ejecuta comandos de git que cambian el árbol o la historia; nadie reconstruye archivos de memoria (`git restore`); cierre con `merge --squash` a `main`.
 - **Docker (opcional):** se desarrolla y se prueba sin él. Si se usa: prefijo `{{SLUG}}` para el stack principal y `{{SLUG}}-<agente>` para cada agente; puertos del host solo entre `{{PUERTO_BASE}}` y el `{{PUERTO_BASE}}` + 49; nunca los puertos reservados (`{{PUERTOS_RESERVADOS}}`); nunca `down -v` ni `prune` sobre el stack principal.
+- **Herramientas locales = CI:** semgrep (misma versión que el CI) y las demás herramientas de revisión se corren igual que en `.github/workflows/ci.yml`; con código 0 y sin hallazgos. **Un CI en rojo es deuda:** después de cada push autorizado se revisa con `gh run list` y se corrige antes de seguir.
+- **Lista congelada:** tras 3 rondas sin aprobar y con la autorización del Product Owner, la ronda extra resuelve y verifica solo la lista pendiente y las regresiones, sin búsquedas nuevas; un hallazgo nuevo se anota con el ID del elemento que lo absorbe.
+- **Preguntar al Product Owner:** lo de negocio (alcance, reglas, prioridades, cerrar con pendientes) lo decide el Product Owner, con decisiones numeradas y una recomendada; nadie lo asume. Después de 3 rondas sin aprobar, también se le pregunta.
 - **Hacia afuera:** nada de `git push`, `gh` de escritura, `docker push` ni borrar ramas con `-D` sin la confirmación explícita del usuario; los subagentes no los ejecutan nunca.
 - **Secretos:** nadie lee ni escribe `.env` ni `.env.*`.
 - **Memoria:** engram con `project` = `{{SLUG}}`.

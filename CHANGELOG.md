@@ -17,6 +17,13 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 - El esqueleto ya no anuncia una bitácora que no existe (capacidad, rol `auditor` y textos marcados como ejemplo) y documenta paso a paso cómo reemplazar los roles de ejemplo.
 - Una sola Definición de Terminado (`proyecto-contexto`); el SRS y el PLAN la referencian. Los comandos de Word usan el Python del entorno de la documentación (`$PYDOC`). El README ya no contradice el orden descubrimiento → `init`.
 
+### Ronda de correcciones 2
+- `scripts/gitleaks_archivos.py` distingue "herramienta no disponible" (código 2, con instrucciones) de "hay hallazgos" (código 1); busca el binario también en las rutas de winget y detecta un demonio de Docker apagado.
+- `prod.py` rechaza `SECURE_SSL_REDIRECT` apagado y HSTS menor a un año en un servidor real (solo advierte en `localhost`); `APP_EXIGIR_TLS_DATOS` exige `sslmode` y `rediss://`; `roles_bd` valida la clave de Redis; tope de 128 caracteres de contraseña antes de Argon2.
+- Idioma y zona horaria por defecto neutrales (`es`, `UTC`) en `configuracion/localizacion.py`, sobrescribibles con `APP_IDIOMA` y `APP_ZONA_HORARIA`; `devskills init --idioma --zona` los fija.
+- `bin/devskills` sin `eval`; `uninstall.sh` e `install.sh` limpian carpetas vacías solo hasta la raíz de cada skill; imágenes de gitleaks y semgrep fijadas por digest; `.gitignore` de la plantilla excluye llaves y credenciales; `exportar_sesion.py` enmascara secretos obvios.
+- Método: los agentes de `gga` y `judgment-day` no hacen commit (lo hace el orquestador), orden de cierre explícito, verificación final condicionada a que hubo correcciones, regla "herramientas locales = CI" entre los puntos de control, `main` sin commits `wip:`; Dev A y Dev B sin sesgo de dominio.
+
 ### Docker es opcional
 - Se desarrolla y se prueba sin Docker: PostgreSQL embebido, Celery en modo local sin Redis en desarrollo y pruebas, gitleaks nativo, semgrep nativo (macOS/Linux) o por WSL/Docker (Windows) y siempre obligatorio en el CI. `devskills doctor` lo trata como opcional y dice qué se pierde. Las pruebas de Compose y del certificado se omiten sin Docker y no se pueden omitir en el CI (`REQUIERE_DOCKER=1`).
 - El CI del plugin genera un proyecto con `devskills init` y corre ruff, mypy, lint-imports y el pytest completo sin Docker (`SIN_DOCKER=1`).

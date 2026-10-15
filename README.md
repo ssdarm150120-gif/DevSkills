@@ -147,7 +147,7 @@ cd ~/proyectos/mi-sistema && claude                # abre Claude Code en el proy
 | `orquestador` | Coordina al equipo, decide lo técnico, pregunta lo de negocio y hace los commits. No escribe código |
 | `analista-arquitecto` | Redacta y versiona el SRS, el DISEÑO y el PLAN; mantiene preguntas, riesgos y trazabilidad |
 | `dev-a` | Desarrollador A: dominio y datos, y los habilitadores de cimientos |
-| `dev-b` | Desarrollador B: canales, experiencia y servicios |
+| `dev-b` | Desarrollador B: interfaz, experiencia y servicios |
 | `dev-dominio` | Entidades, máquinas de estado y casos de uso, con TDD |
 | `dev-integraciones` | Adaptadores, outbox, Celery y migraciones |
 | `dev-interfaz` | Vistas Django + HTMX, accesibilidad y formatos |
