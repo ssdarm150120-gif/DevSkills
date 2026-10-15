@@ -111,7 +111,13 @@ Como plugin: `/plugin uninstall devskills@devskills-local`.
 Sirve para correr un ciclo sin una persona frente a la terminal (un servidor, una prueba, un trabajo programado). Lo que sigue es lo que se comprobó en una prueba real con una historia pequeña.
 
 ```bash
-claude -p "<prompt con el ID y las respuestas del Product Owner>"   --plugin-dir /ruta/a/DevSkills   --output-format stream-json --verbose   --permission-mode acceptEdits   --allowedTools "Read,Edit,Write,Glob,Grep,Agent,Skill,Bash(git status*),Bash(git diff*),Bash(git log*),Bash(git show*),Bash(git add*),Bash(git commit*),Bash(git switch*),Bash(git merge --squash*),Bash(git restore*),Bash(python -m pytest*),Bash(python -m ruff*),Bash(python -m mypy*),Bash(lint-imports*),Bash(python manage.py*),Bash(python documentacion/analisis/*),Bash(gh run list*),Bash(gh run view*)"   --disallowedTools "Bash(git push*),Bash(git reset*),Bash(git clean*),Bash(git branch -D*),Bash(git remote*),Bash(git config*),Bash(gh issue*),Bash(gh pr*),Bash(gh repo*),Bash(gh release*),Bash(gh api*),Bash(gh workflow*),Bash(gh secret*),Bash(gh variable*),Bash(docker push*),Bash(docker login*),Bash(docker system prune*),Bash(docker volume prune*),Bash(docker compose down -v*),Bash(docker compose down --volumes*)"   --max-turns 200 --max-budget-usd 25
+claude -p "<prompt con el ID y las respuestas del Product Owner>" \
+  --plugin-dir /ruta/a/DevSkills \
+  --output-format stream-json --verbose \
+  --permission-mode acceptEdits \
+  --allowedTools "Read,Edit,Write,Glob,Grep,Agent,Skill,Bash(git status*),Bash(git diff*),Bash(git log*),Bash(git show*),Bash(git add*),Bash(git commit*),Bash(git switch*),Bash(git merge --squash*),Bash(git restore*),Bash(python -m pytest*),Bash(python -m ruff*),Bash(python -m mypy*),Bash(lint-imports*),Bash(python manage.py*),Bash(python documentacion/analisis/*),Bash(gh run list*),Bash(gh run view*)" \
+  --disallowedTools "Bash(git push*),Bash(git reset*),Bash(git clean*),Bash(git branch -D*),Bash(git remote*),Bash(git config*),Bash(gh issue*),Bash(gh pr*),Bash(gh repo*),Bash(gh release*),Bash(gh api*),Bash(gh workflow*),Bash(gh secret*),Bash(gh variable*),Bash(docker push*),Bash(docker login*),Bash(docker system prune*),Bash(docker volume prune*),Bash(docker compose down -v*),Bash(docker compose down --volumes*)" \
+  --max-turns 200 --max-budget-usd 25
 ```
 
 | Qué | Para qué |
@@ -174,7 +180,7 @@ El plugin engram puede fallar en las sesiones anidadas (la de `claude -p` lanzad
 
 ## GitHub CLI (`gh`) y el CI
 
-Un proyecto creado con DevSkills trae su CI en `.github/workflows/`, pero **solo corre cuando el repositorio tiene remoto** en GitHub. Crea el remoto privado desde el inicio y revisa el CI después de cada push, con `gh`:
+Un proyecto creado con DevSkills trae su CI en `.github/workflows/`, pero **solo corre cuando el repositorio tiene remoto** en GitHub. Crea el remoto privado desde el inicio y revisa el CI después de cada push, con `gh`. **Los agentes no suben nada por su cuenta:** proponen el comando y esperas tu "sí"; lo que sigue lo ejecutas tú (o lo apruebas cuando te lo propongan):
 
 ```bash
 winget install GitHub.cli        # Windows · macOS: brew install gh · Linux: https://github.com/cli/cli#installation
@@ -186,7 +192,7 @@ gh run list --limit 3            # estado de las últimas corridas del CI
 gh run view <id> --log-failed    # solo el registro de lo que falló
 ```
 
-Un CI en rojo es deuda: se corrige antes de seguir. Los PR de Dependabot fallarán mientras el CI de `main` esté en rojo: primero `main` en verde, luego `@dependabot rebase`, integra las menores y revisa aparte las versiones mayores. Los flujos usan `ubuntu-24.04` (no `ubuntu-latest`): subir esa imagen es un cambio a mano.
+Un CI en rojo es deuda: se corrige antes de seguir. Los PR de Dependabot fallarán mientras el CI de `main` esté en rojo: primero `main` en verde, luego `@dependabot rebase`, integra las menores y revisa aparte las versiones mayores. **Cada `@dependabot rebase` y cada merge es una acción hacia afuera:** el agente los lista y los propone, y solo ejecuta los que apruebas. Los flujos usan `ubuntu-24.04` (no `ubuntu-latest`): subir esa imagen es un cambio a mano.
 
 ## Requisitos
 
