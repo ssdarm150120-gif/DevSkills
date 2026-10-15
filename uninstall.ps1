@@ -32,9 +32,11 @@ foreach ($archivo in Get-Content -Encoding UTF8 $Manifiesto) {
         [IO.File]::Delete($archivo)
         $quitados++
     }
-    # Borra carpetas que quedaron vacías (la de cada skill), sin subir más allá.
+    # Borra carpetas que quedaron vacías, subiendo solo hasta la raíz de la skill (skills/devskills-<nombre>).
     $dir = Split-Path -Parent $archivo
-    while ($dir -and ($dir -replace '\\', '/') -like '*/devskills-*' -and (Test-Path -LiteralPath $dir) -and -not (Get-ChildItem -Force -LiteralPath $dir)) {
+    $raiz = $null
+    if (($archivo -replace '\\', '/') -match '^(.*/skills/devskills-[^/]+)/.+') { $raiz = $Matches[1] }
+    while ($raiz -and $dir -and ((($dir -replace '\\', '/') -eq $raiz) -or (($dir -replace '\\', '/').StartsWith("$raiz/"))) -and (Test-Path -LiteralPath $dir) -and -not (Get-ChildItem -Force -LiteralPath $dir)) {
         [IO.Directory]::Delete($dir)
         $dir = Split-Path -Parent $dir
     }

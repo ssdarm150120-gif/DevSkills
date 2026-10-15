@@ -41,6 +41,20 @@ if [[ ! -f "$MANIFIESTO" || ! -f "$SHARE_DIR/.devskills" ]]; then
   exit 0
 fi
 
+# Borra las carpetas que quedaron vacías, subiendo solo hasta la raíz conocida de la skill
+# (<...>/skills/devskills-<nombre>): nunca por encima de ella.
+limpiar_carpetas() {
+  local archivo="$1" base resto raiz dir
+  [[ "$archivo" == */skills/devskills-*/* ]] || return 0
+  base="${archivo%/skills/devskills-*}"
+  resto="${archivo#"$base"/skills/}"
+  raiz="$base/skills/${resto%%/*}"
+  dir="$(dirname "$archivo")"
+  while [[ "$dir" == "$raiz" || "$dir" == "$raiz"/* ]] && rmdir "$dir" 2>/dev/null; do
+    dir="$(dirname "$dir")"
+  done
+}
+
 quitados=0
 while IFS= read -r archivo; do
   [[ -z "$archivo" ]] && continue
@@ -52,11 +66,7 @@ while IFS= read -r archivo; do
     rm -f "$archivo"
     quitados=$((quitados + 1))
   fi
-  # Borra carpetas que quedaron vacías (por ejemplo, la de cada skill), sin subir más allá.
-  dir="$(dirname "$archivo")"
-  while [[ "$dir" == *"/devskills-"* ]] && rmdir "$dir" 2>/dev/null; do
-    dir="$(dirname "$dir")"
-  done
+  limpiar_carpetas "$archivo"
 done <"$MANIFIESTO"
 
 rm -rf "$SHARE_DIR"

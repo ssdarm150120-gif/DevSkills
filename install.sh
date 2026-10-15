@@ -240,6 +240,20 @@ for entrada in "${PLAN[@]}"; do
   ruta_portable "$destino" >>"$MANIFIESTO.nuevo"
 done
 
+# Borra las carpetas que quedaron vacías, subiendo solo hasta la raíz conocida de la skill
+# (<...>/skills/devskills-<nombre>): nunca por encima de ella.
+limpiar_carpetas() {
+  local archivo="$1" base resto raiz dir
+  [[ "$archivo" == */skills/devskills-*/* ]] || return 0
+  base="${archivo%/skills/devskills-*}"
+  resto="${archivo#"$base"/skills/}"
+  raiz="$base/skills/${resto%%/*}"
+  dir="$(dirname "$archivo")"
+  while [[ "$dir" == "$raiz" || "$dir" == "$raiz"/* ]] && rmdir "$dir" 2>/dev/null; do
+    dir="$(dirname "$dir")"
+  done
+}
+
 # Quita lo que la instalación anterior puso y esta ya no trae. Solo toca entradas con aspecto de
 # DevSkills (devskills-*, o el CLI): un manifiesto alterado no puede borrar archivos ajenos.
 if [[ -n "$MANIFIESTO_ANTERIOR" ]]; then
@@ -250,10 +264,7 @@ if [[ -n "$MANIFIESTO_ANTERIOR" ]]; then
     fi
     if ! grep -Fxq -- "$viejo" "$MANIFIESTO.nuevo"; then
       rm -f "$viejo"
-      dir="$(dirname "$viejo")"
-      while [[ "$dir" == *"/devskills-"* ]] && rmdir "$dir" 2>/dev/null; do
-        dir="$(dirname "$dir")"
-      done
+      limpiar_carpetas "$viejo"
     fi
   done <"$MANIFIESTO_ANTERIOR"
   rm -f "$MANIFIESTO_ANTERIOR"

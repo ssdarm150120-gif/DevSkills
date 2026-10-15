@@ -151,6 +151,28 @@ Describe 'install.sh y uninstall.sh'
       The path "$SHARE_TEMPORAL" should not be exist
     End
 
+    # La ruta del usuario contiene "/devskills-": la limpieza de carpetas vacías no puede subir de la raíz de la skill.
+    desinstalar_con_ruta_con_prefijo() {
+      local original="$HOME_TEMPORAL"
+      HOME_TEMPORAL="$original/devskills-casa"
+      BIN_TEMPORAL="$HOME_TEMPORAL/bin"
+      SHARE_TEMPORAL="$HOME_TEMPORAL/share/devskills"
+      mkdir -p "$HOME_TEMPORAL"
+      crear_origen_falso
+      instalar_falso --si >/dev/null
+      desinstalar >/dev/null
+      test -d "$HOME_TEMPORAL/.claude/skills" && echo "skills-sigue"
+      test -d "$HOME_TEMPORAL/.claude/agents" && echo "agents-sigue"
+      test -d "$HOME_TEMPORAL/.claude/skills/devskills-s1" && echo "skill-sigue"
+      HOME_TEMPORAL="$original"
+    }
+    It 'la limpieza de carpetas vacías no sube por encima de la raíz de la skill'
+      When call desinstalar_con_ruta_con_prefijo
+      The output should include 'skills-sigue'
+      The output should include 'agents-sigue'
+      The output should not include 'skill-sigue'
+    End
+
     It 'un manifiesto alterado no puede hacer borrar archivos ajenos al desinstalar'
       crear_origen_falso
       instalar_falso --si >/dev/null

@@ -164,7 +164,10 @@ foreach ($viejo in $Propios) {
     if ($Nuevos -notcontains $viejo) {
         if (Test-Path -LiteralPath $viejo) { [IO.File]::Delete($viejo) }
         $dir = Split-Path -Parent $viejo
-        while ($dir -and ($dir -replace '\\', '/') -like '*/devskills-*' -and (Test-Path -LiteralPath $dir) -and -not (Get-ChildItem -Force -LiteralPath $dir)) {
+        # Solo sube hasta la raíz de la skill (skills/devskills-<nombre>), nunca por encima.
+        $raiz = $null
+        if (($viejo -replace '\\', '/') -match '^(.*/skills/devskills-[^/]+)/.+') { $raiz = $Matches[1] }
+        while ($raiz -and $dir -and ((($dir -replace '\\', '/') -eq $raiz) -or (($dir -replace '\\', '/').StartsWith("$raiz/"))) -and (Test-Path -LiteralPath $dir) -and -not (Get-ChildItem -Force -LiteralPath $dir)) {
             [IO.Directory]::Delete($dir)
             $dir = Split-Path -Parent $dir
         }
