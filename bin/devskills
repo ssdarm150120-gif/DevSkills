@@ -58,6 +58,9 @@ Uso:
       --puerto-base <N>              Inicio del rango de 50 puertos del host (por defecto 20000)
       --puertos-reservados <lista>   Puertos del host que nunca se usan (por defecto 5432)
       --autor "<Autor>"              Autor de los documentos (por defecto, git config user.name)
+      --idioma <código>              Idioma de la interfaz y de Django: es, en, es-mx, pt-br... (por defecto es)
+      --zona <zona>                  Zona horaria con que se muestran las fechas: UTC o Area/Ciudad,
+                                     por ejemplo America/Bogota (por defecto UTC; se guardan siempre en UTC)
       --sin-git                      No inicializa git ni hace el primer commit
   devskills doctor                   Revisa los requisitos: obligatorios (git, Python 3.12, Claude Code, gitleaks) y
                                      opcionales con lo que pierdes sin ellos (Docker, semgrep, Node, mermaid-cli, gh, engram)
@@ -76,7 +79,7 @@ slug_de() {
 }
 
 cmd_init() {
-  local ruta="" nombre="" slug="" puerto_base="20000" reservados="5432" autor="" sin_git=""
+  local ruta="" nombre="" slug="" puerto_base="20000" reservados="5432" autor="" sin_git="" idioma="es" zona="UTC"
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --nombre) nombre="${2:-}"; shift 2 ;;
@@ -84,6 +87,8 @@ cmd_init() {
       --puerto-base) puerto_base="${2:-}"; shift 2 ;;
       --puertos-reservados) reservados="${2:-}"; shift 2 ;;
       --autor) autor="${2:-}"; shift 2 ;;
+      --idioma) idioma="${2:-}"; shift 2 ;;
+      --zona) zona="${2:-}"; shift 2 ;;
       --sin-git) sin_git="--sin-git"; shift ;;
       -h|--help) mostrar_ayuda; return 0 ;;
       -*) error "Opción desconocida: $1"; return 2 ;;
@@ -119,7 +124,7 @@ cmd_init() {
     ruta="$(cygpath -m "$ruta")"
   fi
   local args=(--destino "$ruta" --nombre "$nombre" --slug "$slug" --puerto-base "$puerto_base"
-              --puertos-reservados "$reservados" --autor "$autor")
+              --puertos-reservados "$reservados" --autor "$autor" --idioma "$idioma" --zona "$zona")
   [[ -n "$sin_git" ]] && args+=("$sin_git")
   # shellcheck disable=SC2086
   $python "$script" "${args[@]}"
@@ -131,9 +136,11 @@ cmd_init() {
 }
 
 revisar() {
-  # revisar <etiqueta> <comando de prueba> <cómo instalar>   (obligatorio: si falta, cuenta como requisito faltante)
-  local etiqueta="$1" prueba="$2" como="$3"
-  if eval "$prueba" >/dev/null 2>&1; then
+  # revisar <etiqueta> <cómo instalar> <comando...>   (obligatorio: si falta, cuenta como requisito faltante)
+  # El comando es una lista de argumentos (o una función); nunca una cadena interpretada como código.
+  local etiqueta="$1" como="$2"
+  shift 2
+  if "$@" >/dev/null 2>&1; then
     ok "$etiqueta"
     return 0
   fi
@@ -142,9 +149,10 @@ revisar() {
 }
 
 revisar_opcional() {
-  # revisar_opcional <etiqueta> <comando de prueba> <qué se pierde sin él y cómo instalarlo>   (solo advertencia)
-  local etiqueta="$1" prueba="$2" como="$3"
-  if eval "$prueba" >/dev/null 2>&1; then
+  # revisar_opcional <etiqueta> <qué se pierde sin él y cómo instalarlo> <comando...>   (solo advertencia)
+  local etiqueta="$1" como="$2"
+  shift 2
+  if "$@" >/dev/null 2>&1; then
     ok "$etiqueta"
     return 0
   fi
@@ -152,19 +160,31 @@ revisar_opcional() {
   return 1
 }
 
+hay_semgrep() {
+  command -v semgrep || semgrep --version || (command -v wsl && wsl semgrep --version) || docker image inspect semgrep/semgrep:1.178.0
+}
+
+hay_mmdc() {
+  command -v mmdc || test -e "$HOME/.devskills/doc/node_modules/.bin/mmdc" || test -e "$HOME/.devskills/doc/node_modules/.bin/mmdc.cmd"
+}
+
+hay_engram() {
+  claude plugin list 2>/dev/null | grep -qi engram || command -v engram
+}
+
 cmd_doctor() {
   local so faltan=0 opcionales=0
   so="$(detectar_so)"
   echo -e "${CIAN}${NEGRITA}DevSkills doctor${NC} (${so})"
   echo -e "${NEGRITA}Obligatorios${NC}"
-  revisar "git" "git --version" "Instálalo: https://git-scm.com/downloads" || faltan=$((faltan + 1))
+  revisar "git" "Instálalo: https://git-scm.com/downloads" git --version || faltan=$((faltan + 1))
   if python="$(buscar_python)"; then
     ok "Python 3.12 ($python)"
   else
     aviso "Python 3.12 — falta. Windows: 'winget install Python.Python.3.12'; macOS: 'brew install python@3.12'; Linux: el paquete python3.12 de tu distribución."
     faltan=$((faltan + 1))
   fi
-  revisar "Claude Code" "claude --version" "Instálalo: https://code.claude.com" || faltan=$((faltan + 1))
+  revisar "Claude Code" "Instálalo: https://code.claude.com" claude --version || faltan=$((faltan + 1))
   # gitleaks es obligatorio para cerrar cualquier commit, pero basta UNA vía: el binario nativo o Docker.
   if command -v gitleaks >/dev/null 2>&1; then
     ok "gitleaks (nativo)"
@@ -176,16 +196,15 @@ cmd_doctor() {
   fi
   echo -e "${NEGRITA}Opcionales (no bloquean; dicen qué pierdes)${NC}"
   # Docker NO es requisito: se desarrolla y se prueba con PostgreSQL embebido y Celery local.
-  revisar_opcional "Docker (cliente)" "docker --version" "Sin él no puedes levantar el stack con Compose ni construir la imagen en tu máquina; se sigue desarrollando y probando sin Docker. Para desplegar: Docker Desktop (Windows/macOS) o Docker Engine (Linux)." || opcionales=$((opcionales + 1))
-  revisar_opcional "Docker (servicio en marcha)" "docker info" "Sin el servicio, se omiten solas las pruebas de Compose y del certificado (corren en el CI). Arranca Docker Desktop o el servicio solo si necesitas el stack completo." || opcionales=$((opcionales + 1))
-  revisar_opcional "semgrep (análisis estático local)" "command -v semgrep || semgrep --version || (command -v wsl && wsl semgrep --version) || docker image inspect semgrep/semgrep:1.178.0" "Sin él no corres semgrep en tu máquina; el CI de GitHub lo corre siempre y es obligatorio ahí. Nativo en macOS/Linux ('pipx install semgrep==1.178.0'); en Windows, por WSL o Docker." || opcionales=$((opcionales + 1))
-  revisar_opcional "Node.js (presentación y mermaid-cli)" "node --version" "Sin él no generas la presentación ni los diagramas de los Word. Instala Node LTS: https://nodejs.org (o 'winget install OpenJS.NodeJS.LTS')." || opcionales=$((opcionales + 1))
+  revisar_opcional "Docker (cliente)" "Sin él no puedes levantar el stack con Compose ni construir la imagen en tu máquina; se sigue desarrollando y probando sin Docker. Para desplegar: Docker Desktop (Windows/macOS) o Docker Engine (Linux)." docker --version || opcionales=$((opcionales + 1))
+  revisar_opcional "Docker (servicio en marcha)" "Sin el servicio, se omiten solas las pruebas de Compose y del certificado (corren en el CI). Arranca Docker Desktop o el servicio solo si necesitas el stack completo." docker info || opcionales=$((opcionales + 1))
+  revisar_opcional "semgrep (análisis estático local)" "Sin él no corres semgrep en tu máquina; el CI de GitHub lo corre siempre y es obligatorio ahí. Nativo en macOS/Linux ('pipx install semgrep==1.178.0'); en Windows, por WSL o Docker." hay_semgrep || opcionales=$((opcionales + 1))
+  revisar_opcional "Node.js (presentación y mermaid-cli)" "Sin él no generas la presentación ni los diagramas de los Word. Instala Node LTS: https://nodejs.org (o 'winget install OpenJS.NodeJS.LTS')." node --version || opcionales=$((opcionales + 1))
   revisar_opcional "mermaid-cli (diagramas de los Word)" \
-    "command -v mmdc || test -e \"\$HOME/.devskills/doc/node_modules/.bin/mmdc\" || test -e \"\$HOME/.devskills/doc/node_modules/.bin/mmdc.cmd\"" \
-    "Sin él los diagramas de los Word quedan como bloque de código. Instálalo en una carpeta local: 'npm install --save-exact --prefix ~/.devskills/doc @mermaid-js/mermaid-cli@12.0.0' y úsalo con 'md_a_word.py --mermaid ~/.devskills/doc' (ver docs/generadores.md)." || opcionales=$((opcionales + 1))
-  revisar_opcional "GitHub CLI (gh)" "gh --version" "Sin él no revisas el CI desde la terminal ni creas el remoto con un comando. Windows 'winget install GitHub.cli'; macOS 'brew install gh'." || opcionales=$((opcionales + 1))
-  revisar_opcional "Plugin engram (memoria persistente)" "claude plugin list 2>/dev/null | grep -qi engram || command -v engram" \
-    "Sin él no hay memoria entre sesiones (el ciclo funciona, pero no se guarda el avance). Instálalo como plugin de Claude Code (ver README, sección Requisitos)." || opcionales=$((opcionales + 1))
+    "Sin él los diagramas de los Word quedan como bloque de código. Instálalo en una carpeta local: 'npm install --save-exact --prefix ~/.devskills/doc @mermaid-js/mermaid-cli@12.0.0' y úsalo con 'md_a_word.py --mermaid ~/.devskills/doc' (ver docs/generadores.md)." hay_mmdc || opcionales=$((opcionales + 1))
+  revisar_opcional "GitHub CLI (gh)" "Sin él no revisas el CI desde la terminal ni creas el remoto con un comando. Windows 'winget install GitHub.cli'; macOS 'brew install gh'." gh --version || opcionales=$((opcionales + 1))
+  revisar_opcional "Plugin engram (memoria persistente)" \
+    "Sin él no hay memoria entre sesiones (el ciclo funciona, pero no se guarda el avance). Instálalo como plugin de Claude Code (ver README, sección Requisitos)." hay_engram || opcionales=$((opcionales + 1))
   echo ""
   if [[ $faltan -eq 0 ]]; then
     ok "Todo lo obligatorio está listo."

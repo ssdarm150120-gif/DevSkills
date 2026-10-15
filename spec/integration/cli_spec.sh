@@ -33,6 +33,11 @@ Describe 'CLI devskills'
       The stderr should include 'Comando desconocido'
     End
 
+    It 'el CLI no ejecuta cadenas con eval'
+      When call grep -nE '(^|[^[:alnum:]_])eval[[:space:]]' "$PROJECT_ROOT/bin/devskills"
+      The status should be failure
+    End
+
     It 'doctor revisa los requisitos sin fallar'
       When call devskills doctor
       The status should be success
@@ -210,6 +215,35 @@ Describe 'CLI devskills'
       The status should be failure
       The stderr should be present
       The contents of file "$CARPETA/ocupada/archivo.txt" should eq "algo"
+    End
+
+    It 'sin --idioma ni --zona deja los valores neutrales es y UTC'
+      devskills init "$CARPETA/demo" --nombre "Demo" --slug demo --puerto-base 19100 --sin-git >/dev/null
+      When call cat "$CARPETA/demo/codigo/configuracion/localizacion.py"
+      The output should include 'IDIOMA_PREDETERMINADO = "es"'
+      The output should include 'ZONA_PREDETERMINADA = "UTC"'
+    End
+
+    It 'con --idioma y --zona los fija como valores por defecto del proyecto'
+      When call devskills init "$CARPETA/demo" --nombre "Demo" --slug demo --puerto-base 19100 --sin-git --idioma pt_BR --zona America/Sao_Paulo
+      The status should be success
+      The output should include 'idioma: pt-br; zona horaria: America/Sao_Paulo'
+      The contents of file "$CARPETA/demo/codigo/configuracion/localizacion.py" should include 'IDIOMA_PREDETERMINADO = "pt-br"'
+      The contents of file "$CARPETA/demo/codigo/configuracion/localizacion.py" should include 'ZONA_PREDETERMINADA = "America/Sao_Paulo"'
+    End
+
+    It 'rechaza un idioma inválido sin crear nada'
+      When call devskills init "$CARPETA/demo" --nombre "Demo" --slug demo --puerto-base 19100 --idioma 'es mx'
+      The status should be failure
+      The stderr should include 'Idioma inválido'
+      The path "$CARPETA/demo/codigo" should not be exist
+    End
+
+    It 'rechaza una zona horaria inválida sin crear nada'
+      When call devskills init "$CARPETA/demo" --nombre "Demo" --slug demo --puerto-base 19100 --zona 'US/../x"y'
+      The status should be failure
+      The stderr should include 'Zona horaria inválida'
+      The path "$CARPETA/demo/codigo" should not be exist
     End
 
     It 'rechaza un nombre con salto de línea (inyectaría líneas en .env.ejemplo)'

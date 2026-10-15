@@ -1,7 +1,7 @@
 """Crea la carpeta de un proyecto nuevo a partir de las plantillas de DevSkills.
 
     python crear_proyecto.py --destino <ruta> --nombre "<Nombre>" --slug <slug> --puerto-base <N>
-        [--puertos-reservados 5432,...] [--autor "<Autor>"] [--sin-git]
+        [--puertos-reservados 5432,...] [--autor "<Autor>"] [--idioma es] [--zona UTC] [--sin-git]
 
 Qué hace:
 
@@ -9,7 +9,9 @@ Qué hace:
    `plantillas/codigo` a `codigo/`, `plantillas/documentacion` a `documentacion/` y
    `plantillas/analisis` a `documentacion/analisis/`.
 2. Sustituye los marcadores `{{...}}` en todos los archivos de texto (ver `MARCADORES`).
-3. Salvo con `--sin-git`: `git init -b main`, `git add -A` y un primer commit.
+3. Fija el idioma y la zona horaria por defecto del proyecto en `codigo/configuracion/localizacion.py`
+   (neutrales: `es` y `UTC`; el entorno los sobrescribe con `APP_IDIOMA` y `APP_ZONA_HORARIA`).
+4. Salvo con `--sin-git`: `git init -b main`, `git add -A` y un primer commit.
 
 Reglas del host que valida: el proyecto recibe un rango propio de 50 puertos, `[N, N+49]`, que no
 puede incluir puertos privilegiados (menores a 1024), pasar de 65535 ni contener ninguno de los
@@ -33,6 +35,13 @@ TAMANO_DEL_RANGO = 50
 PUERTO_MINIMO = 1024
 PUERTO_MAXIMO = 65535
 PATRON_SLUG = re.compile(r"[a-z][a-z0-9-]*")
+PATRON_IDIOMA = re.compile(r"[a-z]{2,3}(-[a-z0-9]{2,8})*")
+# `UTC` o `Area/Ciudad` (con una segunda barra posible: `America/Argentina/Buenos_Aires`). El proyecto
+# generado vuelve a validarla contra la base IANA al arrancar.
+PATRON_ZONA = re.compile(r"UTC|[A-Z][A-Za-z]+(/[A-Za-z0-9_+-]+){1,2}")
+IDIOMA_PREDETERMINADO = "es"
+ZONA_PREDETERMINADA = "UTC"
+ARCHIVO_DE_LOCALIZACION = Path("codigo") / "configuracion" / "localizacion.py"
 # Carpetas y archivos que nunca se copian (residuos de haber corrido algo dentro de las plantillas).
 IGNORADOS = shutil.ignore_patterns(
     "__pycache__", "*.pyc", ".pgdata", ".pgdata_pruebas", ".venv", ".mypy_cache", ".ruff_cache",
@@ -87,6 +96,43 @@ def validar_texto(etiqueta: str, valor: str, *, obligatorio: bool) -> str:
                 f"YAML y .env, y rompería alguno. Prohibidos: {' '.join(CARACTERES_PROHIBIDOS)}"
             )
     return limpio
+
+
+def validar_idioma(idioma: str) -> str:
+    """El código de idioma de Django en minúsculas (`es`, `en`, `es-mx`), o `ErrorDeCreacion`."""
+    limpio = idioma.strip().lower().replace("_", "-")
+    if not PATRON_IDIOMA.fullmatch(limpio):
+        raise ErrorDeCreacion(
+            f"Idioma inválido: {idioma!r}. Usa un código como es, en, es-mx o pt-br"
+        )
+    return limpio
+
+
+def validar_zona(zona: str) -> str:
+    """`UTC` o una zona `Area/Ciudad` bien formada, o `ErrorDeCreacion`."""
+    limpia = zona.strip()
+    if not PATRON_ZONA.fullmatch(limpia):
+        raise ErrorDeCreacion(
+            f"Zona horaria inválida: {zona!r}. Usa UTC o Area/Ciudad, por ejemplo America/Bogota"
+        )
+    return limpia
+
+
+def fijar_localizacion(destino: Path, idioma: str, zona: str) -> None:
+    """Escribe el idioma y la zona por defecto en `codigo/configuracion/localizacion.py`."""
+    ruta = destino / ARCHIVO_DE_LOCALIZACION
+    if not ruta.is_file():
+        return  # plantilla sin ese módulo (por ejemplo, plantillas de prueba mínimas)
+    texto = ruta.read_bytes().decode("utf-8")
+    nuevo, cambios_idioma = re.subn(
+        r'^IDIOMA_PREDETERMINADO = ".*"$', f'IDIOMA_PREDETERMINADO = "{idioma}"', texto, flags=re.M
+    )
+    nuevo, cambios_zona = re.subn(
+        r'^ZONA_PREDETERMINADA = ".*"$', f'ZONA_PREDETERMINADA = "{zona}"', nuevo, flags=re.M
+    )
+    if cambios_idioma != 1 or cambios_zona != 1:
+        raise ErrorDeCreacion(f"No pude fijar el idioma y la zona: {ruta} no tiene el formato esperado")
+    ruta.write_bytes(nuevo.encode("utf-8"))
 
 
 def validar_slug(slug: str) -> str:
@@ -212,11 +258,15 @@ def crear(
     con_git: bool,
     plantillas: Path = PLANTILLAS,
     fecha: str | None = None,
+    idioma: str = IDIOMA_PREDETERMINADO,
+    zona: str = ZONA_PREDETERMINADA,
 ) -> dict[str, object]:
     """Crea el proyecto y devuelve un resumen. Lanza `ErrorDeCreacion` si algo no es válido."""
     nombre = validar_texto("nombre del proyecto", nombre, obligatorio=True)
     autor = validar_texto("autor", autor, obligatorio=False)
     validar_slug(slug)
+    idioma = validar_idioma(idioma)
+    zona = validar_zona(zona)
     rango = validar_rango(puerto_base, reservados)
     if not plantillas.is_dir():
         raise ErrorDeCreacion(f"No se encontraron las plantillas en {plantillas}")
@@ -238,6 +288,7 @@ def crear(
         fecha=fecha or datetime.date.today().isoformat(),
     )
     sustituidos = sustituir_en(destino, valores)
+    fijar_localizacion(destino, idioma, zona)
     commit = iniciar_git(destino) if con_git else None
     return {
         "destino": destino,
@@ -245,6 +296,8 @@ def crear(
         "sustituidos": sustituidos,
         "rango": rango,
         "commit": commit,
+        "idioma": idioma,
+        "zona": zona,
     }
 
 
@@ -274,6 +327,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="puertos del host que el proyecto nunca debe usar, separados por comas (5432)",
     )
     parser.add_argument("--autor", default="", help="autor de los documentos")
+    parser.add_argument(
+        "--idioma",
+        default=IDIOMA_PREDETERMINADO,
+        help="idioma de la interfaz y de Django (es, en, es-mx...); el entorno lo sobrescribe con APP_IDIOMA",
+    )
+    parser.add_argument(
+        "--zona",
+        default=ZONA_PREDETERMINADA,
+        help="zona horaria con que se muestran las fechas (UTC o Area/Ciudad); APP_ZONA_HORARIA la sobrescribe",
+    )
     parser.add_argument("--sin-git", action="store_true", help="no inicializa el repositorio")
     args = parser.parse_args(argv)
 
@@ -286,6 +349,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             reservados=leer_puertos(args.puertos_reservados),
             autor=args.autor,
             con_git=not args.sin_git,
+            idioma=args.idioma,
+            zona=args.zona,
         )
     except ErrorDeCreacion as error:
         print(f"Error: {error}", file=sys.stderr)
@@ -302,6 +367,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     print(f"  marcadores sustituidos en {resumen['sustituidos']} archivos")
     print(f"  prefijo de Docker y proyecto de engram: {args.slug}")
     print(f"  rango de puertos del host: {rango.start}-{rango[-1]}")
+    print(f"  idioma: {resumen['idioma']}; zona horaria: {resumen['zona']}")
     if resumen["commit"]:
         print(f"  primer commit: {resumen['commit']} ({MENSAJE_DEL_COMMIT})")
     else:
