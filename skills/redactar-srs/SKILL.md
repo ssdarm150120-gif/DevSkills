@@ -39,7 +39,7 @@ Antes de pasar de fase, cierra cada pendiente abierto que la afecte. Si validar 
 ### 2. Problema de negocio y línea base medible (paso 1)
 - Escribe **la necesidad real**, no la solución: qué pasa hoy, cuándo duele, a quién. Marca qué confirmó el negocio y en qué versión.
 - Cada meta va en la tabla "Metas medibles del sistema": indicador, línea base, meta. Si un indicador no se registra hoy, la línea base dice "No se registra" y la meta, cómo se medirá desde el primer día.
-- **Línea base medida:** se mide con datos reales en **solo lectura**. Los scripts y consultas quedan en `documentacion/analisis/` y se citan en 1.4. Anota fuente, población y periodo, y escribe las **limitaciones de la medición** (qué dato falta, qué no se pudo calcular, qué no confirman los datos). Si los datos contradicen lo que dice el negocio, se registra un `P-nn`: no se acomoda la medición.
+- **Línea base medida:** se mide con datos reales en **solo lectura** y **solo con la autorización expresa del usuario** (sistema, consultas y periodo); nunca se lee `.env` ni `.env.*` para obtener credenciales: las da el usuario por una variable de entorno o un archivo que él indique. Sin autorización queda un `P-nn`. Los scripts y consultas quedan en `documentacion/analisis/` y se citan en 1.4. Anota fuente, población y periodo, y escribe las **limitaciones de la medición** (qué dato falta, qué no se pudo calcular, qué no confirman los datos). Si los datos contradicen lo que dice el negocio, se registra un `P-nn`: no se acomoda la medición.
 - Nunca copies datos personales ni datos reales del negocio a los ejemplos, a las pruebas ni a los prototipos.
 
 ### 3. Convenciones de IDs (no se renumeran, no se reutilizan)
