@@ -44,7 +44,7 @@ El `README.md` de `codigo/` de cada proyecto trae el detalle: variables de entor
 - **Docker Compose 2.38 (el del runner de GitHub) pierde `!reset` si llega por la fusión `<<:` de un ancla YAML.** En `despliegue/docker-compose.pruebas.yml`, `build: !reset null` va **directamente en cada servicio**, nunca dentro del ancla; en local con un Compose más nuevo el error no se ve y el CI sí lo muestra (intenta construir en lugar de usar la imagen). Una prueba estática del esqueleto lo vigila.
 - **Fija la imagen del runner:** `ubuntu-24.04` en lugar de `ubuntu-latest`; cambiarla es un cambio a mano.
 - **semgrep local = semgrep del CI:** misma versión, con la imagen oficial `semgrep/semgrep:<versión>` (la de `semgrep==` en `ci.yml`), código 0 y "Findings: 0". La regla `django-no-csrf-token` es genérica y solo reconoce `{% csrf_token %}` si el `</form>` está a 10 líneas o menos: los formularios largos se parten en parciales.
-- **El CI se prueba temprano:** crea el remoto privado desde el inicio y revisa cada push con `gh run list` (ver [instalación](instalacion.md#github-cli-gh-y-el-ci)).
+- **El CI se prueba temprano:** crea el remoto privado desde el inicio (con tu confirmación) y revisa cada push con `gh run list` (ver [instalación](instalacion.md#github-cli-gh-y-el-ci)).
 
 ## Verificación
 

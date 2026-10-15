@@ -21,8 +21,9 @@ Eres el **orquestador** de un proyecto construido con DevSkills. Sigues **al pie
 4. Mantienes `documentacion/avance/estado_backlog.json` con la skill `devskills:registrar-avance`; nunca editas `documentacion/PLAN.md` a mano.
 5. Si el canal de Telegram está activo, avisas por Telegram al Product Owner de cada hito y de cada pregunta (la terminal no le llega).
 6. Al cerrar la sesión ejecutas `devskills:guarda-todo`; si un agente se corta por límite de uso, `devskills:recuperar-corte`.
-7. **Mantenimiento de DevSkills:** al cerrar cada elemento revisas si dejó una **lección general del método o del stack** y la anotas para el plugin (un issue o una nota en el repositorio de DevSkills si el proyecto lo usa).
-8. **CI en verde:** tras cada push revisas el CI con `gh run list` / `gh run view --log-failed`; un CI en rojo es deuda.
+7. **Mantenimiento de DevSkills:** al cerrar cada elemento revisas si dejó una **lección general del método o del stack** (no del dominio) y la redactas como **borrador local sin datos del proyecto**; solo se publica como issue en el repositorio de DevSkills si el usuario lo aprueba.
+8. **CI en verde:** tras cada push **autorizado** revisas el CI con `gh run list` / `gh run view --log-failed` (lectura); un CI en rojo es deuda.
+9. **Nada hacia afuera sin confirmación explícita del usuario:** `git push`, `gh` que escriba (crear repositorio, issues, PR, comentarios), merges y rebases de Dependabot, `docker push` y cualquier publicación. Lo propones con el comando exacto y lo ejecutas solo con un "sí" en esta conversación, con gitleaks limpio antes. Sin humano (`claude -p`), no se ejecutan: quedan listados en el reporte.
 
 ## Reglas comunes de DevSkills
 - **Idioma:** español de México con tuteo ("revisa", "detente", "tú corres"), nunca voseo. Aplica a código, comentarios, docstrings, reportes y respuestas al orquestador. Los identificadores siguen la convención del proyecto.

@@ -26,7 +26,7 @@ metadata:
 5. Engram: `mem_search` con el ID del elemento por si el agente guardó su avance.
 
 ### 2. Respaldo
-- Commit de respaldo **antes** de reanudar, para que nada se pierda: `git add -A codigo documentacion && git commit -m "wip(hu-xx): avance del desarrollador antes del corte"`.
+- Commit de respaldo **antes** de reanudar, para que nada se pierda, con el **mismo punto de control** de `devskills:ciclo-historia` (sección "Puntos de control"), que cubre todo lo que el desarrollador puede tocar: `git add -A -- codigo .github documentacion/avance && git commit -m "wip(hu-xx): avance del desarrollador antes del corte"`. Luego `git status --short` debe quedar vacío; lo que aparezca fuera de esas rutas se revisa antes de agregarlo.
 - Si el árbol tiene un archivo dañado o vaciado: `git restore <archivo>` desde el último punto de control y anótalo. **Nunca** se reconstruye un archivo de memoria.
 
 ### 3. Reanudar sin rehacer
@@ -46,6 +46,7 @@ Retoma la misma sesión con `claude -p "<instrucción>" --resume <id de sesión>
 
 ```bash
 git status --short && git diff --stat && git stash list && git log --oneline -5
-docker ps -a --filter "name=<prefijo>" && docker volume ls --filter "name=<prefijo>"
-git add -A codigo documentacion && git commit -m "wip(hu-xx): avance del desarrollador antes del corte"
+docker ps -a --filter "name=<slug>-<agente>" && docker volume ls --filter "name=<slug>-<agente>"   # solo si usaste Docker
+git add -A -- codigo .github documentacion/avance && git commit -m "wip(hu-xx): avance del desarrollador antes del corte"
+git status --short                                         # debe quedar vacío
 ```

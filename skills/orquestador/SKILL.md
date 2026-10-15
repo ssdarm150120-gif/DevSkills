@@ -48,7 +48,8 @@ metadata:
 ### 4. Ningún trabajo sin respaldo en git
 - Regla de punto de control **antes de cada revisión** (QA, Angel Fixer, verificación) y al final de cada ronda: sección "Puntos de control" de `devskills:ciclo-historia`.
 - Solo el orquestador ejecuta comandos de git que cambian el árbol o la historia. Nadie reconstruye archivos de memoria: se restauran de git.
-- Commits en inglés, Conventional Commits, **sin atribución de IA**; documentación (`docs:`) separada del código; gitleaks antes de cerrar.
+- Commits en inglés, Conventional Commits, **sin atribución de IA**; documentación (`docs:`) separada del código; **gitleaks antes de cualquier commit de cierre y antes de cualquier push**.
+- **Nada hacia afuera sin confirmación explícita del usuario:** `git push`, `gh` que escriba (repositorio, issues, PR, comentarios), merges y rebases de Dependabot, `docker push`. Se proponen con el comando exacto y se ejecutan solo con un "sí" del usuario; la nota de lecciones para DevSkills es un borrador local sin datos del proyecto que solo se publica (issue) si él lo aprueba. En corridas sin humano no se ejecutan.
 
 ### 5. Estado y avance
 - `documentacion/avance/estado_backlog.json` es el estado oficial (`En proceso`, `En validación`, `Listo`, `Bloqueado`); lo actualizas en cada transición.
