@@ -26,12 +26,14 @@ El SRS dice **qué**; el diseño dice **cómo**. Aquí no se copian requisitos: 
 ### 2. Orden (cada paso se valida antes del siguiente)
 | Paso | Contenido | Qué debe quedar definido |
 |------|-----------|--------------------------|
-| D.1 | Mapa de módulos, puertos y adaptadores | Principios, tabla de módulos con sus RF y CU, **grafo de dependencias sin ciclos** (D.1.3), puertos hacia lo externo con adaptador real y falso (D.1.4), estructura de carpetas (D.1.5), ADR (D.1.6) |
+| D.0 | Introducción | Propósito, alcance, glosario, referencias y **partes interesadas con sus preocupaciones** (cada preocupación apunta a la sección que la atiende) |
+| D.1 | Mapa de módulos, puertos y adaptadores | Principios, tabla de módulos con sus RF y CU, **grafo de dependencias sin ciclos** (D.1.3), puertos hacia lo externo con adaptador real y falso (D.1.4), estructura de carpetas (D.1.5), ADR (D.1.6), **vista de contexto** (D.1.7) |
 | D.2 | Modelo de datos | Convenciones, diagramas ER por núcleo, catálogo de entidades por módulo, índices y restricciones con el requisito que los exige |
 | D.3 | Máquinas de estado | Un diagrama por entidad con estados; quién ejecuta cada transición y qué evento emite |
 | D.4 | Flujos de integración | Diagramas de secuencia que separan lo síncrono de lo asíncrono, con sus **puntos de falla** |
 | D.5 | Contratos | Reglas y catálogo de eventos, `api_publica.py` por módulo, rutas HTTP, permisos por caso de uso |
 | D.6 | Despliegue y seguridad | Topología, entornos y pipeline, controles de seguridad, observabilidad, crecimiento |
+| D.7 | Algoritmos | Solo la lógica no trivial: entradas, salidas, pasos, casos límite, complejidad y cómo se prueba (o "Sin algoritmos no triviales") |
 
 La tabla "Plan del diseño" del documento lleva el estado de cada paso.
 
@@ -65,7 +67,7 @@ El trabajo que pide el diseño y que no es una historia de usuario se vuelve un 
 ## Commands
 
 ```bash
-python documentacion/analisis/md_a_word.py --mermaid <carpeta_mermaid_cli> --solo DISENO   # Word con los diagramas
+"$PYDOC" documentacion/analisis/md_a_word.py --mermaid <carpeta_mermaid_cli> --solo DISENO   # Word con los diagramas
 # desde codigo/, cuando cambie el grafo de D.1.3:
 python -m herramientas.contratos_importlinter --escribir && lint-imports
 ```

@@ -51,7 +51,7 @@
 
 ### P.1.5 Definiciones de Listo y de Terminado
 - **Definición de Listo:** la del SRS B.0, más: dependencias del backlog ya terminadas, accesos externos disponibles y datos de prueba preparados.
-- **Definición de Terminado:** la del SRS B.0, más: el pipeline en verde (límites de módulos, pruebas, análisis de seguridad), desplegado en el entorno de pruebas, y la matriz de trazabilidad (Anexo C) regenerada si cambió algún requisito.
+- **Definición de Terminado:** la común del método (skill `devskills:proyecto-contexto`, única fuente) y los criterios propios del SRS B.0, más: el pipeline en verde (límites de módulos, pruebas, análisis de seguridad), desplegado en el entorno de pruebas, y la matriz de trazabilidad (Anexo C) regenerada si cambió algún requisito.
 - **Ciclo de calidad:** cada elemento pasa por **desarrollo → QA → Angel Fixer** (agentes del plugin DevSkills, comando `/devskills:ciclo`). Solo se marca Listo con QA aprobada sin observaciones abiertas y el Angel Fixer sin hallazgos abiertos de ninguna severidad (política de cero deuda); entonces se escribe su reporte en `avance/S{NN}/{ID}.md` y el elemento aparece **tachado** en P.2.2.
 
 ### P.1.6 Herramientas

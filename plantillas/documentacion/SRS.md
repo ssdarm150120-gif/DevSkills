@@ -130,7 +130,7 @@ recursos humanos (colaboradores, jefes, quizá la nómina como sistema externo).
 ### 2.5 Restricciones de diseño e implementación
 <!-- Una restricción por línea, numerada R-nn. No se renumeran: si una sale, se marca retirada. -->
 - **R-01** <!-- restricción -->
-- **R-nn** Portabilidad: los componentes se despliegan en **contenedores (Docker)** y la configuración va por variables de entorno.
+- **R-nn** Portabilidad: los componentes se **despliegan** en contenedores (Docker Compose) y la configuración va por variables de entorno. Para desarrollar y probar, Docker no es necesario.
 
 ### 2.6 Supuestos y dependencias
 <!-- Supuestos, dependencias externas y riesgos aceptados, numerados S-nn. Un riesgo aceptado lleva su mitigación y la versión en que se aceptó: "**Riesgo aceptado (versión X.Y):** ...". -->
@@ -161,11 +161,39 @@ El criterio es **seguridad, mantenibilidad y escalabilidad**. El stack es el del
                                                  └──► <!-- sistemas externos -->
 ```
 
+### 2.8 Modos y estados del sistema
+<!-- ISO/IEC/IEEE 29148 pide describir los modos de operación cuando los requisitos dependen de ellos. Lista
+cada modo, qué funciones tiene disponibles y cómo se entra y se sale. Si el sistema tiene un solo modo,
+escribe "Un solo modo de operación" y borra la tabla. Los estados de las ENTIDADES (un pedido, una solicitud)
+no van aquí: van en el DISEÑO D.3. -->
+
+| Modo | Cuándo está activo | Funciones disponibles | Cómo se entra y se sale |
+|------|--------------------|-----------------------|-------------------------|
+| Operación normal | Siempre que todo responde | Todas | Estado por defecto |
+| <!-- Degradado (p. ej. un sistema externo caído) --> | <!-- condición --> | <!-- qué sigue funcionando y qué se encola --> | <!-- detección y recuperación --> |
+| <!-- Mantenimiento --> | <!-- ventana programada --> | <!-- solo lectura / ninguna --> | <!-- quién lo activa --> |
+
 ---
 
 ## 3. Requisitos funcionales
 
 Prioridad: **A** = imprescindible (MVP), **M** = importante, **B** = deseable. Un requisito fuera del MVP a propósito lleva prioridad "Fase 2" (o se lista en `documentacion/analisis/trazabilidad.json`); uno retirado, "Retirado en X.Y".
+
+### 3.0 Atributos de cada requisito
+<!-- ISO/IEC/IEEE 29148 pide que cada requisito (RF y RNF) tenga, además de su texto y prioridad, su FUENTE, su
+JUSTIFICACIÓN, su MÉTODO DE VERIFICACIÓN y su ESTADO. Se llevan en esta tabla aparte, una fila por requisito, y
+NO como columnas de las tablas de requisitos de abajo: `trazabilidad.py` lee esas tablas con 3 columnas
+(ID, requisito, prioridad). Por eso el ID va entre comillas invertidas en esta tabla (así el generador no la
+confunde con la definición del requisito). Se llena junto con cada requisito y se revisa en cada pasada. -->
+
+- **Fuente:** de dónde sale (una persona o rol del negocio, un documento, una norma, una restricción `R-nn`, un pendiente `P-nn` resuelto).
+- **Justificación:** por qué existe (qué meta de 1.1.1 sirve o qué riesgo evita).
+- **Verificación:** **Prueba** (automatizada o manual), **Inspección** (revisión de artefactos), **Análisis** (cálculo o modelo) o **Demostración** (operación observada). El detalle técnico de los RNF va en `trazabilidad.json` (Anexo C.3).
+- **Estado:** **Propuesto** → **Aprobado** (lo aprobó el Product Owner, con versión) → **Implementado** → **Verificado**; o **Retirado en X.Y**.
+
+| ID | Fuente | Justificación | Verificación | Estado |
+|----|--------|---------------|--------------|--------|
+| `<!-- RF-ABC-01 -->` | <!-- Product Owner, versión 0.1 --> | <!-- meta que sirve --> | <!-- Prueba --> | <!-- Propuesto --> |
 
 <!-- Una subsección por módulo, con prefijo de tres o más letras propio del módulo (RF-ABC-nn).
 Cada requisito: "El sistema debe ..." o "El <rol> debe poder ...", verificable y sin decir cómo.
@@ -180,8 +208,10 @@ No se renumeran: los nuevos van al final del módulo. Si una versión cambia un 
 ### 3.n Administración (RF-ADM)
 <!-- El esqueleto de DevSkills ya trae el módulo identidad (usuarios, roles, ingreso con contraseña
 Argon2, bloqueo por intentos, sesión con tope, segundo factor TOTP, gestión de usuarios, aviso por
-reuso del código) y la bitácora de eventos. Si el proyecto los usa, sus requisitos van aquí y
-se trazan a las historias de la Entrega 0. -->
+reuso del código). NO trae bitácora de auditoría: el módulo `auditoria` es un molde vacío y la capacidad
+y el rol `auditor` son ejemplos. Si el proyecto necesita una bitácora, es un requisito suyo (RF y RNF)
+y un elemento del plan. Si usa lo que sí trae el esqueleto, sus requisitos van aquí y se trazan a las
+historias de la Entrega 0. -->
 | ID | Requisito | Prioridad |
 |----|-----------|-----------|
 | <!-- RF-ADM-01 --> | <!-- El sistema debe permitir al Administrador crear, editar y desactivar usuarios. --> | <!-- A --> |
@@ -196,6 +226,17 @@ se trazan a las historias de la Entrega 0. -->
 
 <!-- Cada RNF necesita una verificación técnica (prueba o revisión) que se escribe en
 documentacion/analisis/trazabilidad.json y aparece en el Anexo C.3. -->
+
+### 4.1 Cumplimiento normativo y legal
+<!-- Las leyes, normas y políticas que el sistema debe cumplir y qué requisitos las cubren. No des por hecha
+ninguna: confírmalas con el Product Owner y, si hace falta, con el área legal o de cumplimiento. "No aplica"
+también es una respuesta y se justifica. Lo que no se pueda confirmar queda como P-nn. -->
+
+| Norma, ley o política | ¿Aplica? | Qué exige al sistema | Requisitos que la cubren | Quién lo confirmó |
+|-----------------------|----------|----------------------|--------------------------|-------------------|
+| <!-- protección de datos personales de tu país o región --> | <!-- Sí | No | Por confirmar (P-nn) --> | <!-- consentimiento, derechos del titular, retención --> | <!-- RNF-nn, RF-ABC-nn --> | <!-- rol, versión --> |
+| <!-- política interna de seguridad / auditoría --> | <!-- --> | <!-- --> | <!-- --> | <!-- --> |
+| <!-- normas del sector (financiero, salud, educación…) --> | <!-- --> | <!-- --> | <!-- --> | <!-- --> |
 
 ---
 
@@ -290,7 +331,7 @@ retirado conserva su fila con "(**Retirado en X.Y**: lo reemplaza CU-nn)" en el 
 
 **Definición de Listo (DoR):** una historia entra a desarrollo solo si tiene trazabilidad a un RF, criterios de aceptación verificables y ningún pendiente abierto que la afecte.
 
-**Definición de Terminado (DoD):** todos los escenarios pasan como pruebas automatizadas, hay revisión de código, cumple los RNF que apliquen (seguridad, auditoría, rendimiento) y la bitácora registra las acciones relevantes.
+**Definición de Terminado (DoD):** la **común del método** vive en un solo lugar, la skill `devskills:proyecto-contexto` (escenarios Gherkin automatizados y en verde, análisis de seguridad y límites de módulos en verde, RNF verificados, QA sin observaciones, Angel Fixer sin hallazgos de ninguna severidad, verificación final y avance registrado); no se copia aquí para que no diverja. **Criterios propios de este proyecto** (si los hay, solo lo que se suma): <!-- p. ej. "la bitácora registra las acciones relevantes" SOLO si este proyecto construye una bitácora (el esqueleto no la trae) -->.
 
 **Orden de trabajo:** un módulo a la vez, en el orden del Anexo A. Cada módulo se valida antes de pasar al siguiente.
 

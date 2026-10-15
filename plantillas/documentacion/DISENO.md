@@ -27,17 +27,62 @@ Cómo se mantiene (skills devskills:redactar-diseno y devskills:pasada-documenta
 ### Plan del diseño
 | Paso | Contenido | Estado |
 |------|-----------|--------|
-| D.1 | Mapa de módulos, puertos y adaptadores | En curso |
+| D.0 | Introducción: propósito, alcance, glosario, referencias, partes interesadas y preocupaciones | En curso |
+| D.1 | Mapa de módulos, puertos y adaptadores (incluye la vista de contexto, D.1.7) | En curso |
 | D.2 | Modelo de datos | Pendiente |
 | D.3 | Máquinas de estado | Pendiente |
 | D.4 | Flujos de integración (diagramas de secuencia) | Pendiente |
 | D.5 | Contratos: APIs internas y eventos | Pendiente |
 | D.6 | Despliegue y seguridad | Pendiente |
+| D.7 | Algoritmos | Pendiente (solo si hay lógica no trivial) |
 
 ### Historial de cambios
 | Versión | Fecha | Cambios |
 |---------|-------|---------|
 | 0.1 | {{FECHA}} | Borrador inicial con las decisiones heredadas del esqueleto DevSkills (ADR-001 a ADR-008) |
+
+---
+
+## D.0 Introducción
+
+<!-- IEEE 1016 pide, antes de las vistas, el propósito, el alcance, las definiciones, las referencias y las
+partes interesadas con sus preocupaciones. Lo llena el analista al abrir el documento y se revisa en cada pasada. -->
+
+### D.0.1 Propósito
+<!-- Para quién es este diseño y qué decisiones permite tomar: desarrolladores (qué construir y dónde), QA
+(qué contratos probar), operación (cómo se despliega) y el Product Owner (qué se decidió). -->
+
+### D.0.2 Alcance
+<!-- Qué cubre este diseño (el sistema {{NOMBRE_PROYECTO}} y sus módulos) y qué NO (lo que otros equipos operan:
+sistemas externos, infraestructura del cliente). Debe coincidir con el alcance del SRS 1.2. -->
+
+### D.0.3 Definiciones, acrónimos y glosario
+| Término | Definición |
+|---------|------------|
+| Puerto / adaptador | Interfaz que define el dominio / pieza que la implementa para una tecnología o sistema concretos |
+| ADR | Registro de una decisión de arquitectura (D.1.6) |
+| Outbox | Tabla donde se guarda, en la misma transacción, todo envío hacia afuera para despacharlo después con reintentos |
+| <!-- término del dominio o de la arquitectura --> | <!-- definición; los términos del negocio son los del SRS 1.3 --> |
+
+### D.0.4 Referencias
+- IEEE 1016-2009, Software Design Descriptions.
+- `documentacion/SRS.md`, versión <!-- X.Y -->: los requisitos (RF, RNF, CU, HU) que este diseño referencia por ID.
+- `documentacion/PLAN.md`: entregas y sprints. `documentacion/CONTEXTO.md`: módulos, asignación y entorno.
+- <!-- documentación técnica de los sistemas externos y de las normas aplicables (SRS 4.1) -->
+
+### D.0.5 Partes interesadas y preocupaciones
+<!-- IEEE 1016 relaciona cada parte interesada con sus preocupaciones y con la vista de este documento que las
+atiende. Si una preocupación no tiene dónde atenderse, falta una vista o un ADR. -->
+
+| Parte interesada | Preocupación | Dónde se atiende |
+|------------------|--------------|------------------|
+| Product Owner | Que el diseño cumpla las metas del SRS 1.1.1 sin alcance escondido | D.1.2 (módulos y requisitos), D.1.6 (ADR) |
+| Usuarios | Rapidez, claridad y accesibilidad | SRS RNF, D.5 (rutas y permisos) |
+| Desarrolladores | Límites claros, contratos de los puertos y qué tocar | D.1.3 a D.1.5, D.5 |
+| QA | Contratos y estados verificables | D.3, D.5, adaptadores falsos (D.1.4) |
+| Seguridad y cumplimiento | Datos personales, permisos, trazabilidad de acciones | D.6.3, SRS 4.1 |
+| Operación | Despliegue, respaldo, observabilidad y recuperación | D.6 |
+| <!-- otra parte interesada --> | <!-- preocupación --> | <!-- sección --> |
 
 ---
 
@@ -132,6 +177,23 @@ codigo/
 | <!-- ADR-009 --> | <!-- decisión del proyecto --> | <!-- alternativa --> | <!-- motivo; "Decisión del Product Owner" si es de negocio --> |
 
 <!-- Un ADR rechazado conserva su fila: "**Rechazado (AAAA-MM-DD):** ... Ver `documentacion/EVALUACION_ALTERNATIVAS.md`". -->
+
+### D.1.7 Vista de contexto
+<!-- IEEE 1016, punto de vista de contexto: el sistema como una caja, con los actores y los sistemas externos
+que lo rodean y las interfaces entre ellos. Parte del SRS 2.1 y 5, pero aquí con la mirada del diseño: cada
+flecha es un puerto (D.1.4) o una ruta de la interfaz de usuario (D.5). Si no hay sistemas externos,
+dibuja solo los actores y escribe "Sin integraciones externas". -->
+
+```mermaid
+flowchart LR
+    U((Usuarios internos)) -->|HTTPS| S["{{NOMBRE_PROYECTO}}"]
+    S -->|puerto + adaptador| X[[Sistema externo]]
+```
+
+| Interfaz con el entorno | Sentido | Mecanismo | Puerto o ruta | Quién la opera |
+|-------------------------|---------|-----------|---------------|----------------|
+| Usuarios internos | Entrada | Web (HTTPS) | Rutas de D.5 | Equipo del proyecto |
+| <!-- sistema externo --> | <!-- lectura / escritura --> | <!-- API, webhook, base en solo lectura --> | <!-- PuertoAlgo (D.1.4) --> | <!-- responsable --> |
 
 ---
 
@@ -279,7 +341,7 @@ límites de memoria y procesos), red de datos interna, solo nginx publica puerto
 
 | Entorno | Para qué | Integraciones |
 |---------|----------|---------------|
-| Desarrollo | Cada desarrollador, con Docker Compose o PostgreSQL embebido | Adaptadores **falsos** |
+| Desarrollo | Cada desarrollador, con PostgreSQL embebido y Celery local (Docker es opcional) | Adaptadores **falsos** |
 | Pruebas (staging) | Validación con el negocio y piloto | <!-- canales y datos de prueba --> |
 | Producción | Operación | Integraciones reales |
 
@@ -317,3 +379,23 @@ límites de memoria y procesos), red de datos interna, solo nginx publica puerto
 | Docker Compose | Servicio de contenedores administrado | Manifiestos de despliegue; las imágenes son las mismas |
 
 El código no cambia: todo lo que difiere entre entornos está en variables de entorno y detrás de puertos (D.1.4).
+
+---
+
+## D.7 Algoritmos
+
+<!-- IEEE 1016, punto de vista de algoritmos: SOLO la lógica no trivial que un desarrollador no puede deducir
+del caso de uso (cálculos, reglas de priorización, conciliaciones, asignaciones, detección de duplicados…).
+Una subsección por algoritmo. Si el proyecto no tiene ninguno, escribe "Sin algoritmos no triviales" y deja
+el paso como cerrado. Las reglas de negocio simples van en el SRS; aquí va el CÓMO exacto. -->
+
+### D.7.1 <!-- Nombre del algoritmo -->
+| Campo | Contenido |
+|-------|-----------|
+| Requisito que lo exige | <!-- RF-ABC-nn, RNF-nn --> |
+| Módulo y caso de uso | <!-- `modulo`, CU-nn --> |
+| Entradas y salidas | <!-- tipos, rangos, unidades --> |
+| Pasos | <!-- pseudocódigo o lista numerada --> |
+| Casos límite | <!-- vacío, empates, valores extremos, concurrencia --> |
+| Complejidad y límites | <!-- tamaño máximo esperado, tiempo objetivo --> |
+| Cómo se prueba | <!-- ejemplos con datos ficticios y propiedades que deben cumplirse --> |

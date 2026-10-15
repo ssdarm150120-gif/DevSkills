@@ -26,9 +26,9 @@ metadata:
 | Paso | Sección del SRS | Se cierra cuando |
 |------|-----------------|------------------|
 | 1 | 1. Introducción: propósito, **1.1.1 problema de negocio**, metas medibles, línea base, alcance, definiciones | El Product Owner reconoce el problema con sus palabras y cada meta tiene indicador, línea base y valor meta |
-| 2 | 2. Descripción general: perspectiva, funciones, clases de usuarios, entorno, **R-nn**, **S-nn**, stack (fijo) | Cada rol tiene responsabilidades y cada restricción o supuesto tiene su ID |
-| 3 | 3. Requisitos funcionales por módulo (`RF-XXX-nn`, prioridad A/M/B) | Cada función de 2.2 tiene requisitos verificables |
-| 4 | 4. RNF (`RNF-nn` con categoría) y 5. Interfaces externas | Cada RNF es medible y tiene su verificación técnica en `documentacion/analisis/trazabilidad.json` |
+| 2 | 2. Descripción general: perspectiva, funciones, clases de usuarios, entorno, **R-nn**, **S-nn**, stack (fijo) | Cada rol tiene responsabilidades, cada restricción o supuesto tiene su ID y los **modos y estados del sistema** (2.8) están descritos o dicen "un solo modo" |
+| 3 | 3. Requisitos funcionales por módulo (`RF-XXX-nn`, prioridad A/M/B) | Cada función de 2.2 tiene requisitos verificables y cada requisito (RF y RNF) tiene sus **atributos** (3.0: fuente, justificación, método de verificación y estado) |
+| 4 | 4. RNF (`RNF-nn` con categoría) y 5. Interfaces externas | Cada RNF es medible y tiene su verificación técnica en `documentacion/analisis/trazabilidad.json`, y el **cumplimiento normativo** (4.1) dice qué normas aplican, cuáles no y por qué |
 | 5 | 6. Pendientes: cerrar todos los `P-nn` que bloquean | **Línea base de requisitos** declarada (sube la versión mayor) |
 | 6 | Anexo A: A.1 actores → A.2 diagrama → A.3 catálogo de casos de uso | Cada RF del MVP está en la columna "Requisitos" de algún CU |
 | 7 | Anexo B: B.0 convenciones y las historias, **un módulo a la vez** en el orden del Anexo A | El Product Owner valida cada módulo antes de pasar al siguiente |
@@ -85,7 +85,7 @@ Antes de pasar de fase, cierra cada pendiente abierto que la afecte. Si validar 
 python documentacion/analisis/trazabilidad.py                       # solo diagnóstico
 python documentacion/analisis/trazabilidad.py _tmp.md --escribir    # regenera el Anexo C del SRS
 python documentacion/analisis/plan_sprints.py                       # regenera PLAN.md y el tablero
-python documentacion/analisis/md_a_word.py --solo SRS               # regenera el Word del SRS
+"$PYDOC" documentacion/analisis/md_a_word.py --solo SRS               # regenera el Word del SRS
 ```
 
 ## Resources
