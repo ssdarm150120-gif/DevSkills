@@ -61,6 +61,72 @@ Describe 'CLI devskills'
     End
   End
 
+  Describe 'update'
+    g() { git -c user.name=Pruebas -c user.email=pruebas@example.invalid -c core.safecrlf=false "$@" >/dev/null 2>&1; }
+
+    # Un remoto local, un clon de origen con un install.sh falso que deja una marca, y un DEVSKILLS_HOME
+    # que apunta a ese clon. Después otro clon sube una segunda versión al remoto.
+    preparar_update() {
+      RAIZ_U="$(mktemp -d)"
+      git init -q --bare -b main "$RAIZ_U/remoto.git"
+      git init -q -b main "$RAIZ_U/origen"
+      g -C "$RAIZ_U/origen" config core.autocrlf false
+      printf '%s\n' '#!/usr/bin/env bash' 'echo "instalado v$(cat "$(dirname "$0")/VERSION.txt")" >"$MARCA_UPDATE"' >"$RAIZ_U/origen/install.sh"
+      echo 1 >"$RAIZ_U/origen/VERSION.txt"
+      g -C "$RAIZ_U/origen" add -A
+      g -C "$RAIZ_U/origen" commit -q -m "feat: primera version"
+      g -C "$RAIZ_U/origen" remote add origin "$RAIZ_U/remoto.git"
+      g -C "$RAIZ_U/origen" push -q -u origin main
+      mkdir -p "$RAIZ_U/casa"
+      echo "$RAIZ_U/origen" >"$RAIZ_U/casa/.origen"
+      MARCA_UPDATE="$RAIZ_U/marca.txt"
+      export MARCA_UPDATE RAIZ_U
+    }
+    publicar_segunda_version() {
+      git clone -q "$RAIZ_U/remoto.git" "$RAIZ_U/otro" >/dev/null 2>&1
+      echo 2 >"$RAIZ_U/otro/VERSION.txt"
+      g -C "$RAIZ_U/otro" commit -q -am "feat: segunda version con cambios visibles"
+      g -C "$RAIZ_U/otro" push -q origin main
+    }
+    limpiar_update() { rm -rf "$RAIZ_U"; }
+    actualizar() { DEVSKILLS_HOME="$RAIZ_U/casa" bash "$PROJECT_ROOT/bin/devskills" update "$@" </dev/null; }
+    BeforeEach 'preparar_update'
+    AfterEach 'limpiar_update'
+
+    It 'sin cambios en el remoto dice que ya tienes la última versión y no reinstala'
+      When call actualizar
+      The status should be success
+      The output should include 'última versión'
+      The path "$MARCA_UPDATE" should not be exist
+    End
+
+    It 'con cambios y sin terminal muestra qué traería y no aplica nada sin --si'
+      publicar_segunda_version
+      When call actualizar
+      The status should be failure
+      The output should include 'segunda version con cambios visibles'
+      The output should include 'VERSION.txt'
+      The stderr should include '--si'
+      The path "$MARCA_UPDATE" should not be exist
+      The contents of file "$RAIZ_U/origen/VERSION.txt" should eq '1'
+    End
+
+    It 'con --si trae los cambios y reinstala con el código nuevo'
+      publicar_segunda_version
+      When call actualizar --si
+      The status should be success
+      The output should include 'segunda version con cambios visibles'
+      The contents of file "$MARCA_UPDATE" should eq 'instalado v2'
+      The contents of file "$RAIZ_U/origen/VERSION.txt" should eq '2'
+    End
+
+    It 'rechaza una opción desconocida'
+      When call actualizar --otra
+      The status should eq 2
+      The stderr should include 'Opción desconocida'
+    End
+  End
+
   Describe 'init'
     setup() {
       CARPETA="$(mktemp -d)"
@@ -113,6 +179,53 @@ Describe 'CLI devskills'
       The status should be failure
       The stderr should be present
       The contents of file "$CARPETA/ocupada/archivo.txt" should eq "algo"
+    End
+
+    It 'rechaza un nombre con salto de línea (inyectaría líneas en .env.ejemplo)'
+      When call devskills init "$CARPETA/demo" --nombre "$(printf 'Demo\nINYECTADO=1')" --slug demo --puerto-base 19100
+      The status should be failure
+      The stderr should include 'caracteres de control'
+      The path "$CARPETA/demo/codigo" should not be exist
+    End
+
+    It 'rechaza un autor con salto de línea'
+      When call devskills init "$CARPETA/demo" --nombre "Demo" --autor "$(printf 'Ana\nRoot')" --slug demo --puerto-base 19100
+      The status should be failure
+      The stderr should include 'caracteres de control'
+      The path "$CARPETA/demo/codigo" should not be exist
+    End
+
+    Describe 'rechaza lo que rompería TOML, JSON, YAML o .env'
+      Parameters
+        'Demo "x"'
+        'Demo \ x'
+        'Demo $HOME'
+        'Demo {{SLUG}}'
+        'Demo {x}'
+        'Demo #1'
+      End
+      It "nombre: $1"
+        When call devskills init "$CARPETA/demo" --nombre "$1" --slug demo --puerto-base 19100
+        The status should be failure
+        The stderr should include 'no puede llevar'
+        The path "$CARPETA/demo/codigo" should not be exist
+      End
+    End
+
+    It 'con acentos, dos puntos, apóstrofo y & genera TOML y JSON válidos'
+      devskills init "$CARPETA/demo" --nombre "Ñandú: sistema d'Ana & Co." --autor "María Pérez" --slug demo --puerto-base 19100 --sin-git >/dev/null
+      valida() {
+        python -c "
+import json, sys, tomllib
+raiz = sys.argv[1]
+nombre = tomllib.load(open(raiz + '/codigo/pyproject.toml', 'rb'))['project']['description']
+assert nombre.startswith(\"Ñandú: sistema d'Ana & Co.\"), nombre
+datos = json.load(open(raiz + '/documentacion/presentacion/datos_presentacion.json', encoding='utf-8'))
+assert datos['proyecto'] == \"Ñandú: sistema d'Ana & Co.\", datos['proyecto']
+print('ok')
+" "$CARPETA/demo"
+      }
+      The value "$(valida 2>&1)" should eq 'ok'
     End
 
     It 'rechaza un rango de puertos que incluye uno reservado'

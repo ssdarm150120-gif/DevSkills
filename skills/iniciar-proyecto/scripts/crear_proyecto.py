@@ -24,6 +24,7 @@ import re
 import shutil
 import subprocess
 import sys
+import unicodedata
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -38,6 +39,12 @@ IGNORADOS = shutil.ignore_patterns(
     ".pytest_cache", ".import_linter_cache",
 )
 MENSAJE_DEL_COMMIT = "chore: bootstrap project from devskills"
+# El nombre y el autor se escriben tal cual en archivos de varios formatos (TOML, JSON, YAML, `.env`,
+# Markdown, Mermaid). En vez de escapar por tipo de archivo, se rechaza lo que rompería alguno:
+# comillas dobles y barra invertida (cadenas de TOML y JSON), `$`, `{` y `}` (interpolación de Compose y
+# marcadores `{{...}}`), `#` (comentarios de YAML y `.env`) y el acento grave.
+CARACTERES_PROHIBIDOS = '"\\$#{}`'
+LARGO_MAXIMO_DEL_TEXTO = 100
 
 
 class ErrorDeCreacion(Exception):
@@ -58,6 +65,28 @@ def leer_puertos(texto: str) -> tuple[int, ...]:
             raise ErrorDeCreacion(f"Puerto reservado fuera de rango (1 a {PUERTO_MAXIMO}): {puerto}")
         puertos.append(puerto)
     return tuple(sorted(set(puertos)))
+
+
+def validar_texto(etiqueta: str, valor: str, *, obligatorio: bool) -> str:
+    """El nombre o el autor, sin espacios en los extremos, o `ErrorDeCreacion` si algún formato se rompería."""
+    limpio = valor.strip()
+    if obligatorio and not limpio:
+        raise ErrorDeCreacion(f"El {etiqueta} es obligatorio")
+    if len(limpio) > LARGO_MAXIMO_DEL_TEXTO:
+        raise ErrorDeCreacion(f"El {etiqueta} no puede pasar de {LARGO_MAXIMO_DEL_TEXTO} caracteres")
+    for caracter in limpio:
+        categoria = unicodedata.category(caracter)
+        if categoria.startswith("C") or categoria in ("Zl", "Zp"):
+            raise ErrorDeCreacion(
+                f"El {etiqueta} no puede llevar saltos de línea, tabuladores ni otros caracteres de control "
+                f"(se encontró U+{ord(caracter):04X})"
+            )
+        if caracter in CARACTERES_PROHIBIDOS:
+            raise ErrorDeCreacion(
+                f"El {etiqueta} no puede llevar {caracter!r}: se escribe sin escapar en archivos TOML, JSON, "
+                f"YAML y .env, y rompería alguno. Prohibidos: {' '.join(CARACTERES_PROHIBIDOS)}"
+            )
+    return limpio
 
 
 def validar_slug(slug: str) -> str:
@@ -185,11 +214,8 @@ def crear(
     fecha: str | None = None,
 ) -> dict[str, object]:
     """Crea el proyecto y devuelve un resumen. Lanza `ErrorDeCreacion` si algo no es válido."""
-    nombre = nombre.strip()
-    if not nombre:
-        raise ErrorDeCreacion("El nombre del proyecto es obligatorio")
-    if "{{" in nombre or "{{" in autor:
-        raise ErrorDeCreacion("El nombre y el autor no pueden llevar `{{`")
+    nombre = validar_texto("nombre del proyecto", nombre, obligatorio=True)
+    autor = validar_texto("autor", autor, obligatorio=False)
     validar_slug(slug)
     rango = validar_rango(puerto_base, reservados)
     if not plantillas.is_dir():
@@ -208,7 +234,7 @@ def crear(
         slug=slug,
         rango=rango,
         reservados=reservados,
-        autor=autor.strip(),
+        autor=autor,
         fecha=fecha or datetime.date.today().isoformat(),
     )
     sustituidos = sustituir_en(destino, valores)

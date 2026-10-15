@@ -47,7 +47,7 @@ x-entorno-app: &entorno-app
   ALLOWED_HOSTS: ${ALLOWED_HOSTS:?define ALLOWED_HOSTS en .env (ver .env.ejemplo)}
   CONFIAR_EN_PROXY_TLS: "true" # siempre hay nginx delante y es quien fija X-Forwarded-Proto
   # Nombre que muestra la interfaz y que aparece como EMISOR en la aplicacion de codigos.
-  APP_NOMBRE_APLICACION: ${APP_NOMBRE_APLICACION:-{{NOMBRE_PROYECTO}}}
+  APP_NOMBRE_APLICACION: "${APP_NOMBRE_APLICACION:-{{NOMBRE_PROYECTO}}}"
   # Zona horaria con la que se muestran las fechas (se guardan en UTC). Vacia: UTC.
   APP_ZONA_HORARIA: ${APP_ZONA_HORARIA:-}
   SECURE_SSL_REDIRECT: "true"

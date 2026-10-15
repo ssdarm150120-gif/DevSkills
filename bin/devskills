@@ -61,7 +61,8 @@ Uso:
       --sin-git                      No inicializa git ni hace el primer commit
   devskills doctor                   Revisa los requisitos (git, Docker, Python 3.12, Node, mermaid-cli, engram, gitleaks)
   devskills version                  Muestra la versión
-  devskills update                   Actualiza desde el clon de git de origen y reinstala
+  devskills update [--si]            Muestra los cambios del clon de origen, pide confirmación y reinstala
+                                     (--si confirma sin preguntar; sin terminal es obligatorio)
   devskills help                     Muestra esta ayuda
 
 Dentro de Claude Code, el mismo arranque se hace con /devskills:nuevo-proyecto.
@@ -109,6 +110,12 @@ cmd_init() {
   if [[ ! -f "$script" ]]; then
     error "No encuentro $script; reinstala DevSkills."
     return 1
+  fi
+  # El Python de Windows es nativo: Git Bash solo convierte por sí solo las rutas "normales", y una ruta con
+  # &, # o ' le llegaría a Python en formato de Unix. cygpath la deja en formato de Windows (C:/...).
+  if command -v cygpath >/dev/null 2>&1; then
+    script="$(cygpath -m "$script")"
+    ruta="$(cygpath -m "$ruta")"
   fi
   local args=(--destino "$ruta" --nombre "$nombre" --slug "$slug" --puerto-base "$puerto_base"
               --puertos-reservados "$reservados" --autor "$autor")
@@ -164,6 +171,14 @@ cmd_doctor() {
 }
 
 cmd_update() {
+  local si=false
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --si|-y) si=true; shift ;;
+      -h|--help) mostrar_ayuda; return 0 ;;
+      *) error "Opción desconocida: $1"; return 2 ;;
+    esac
+  done
   local origen_archivo="$DEVSKILLS_HOME/.origen"
   if [[ ! -f "$origen_archivo" ]]; then
     error "No sé de qué clon se instaló DevSkills ($origen_archivo no existe). Actualiza a mano: git pull && bash install.sh"
@@ -175,8 +190,47 @@ cmd_update() {
     error "El origen $origen no es un clon de git. Actualiza a mano."
     return 1
   fi
-  echo "Actualizando desde $origen..."
-  git -C "$origen" pull --ff-only
+  echo "Origen: $origen ($(git -C "$origen" remote get-url origin 2>/dev/null || echo "sin remoto"))"
+  if ! git -C "$origen" fetch --quiet; then
+    error "No pude consultar el remoto; no cambié nada."
+    return 1
+  fi
+  local remota
+  if ! remota="$(git -C "$origen" rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null)"; then
+    error "La rama actual del clon no tiene una rama remota asociada; actualiza a mano."
+    return 1
+  fi
+  local nuevos
+  nuevos="$(git -C "$origen" rev-list --count "HEAD..$remota")"
+  if [[ "$nuevos" == "0" ]]; then
+    ok "Ya tienes la última versión; no cambié nada."
+    return 0
+  fi
+  # Se muestra lo que va a cambiar ANTES de traerlo: al actualizar se ejecuta el install.sh del código nuevo.
+  echo ""
+  echo -e "${NEGRITA}Cambios que traería ($nuevos commits desde $remota):${NC}"
+  git -C "$origen" log --oneline "HEAD..$remota"
+  echo ""
+  git -C "$origen" diff --stat "HEAD" "$remota"
+  echo ""
+  aviso "Actualizar ejecuta el install.sh del código nuevo. Revísalo antes si no confías en el remoto: git -C \"$origen\" diff HEAD $remota -- install.sh install.ps1 bin/devskills"
+  if [[ "$si" != true ]]; then
+    if [[ -t 0 ]]; then
+      local respuesta
+      read -r -p "¿Aplicar estos cambios y reinstalar? (s/N): " respuesta
+      if [[ "$respuesta" != "s" && "$respuesta" != "S" ]]; then
+        echo "Cancelado; no cambié nada."
+        return 0
+      fi
+    else
+      error "Sin terminal no se aplica nada. Revisa los cambios y repite con --si: devskills update --si"
+      return 1
+    fi
+  fi
+  if ! git -C "$origen" merge --ff-only --quiet "$remota"; then
+    error "No se pudo avanzar el clon sin conflictos (¿cambios locales?). Resuélvelo a mano en $origen."
+    return 1
+  fi
   bash "$origen/install.sh" --si
 }
 

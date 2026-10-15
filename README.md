@@ -190,11 +190,11 @@ cd ~/proyectos/mi-sistema && claude                # abre Claude Code en el proy
 |---------|-------------|
 | `devskills init <ruta>` | Crea un proyecto nuevo con la estructura y el esqueleto |
 | `devskills doctor` | Revisa los requisitos y explica cómo instalar lo que falte |
-| `devskills update` | Actualiza desde el clon de origen y reinstala |
+| `devskills update [--si]` | Muestra los cambios del clon de origen, pide confirmación y reinstala |
 | `devskills version` | Muestra la versión |
 | `devskills help` | Muestra la ayuda |
 
-Opciones de `init`: `--nombre`, `--slug`, `--puerto-base`, `--puertos-reservados`, `--autor`, `--sin-git`.
+Opciones de `init`: `--nombre`, `--slug`, `--puerto-base`, `--puertos-reservados`, `--autor`, `--sin-git`. El nombre y el autor no admiten saltos de línea, comillas dobles, `\`, `$`, `#`, `{`, `}` ni acento grave (romperían TOML, JSON, YAML o `.env`).
 
 ---
 

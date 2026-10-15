@@ -83,15 +83,20 @@ Al copiar, el instalador adapta el contenido: `devskills:<nombre>` pasa a `devsk
 
 - Si un archivo de destino existe y no lo instaló DevSkills, pregunta antes de sobrescribirlo; sin terminal, aborta sin instalar nada. `--forzar` (`-Forzar`) lo sobrescribe a propósito.
 - Si la carpeta de la carga útil existe y no es una instalación de DevSkills, no la toca.
-- Es idempotente: reinstalar deja exactamente los mismos archivos.
+- Es idempotente: reinstalar deja exactamente los mismos archivos. El manifiesto anterior se lee **antes** de reemplazar la carga útil, así que lo que la versión nueva ya no trae (un agente o una skill quitados) se borra, junto con las carpetas que queden vacías.
+- Solo quita o borra entradas del manifiesto con aspecto de DevSkills (`devskills-*` o el CLI): un manifiesto alterado no puede hacer borrar archivos ajenos.
+- **Rutas con caracteres especiales:** `&`, `#`, `\` y la comilla simple (por ejemplo, una carpeta de usuario `O'Brien`) se instalan literales. Se **rechaza** (código 2, sin instalar nada) una ruta con saltos de línea o caracteres de control, `$`, comillas dobles o acento grave, porque las skills instaladas las incrustan en comandos de shell.
 
 Opciones: `--si` (`-Si`) no pregunta al reinstalar. Variables: `CLAUDE_CONFIG_DIR`, `DEVSKILLS_BIN_DIR`, `DEVSKILLS_SHARE_DIR`.
 
 ## Actualizar
 
 ```bash
-devskills update        # git pull en el clon de origen y reinstala
+devskills update        # muestra los commits y los archivos que cambiarían y pide confirmación
+devskills update --si   # confirma sin preguntar (obligatorio sin terminal)
 ```
+
+`devskills update` consulta el remoto del clon de origen (`git fetch`), **te enseña qué traería** (commits y `diff --stat`) y no cambia nada hasta que confirmas. Después avanza el clon solo si es un avance limpio (`--ff-only`) y corre el `install.sh` del código nuevo: por eso conviene revisar el diff antes, sobre todo si no confías en el remoto. Sin terminal y sin `--si` no aplica nada.
 
 Como plugin: `/plugin marketplace update devskills-local`.
 
