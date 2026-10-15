@@ -219,14 +219,16 @@ Corre `devskills doctor` para revisarlos todos.
 | Git | Todo | <https://git-scm.com/downloads> |
 | Claude Code | Agentes y skills | <https://code.claude.com> |
 | Python 3.12 | Esqueleto y generadores | `winget install Python.Python.3.12` · `brew install python@3.12` |
-| gitleaks | Búsqueda de secretos antes de cada commit | Nativo: `winget install Gitleaks.Gitleaks` · `brew install gitleaks` · release de <https://github.com/gitleaks/gitleaks/releases>. Alternativa: `docker pull zricethezav/gitleaks:v8.21.2` |
+| gitleaks | Búsqueda de secretos antes de cada commit | Nativo: `winget install Gitleaks.Gitleaks` · `brew install gitleaks` · release de <https://github.com/gitleaks/gitleaks/releases>. Alternativa: `docker pull zricethezav/gitleaks:v8.21.2@sha256:0e99e8821643ea5b235718642b93bb32486af9c8162c8b8731f7cbdc951a7f46` |
+
+Las imágenes de Docker de gitleaks y semgrep se fijan por **digest** (`etiqueta@sha256:...`), no solo por etiqueta: una etiqueta puede reapuntarse a otra imagen, un digest no. Al subir de versión se recalcula el digest del índice multiarquitectura en el registro (por ejemplo, el encabezado `Docker-Content-Digest` de `GET /v2/<repositorio>/manifests/<etiqueta>`, o `docker buildx imagetools inspect <imagen>:<etiqueta>`) y se cambia en todos los archivos a la vez; la prueba `spec/integration/gitleaks_spec.sh` falla si queda una referencia solo con etiqueta.
 
 **Opcionales** (`devskills doctor` los avisa sin bloquear y dice qué pierdes):
 
 | Requisito | Para qué | Cómo instalarlo |
 |-----------|----------|-----------------|
 | Docker | Levantar el stack con Compose y construir la imagen en tu máquina | Docker Desktop o Docker Engine. Ver [Docker es opcional](#docker-es-opcional) |
-| semgrep | Análisis estático igual que el CI, en tu máquina | macOS y Linux: `pipx install semgrep==1.178.0` (la versión de `semgrep==` en el `ci.yml` del proyecto); Windows: WSL o Docker (`docker pull semgrep/semgrep:1.178.0`). En el CI de GitHub es obligatorio |
+| semgrep | Análisis estático igual que el CI, en tu máquina | macOS y Linux: `pipx install semgrep==1.178.0` (la versión de `semgrep==` en el `ci.yml` del proyecto); Windows: WSL o Docker (`docker pull semgrep/semgrep:1.178.0@sha256:32e459968daabe7ab86968184a29109b9564aa00392401156f9788452b42786b`). En el CI de GitHub es obligatorio |
 | Node.js LTS | Presentación y mermaid-cli | <https://nodejs.org> |
 | mermaid-cli | Diagramas en los Word | En una carpeta local con versión fija, ver [generadores](generadores.md) |
 | GitHub CLI (`gh`) | Remoto privado y revisión del CI | Ver "GitHub CLI (`gh`) y el CI" |

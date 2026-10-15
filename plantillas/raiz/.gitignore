@@ -5,6 +5,25 @@
 !.env.ejemplo
 *.env.local
 
+# Llaves y archivos de credenciales (nunca se versionan; la llave y el certificado autofirmados de
+# desarrollo se GENERAN con despliegue/nginx/generar_certificado.sh y viven en un volumen, fuera de git)
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+id_rsa*
+id_ed25519*
+credentials.json
+credentials.*.json
+service-account*.json
+*.secret
+*.secrets
+.netrc
+.pgpass
+.pypirc
+
 # Python
 __pycache__/
 *.py[cod]

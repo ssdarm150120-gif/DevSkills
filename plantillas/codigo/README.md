@@ -249,7 +249,7 @@ nuevo no ignorado con el binario nativo (o con Docker si no lo hay), o directame
 
 ```bash
 gitleaks dir . --redact --no-banner          # nativo (winget install Gitleaks.Gitleaks | brew install gitleaks)
-docker run --rm -v "$PWD:/repo:ro" zricethezav/gitleaks:v8.21.2 dir /repo --redact --no-banner   # alternativa con Docker
+docker run --rm -v "$PWD:/repo:ro" zricethezav/gitleaks:v8.21.2@sha256:0e99e8821643ea5b235718642b93bb32486af9c8162c8b8731f7cbdc951a7f46 dir /repo --redact --no-banner   # alternativa con Docker
 ```
 
 Un falso positivo se suprime con un comentario `gitleaks:allow` **en esa misma linea** y el motivo; **nunca** se
@@ -263,7 +263,7 @@ codigo 0 y "Findings: 0".
 pipx run --spec "semgrep==1.178.0" semgrep scan --config p/python --config p/django --error --metrics=off \
   --exclude pruebas --exclude conftest.py .
 # Windows: por WSL (el mismo comando de arriba dentro de WSL) o, si prefieres, por Docker
-MSYS_NO_PATHCONV=1 docker run --rm -v "$(pwd -W):/src:ro" -w /src semgrep/semgrep:1.178.0 semgrep scan \
+MSYS_NO_PATHCONV=1 docker run --rm -v "$(pwd -W):/src:ro" -w /src semgrep/semgrep:1.178.0@sha256:32e459968daabe7ab86968184a29109b9564aa00392401156f9788452b42786b semgrep scan \
   --config p/python --config p/django --error --metrics=off --exclude pruebas --exclude conftest.py .
 ```
 

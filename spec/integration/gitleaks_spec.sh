@@ -122,4 +122,15 @@ with mock.patch.object(g, 'buscar_gitleaks', return_value=None), mock.patch.obje
     The stderr should include 'demonio está apagado'
     The stderr should not include 'HAY HALLAZGOS'
   End
+
+  It 'las imágenes de gitleaks y semgrep se fijan por digest, no solo por etiqueta'
+    imagenes_sin_digest() {
+      git -C "$PROJECT_ROOT" grep -n -E '(zricethezav/gitleaks|semgrep/semgrep):[0-9v][0-9.]+' -- \
+        .github bin scripts skills/ciclo-historia skills/validar-historia plantillas/codigo/README.md |
+        grep -v '@sha256:[0-9a-f]\{64\}'
+    }
+    When call imagenes_sin_digest
+    The status should be failure
+    The output should eq ''
+  End
 End

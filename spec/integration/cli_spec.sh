@@ -246,6 +246,18 @@ Describe 'CLI devskills'
       The path "$CARPETA/demo/codigo" should not be exist
     End
 
+    It 'el .gitignore del proyecto excluye llaves, certificados privados y archivos de credenciales'
+      devskills init "$CARPETA/demo" --nombre "Demo" --slug demo --puerto-base 19100 --sin-git >/dev/null
+      git -C "$CARPETA/demo" init -q -b main
+      When call git -C "$CARPETA/demo" check-ignore -v tls.key servidor.pem cliente.p12 id_rsa credentials.json service-account-x.json .pgpass
+      The status should be success
+      The output should include '*.key'
+      The output should include '*.pem'
+      The output should include '*.p12'
+      The output should include 'id_rsa*'
+      The output should include 'credentials.json'
+    End
+
     It 'rechaza un nombre con salto de línea (inyectaría líneas en .env.ejemplo)'
       When call devskills init "$CARPETA/demo" --nombre "$(printf 'Demo\nINYECTADO=1')" --slug demo --puerto-base 19100
       The status should be failure

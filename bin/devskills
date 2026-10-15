@@ -161,7 +161,7 @@ revisar_opcional() {
 }
 
 hay_semgrep() {
-  command -v semgrep || semgrep --version || (command -v wsl && wsl semgrep --version) || docker image inspect semgrep/semgrep:1.178.0
+  command -v semgrep || semgrep --version || (command -v wsl && wsl semgrep --version) || docker image inspect semgrep/semgrep:1.178.0@sha256:32e459968daabe7ab86968184a29109b9564aa00392401156f9788452b42786b
 }
 
 hay_mmdc() {
@@ -188,10 +188,10 @@ cmd_doctor() {
   # gitleaks es obligatorio para cerrar cualquier commit, pero basta UNA vía: el binario nativo o Docker.
   if command -v gitleaks >/dev/null 2>&1; then
     ok "gitleaks (nativo)"
-  elif docker image inspect zricethezav/gitleaks:v8.21.2 >/dev/null 2>&1; then
+  elif docker image inspect zricethezav/gitleaks:v8.21.2@sha256:0e99e8821643ea5b235718642b93bb32486af9c8162c8b8731f7cbdc951a7f46 >/dev/null 2>&1; then
     ok "gitleaks (por Docker)"
   else
-    aviso "gitleaks — falta. Sin él no se puede cerrar un commit. Instálalo: Windows 'winget install Gitleaks.Gitleaks'; macOS 'brew install gitleaks'; Linux la release de https://github.com/gitleaks/gitleaks/releases (o, si usas Docker, 'docker pull zricethezav/gitleaks:v8.21.2')."
+    aviso "gitleaks — falta. Sin él no se puede cerrar un commit. Instálalo: Windows 'winget install Gitleaks.Gitleaks'; macOS 'brew install gitleaks'; Linux la release de https://github.com/gitleaks/gitleaks/releases (o, si usas Docker, 'docker pull zricethezav/gitleaks:v8.21.2@sha256:0e99e8821643ea5b235718642b93bb32486af9c8162c8b8731f7cbdc951a7f46')."
     faltan=$((faltan + 1))
   fi
   echo -e "${NEGRITA}Opcionales (no bloquean; dicen qué pierdes)${NC}"

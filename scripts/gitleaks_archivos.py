@@ -37,7 +37,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-IMAGEN_PREDETERMINADA = "zricethezav/gitleaks:v8.21.2"
+IMAGEN_PREDETERMINADA = "zricethezav/gitleaks:v8.21.2@sha256:0e99e8821643ea5b235718642b93bb32486af9c8162c8b8731f7cbdc951a7f46"
 COMO_INSTALAR = (
     "Instala gitleaks: Windows `winget install Gitleaks.Gitleaks`, macOS `brew install gitleaks`, "
     "Linux la release de https://github.com/gitleaks/gitleaks/releases; o usa Docker (--modo docker)."
