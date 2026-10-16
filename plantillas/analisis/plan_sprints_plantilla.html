@@ -140,6 +140,14 @@
         const estadoDe = id => estados[id] || oficial[id] || 'Pendiente';
 
         // ==================== Utilidades ====================
+        // Mismo formato que porcentaje.py (PLAN.md): menos de 10 % con un decimal truncado, 10 % o más entero truncado.
+        const porcentaje = (hechos, total) => {
+            if (total <= 0 || hechos <= 0) return '0 %';
+            if (hechos >= total) return '100 %';
+            const decimas = Math.floor(hechos * 1000 / total);
+            if (decimas >= 100) return `${Math.floor(decimas / 10)} %`;
+            return decimas === 0 ? '<0.1 %' : `${(decimas / 10).toFixed(1)} %`;
+        };
         const fecha = s => { const [a, m, d] = s.split('-').map(Number); return new Date(a, m - 1, d); };
         const fmt = d => d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short' });
         const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
@@ -179,7 +187,7 @@
             const hus = PLAN.items.filter(i => i.id.startsWith('HU')).length;
             const tarjetas = [
                 ['Puntos totales', total, `${hus} historias · ${PLAN.items.length - hus} habilitadores`],
-                ['Avance', `${Math.round(listos / total * 100)} %`, `${listos} de ${total} puntos en "Listo"`],
+                ['Avance', porcentaje(listos, total), `${listos} de ${total} puntos en "Listo"`],
                 ['Sprint actual', sprintActual ? `S${sprintActual.num}` : '—', sprintActual ? `${fmt(fecha(sprintActual.inicio))} al ${fmt(fecha(sprintActual.fin))}` : 'Fuera del plan'],
                 ['Entrega en curso', sprintActual ? `E${sprintActual.entregas[0]}` : '—', sprintActual ? PLAN.entregas.find(e => e.num === sprintActual.entregas[0]).nombre : ''],
                 ['Bloqueados', bloqueados, bloqueados ? 'Revisar en la daily' : 'Sin impedimentos'],

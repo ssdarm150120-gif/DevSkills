@@ -22,6 +22,8 @@ import re
 import sys
 import unicodedata
 
+from porcentaje import formatear_porcentaje  # mismo formato que el tablero HTML
+
 # En Windows la consola y las tuberías usan la página de códigos local (cp1252): sin esto los acentos
 # salen corruptos. La salida de DevSkills siempre es UTF-8.
 for _flujo in (sys.stdout, sys.stderr):
@@ -130,7 +132,7 @@ for num, nombre, objetivo, items in entregas:
     pts = sum(p for _, p in items)
     hechos = sum(p for i, p in items if avance.get(i, {}).get("estado") == "Listo")
     s_ini = sprint
-    out.append(f"\n#### Entrega {num}: {nombre}\n**Objetivo medible:** {objetivo}. **Total:** {pts} puntos · **Terminados:** {hechos} ({hechos * 100 // pts if pts else 0} %).\n")
+    out.append(f"\n#### Entrega {num}: {nombre}\n**Objetivo medible:** {objetivo}. **Total:** {pts} puntos · **Terminados:** {hechos} ({formatear_porcentaje(hechos, pts)}).\n")
     out.append("| Prioridad | ID | Elemento | Puntos | Sprint | Estado |\n|-----------|----|----------|--------|--------|--------|")
     for k, (i, p) in enumerate(items, 1):
         if carga + p > VELOCIDAD and carga > 0:
@@ -154,8 +156,8 @@ total_hechos = sum(r[5] for r in resumen)
 n_sprints = sprint - 1
 tabla_res = ["| Entrega | Nombre | Puntos | Terminados | Sprints | Fechas estimadas |", "|---------|--------|--------|------------|---------|------------------|"]
 for num, nombre, pts, a, b, h, _ in resumen:
-    tabla_res.append(f"| {num} | {nombre} | {pts} | {h} ({h * 100 // pts} %) | S{a} a S{b} | {fmt(fechas(a)[0])} a {fmt(fechas(b)[1])} |")
-tabla_res.append(f"| **Total** | | **{total}** | **{total_hechos} ({total_hechos * 100 // total} %)** | **{n_sprints} sprints** | **{fmt(INICIO)} a {fmt(fechas(n_sprints)[1])} ({n_sprints * DIAS_SPRINT // 7} semanas)** |")
+    tabla_res.append(f"| {num} | {nombre} | {pts} | {h} ({formatear_porcentaje(h, pts)}) | S{a} a S{b} | {fmt(fechas(a)[0])} a {fmt(fechas(b)[1])} |")
+tabla_res.append(f"| **Total** | | **{total}** | **{total_hechos} ({formatear_porcentaje(total_hechos, total)})** | **{n_sprints} sprints** | **{fmt(INICIO)} a {fmt(fechas(n_sprints)[1])} ({n_sprints * DIAS_SPRINT // 7} semanas)** |")
 
 cuerpo = (f"> Velocidad supuesta: **{VELOCIDAD} puntos por sprint** de {DIAS_SPRINT // 7} semanas. Cada entrega cierra en su propio sprint. "
           f"Los elementos ~~tachados~~ pasaron el ciclo de calidad (desarrollo → QA → Angel Fixer) y tienen su reporte en `documentacion/avance/`.\n\n"
