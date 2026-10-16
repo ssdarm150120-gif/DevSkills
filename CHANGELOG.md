@@ -17,6 +17,16 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 - El esqueleto ya no anuncia una bitácora que no existe (capacidad, rol `auditor` y textos marcados como ejemplo) y documenta paso a paso cómo reemplazar los roles de ejemplo.
 - Una sola Definición de Terminado (`proyecto-contexto`); el SRS y el PLAN la referencian. Los comandos de Word usan el Python del entorno de la documentación (`$PYDOC`). El README ya no contradice el orden descubrimiento → `init`.
 
+### Ronda de correcciones 4
+- Idioma: la plantilla raíz trae `CLAUDE.md` (Claude Code no lee `AGENTS.md`) con `@AGENTS.md` y la regla de que el idioma de `CONTEXTO.md`, que sale de `--idioma`, prevalece sobre el `CLAUDE.md` global del usuario. Los agentes y el orquestador lo dicen.
+- El borrador de lecciones ya no está en `documentacion/avance`: vive en `.devskills/` (ignorada por git), igual que `engram_pendiente.md`.
+- Los subagentes no llaman `mem_save` (sus herramientas MCP no llegan): terminan con la sección **Para engram** y el orquestador la guarda, o la deja en `.devskills/engram_pendiente.md`.
+- Ningún agente instala software; el hook veta a los subagentes `curl | sh`, `get-pip`, `winget`/`brew`/`apt install`, `npm -g` y pip fuera del venv; `devskills doctor` explica cómo instalar semgrep por sistema.
+- Sin remoto, el reporte marca "CI no ejecutado (sin remoto)" y al cerrar cada entrega se exigen localmente con Docker imagen, hadolint, trivy y despliegue.
+- `plan_sprints.py` y el tablero muestran el porcentaje con un decimal por debajo de 10 % (`0.9 %`, no `0 %`).
+- Nuevo `devskills sync-scripts [ruta]` para llevar a un proyecto ya creado los scripts corregidos de `documentacion/analisis/`.
+- `docs/instalacion.md` explica que la duración que muestra Claude Code incluye el tiempo con el equipo suspendido.
+
 ### Ronda de correcciones 2
 - `scripts/gitleaks_archivos.py` distingue "herramienta no disponible" (código 2, con instrucciones) de "hay hallazgos" (código 1); busca el binario también en las rutas de winget y detecta un demonio de Docker apagado.
 - `prod.py` rechaza `SECURE_SSL_REDIRECT` apagado y HSTS menor a un año en un servidor real (solo advierte en `localhost`); `APP_EXIGIR_TLS_DATOS` exige `sslmode` y `rediss://`; `roles_bd` valida la clave de Redis; tope de 128 caracteres de contraseña antes de Argon2.

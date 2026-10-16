@@ -74,7 +74,9 @@ Las reglas 1 a 6 nacieron de un verificador que vació por accidente un archivo 
 Cada decisión queda escrita con quién la tomó: en el SRS, en el reporte de avance y en la memoria.
 
 ### Idioma, secretos y entorno
-- Todo en español de México con tuteo. Commits en inglés, Conventional Commits, sin atribución de IA.
+- El idioma del proyecto es el de `documentacion/CONTEXTO.md` (por defecto español de México con tuteo) y prevalece sobre el estilo personal del usuario; el `CLAUDE.md` de la raíz del proyecto importa `AGENTS.md` y lo declara. Commits en inglés, Conventional Commits, sin atribución de IA.
+- Los borradores locales del orquestador (lecciones para DevSkills, engram pendiente) viven en `.devskills/`, ignorada por git: nunca entran a un commit.
+- Sin remoto no hay CI: el reporte marca "CI no ejecutado (sin remoto)" con la verificación pendiente, y al cerrar cada entrega se exigen localmente con Docker las pruebas que solo cubre el CI (imagen, hadolint, trivy, despliegue); sin Docker se le pide al usuario.
 - Nadie lee ni escribe `.env` ni `.env.*`.
 - Docker es **opcional**: se desarrolla y se prueba sin él (PostgreSQL embebido y Celery local); Compose solo hace falta para desplegar. Si lo usas, el prefijo es `<slug>-<agente>` y la limpieza es solo de lo tuyo. Nunca en puertos reservados del host.
 - Nada sale del equipo sin la confirmación explícita del usuario: `git push`, `gh` de escritura, merges de Dependabot, publicar una lección en el repositorio de DevSkills.

@@ -197,6 +197,7 @@ cd ~/proyectos/mi-sistema && claude                # abre Claude Code en el proy
 | `devskills init <ruta>` | Crea un proyecto nuevo con la estructura y el esqueleto |
 | `devskills doctor` | Revisa los requisitos y explica cómo instalar lo que falte |
 | `devskills update [--si]` | Muestra los cambios del clon de origen, pide confirmación y reinstala |
+| `devskills sync-scripts [ruta] [--si]` | Actualiza los `.py` de `documentacion/analisis/` de un proyecto ya creado con los de la plantilla: lista, `diff --stat`, confirmación; no toca `codigo/`, los `.md` ni los JSON, y solo compara la plantilla HTML |
 | `devskills version` | Muestra la versión |
 | `devskills help` | Muestra la ayuda |
 
@@ -260,7 +261,7 @@ Corre `devskills doctor` para revisarlos. Para correr sin humano (`claude -p`, `
 
 **¿Necesito Telegram?** No. Es opcional, para dirigir al orquestador desde el celular.
 
-**¿En qué idioma trabaja?** Todo el contenido está en español de México. Los commits van en inglés con Conventional Commits.
+**¿En qué idioma trabaja?** El contenido de DevSkills está en español de México. Cada proyecto fija su idioma con `--idioma`: `init` crea un `CLAUDE.md` que importa `AGENTS.md` (Claude Code lee `CLAUDE.md`) y declara que el idioma de `documentacion/CONTEXTO.md` prevalece sobre el estilo personal de tu `CLAUDE.md` global (por ejemplo, si pides voseo). Los commits van en inglés con Conventional Commits.
 
 ---
 

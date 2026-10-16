@@ -51,12 +51,13 @@ Los diez primeros agentes de la lista de desarrollo y calidad vienen del proyect
 
 Cada agente trae al final el mismo bloque de reglas:
 
-- Español de México con tuteo.
+- Idioma: el del campo Idioma de `documentacion/CONTEXTO.md`, que prevalece sobre el estilo personal del usuario (su `CLAUDE.md` global); en español de México, tuteo.
 - Cargar `proyecto-contexto` y leer `documentacion/CONTEXTO.md` antes de trabajar.
 - No leer ni escribir `.env` ni `.env.*`.
 - Docker es opcional (se desarrolla y se prueba sin él). Si se usa: solo con el prefijo `<slug>-<agente>` y el rango de puertos asignados; nunca en puertos reservados del host; limpieza al terminar solo de lo propio; nunca `down -v` ni `prune` sobre el stack principal.
 - Vetos explícitos hacia afuera: ningún agente ejecuta `git push`, `git branch -D`, `gh` de escritura ni `docker push`; un hook del plugin los bloquea a los subagentes y el orquestador solo los ejecuta con la confirmación explícita del usuario.
-- Guardar en engram decisiones y hallazgos no obvios.
+- **Memoria:** las herramientas MCP de engram no llegan a los subagentes del plugin. Cada agente (menos el orquestador) termina su reporte con la sección fija **Para engram** (título, tipo y contenido) y el orquestador la guarda con `mem_save`; si `mem_save` no existe en la sesión, la deja en `.devskills/engram_pendiente.md` (carpeta ignorada por git).
+- **Nadie instala software:** ni pip fuera del venv del proyecto, ni `curl ... | sh`, `get-pip`, `winget`, `brew`, `apt`, `npm -g` ni nada dentro de WSL. Si falta una herramienta el agente se detiene y la reporta; el orquestador se lo pregunta al usuario. El hook del plugin bloquea esos comandos a los subagentes.
 - Cero deuda.
 
 Y un bloque de cuidado del repositorio según su papel:
@@ -65,7 +66,7 @@ Y un bloque de cuidado del repositorio según su papel:
 |-------|--------------|
 | Desarrolladores | Trabajan en la rama del elemento **sin hacer commit**. Solo `status`, `diff`, `log`, `show` y `restore` de un archivo que ellos dañaron |
 | Revisores (QA, Angel Fixer, verificador) | No ejecutan en el repositorio nada que escriba archivos de `codigo/`. Si corrigen, usan solo la herramienta de edición y reportan `git diff --stat` |
-| Todos | Mutaciones y experimentos en una copia del scratchpad. Si dañan un archivo: se detienen, `git restore`, y lo reportan. Nunca reconstruyen de memoria |
+| Todos | Nada de instalaciones de software (ver arriba). Mutaciones y experimentos en una copia del scratchpad. Si dañan un archivo: se detienen, `git restore`, y lo reportan. Nunca reconstruyen de memoria |
 
 ## Asignación de módulos
 

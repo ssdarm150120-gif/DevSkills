@@ -17,6 +17,8 @@ DevSkills es una metodología y un stack para construir cualquier sistema. Cada 
 - **Datos:** `documentacion/analisis/plan_entregas.json` (entregas en orden de prioridad con los puntos de cada elemento, habilitadores, velocidad, días por sprint y fecha de inicio), los títulos de las historias del SRS y el estado oficial de `documentacion/avance/estado_backlog.json`.
 - **Salida:** reemplaza solo lo que está entre `<!-- INICIO BACKLOG GENERADO -->` y `<!-- FIN BACKLOG GENERADO -->` en `PLAN.md`, y genera `documentacion/plan_sprints.html`: indicadores, avance por entrega, sprints con su capacidad, tarjetas arrastrables, Gantt y exportación a CSV. Lo `Listo` sale **tachado** con su fecha y el enlace a su reporte.
 - **Cuándo:** al cerrar cada elemento, en cada pasada documental y al repriorizar o recalibrar. Nunca se edita a mano.
+- **Porcentaje de avance:** menos de 10 % se muestra con un decimal truncado (3 de 327 puntos es `0.9 %`, no `0 %`; `<0.1 %` si ni una décima) y 10 % o más como entero truncado. La misma regla vive en `porcentaje.py` (PLAN.md) y en la plantilla HTML (tablero).
+- **Proyectos ya creados:** los scripts quedan copiados en el proyecto; para recibir las correcciones usa `devskills sync-scripts` (ver [instalación](instalacion.md#actualizar-los-scripts-de-un-proyecto-ya-creado)).
 - **Errores claros:** una historia vigente sin planificar, un elemento duplicado, un habilitador sin definir, una historia inexistente o retirada, o un ID del estado que no está en el plan.
 
 ## Anexo C de trazabilidad

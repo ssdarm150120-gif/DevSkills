@@ -102,6 +102,17 @@ devskills update --si   # confirma sin preguntar (obligatorio sin terminal)
 
 Como plugin: `/plugin marketplace update devskills-local`.
 
+### Actualizar los scripts de un proyecto ya creado
+
+Un proyecto conserva una copia de los generadores de `documentacion/analisis/` del momento en que se creó. Si DevSkills corrige un script después (por ejemplo, la salida en UTF-8 o el formato del porcentaje del plan), tu proyecto sigue con el viejo. Se actualiza con:
+
+```bash
+devskills sync-scripts [ruta]        # lista los .py que difieren de la plantilla, muestra el diff --stat y pide confirmación
+devskills sync-scripts [ruta] --si   # confirma sin preguntar (obligatorio sin terminal)
+```
+
+Sin `ruta` usa la carpeta actual, que debe ser un proyecto DevSkills (tiene `documentacion/CONTEXTO.md` y `documentacion/analisis/`). Copia **solo** los `.py` de `documentacion/analisis/` que cambiaron o que el proyecto no tiene; no toca `codigo/`, ni `documentacion/*.md`, ni los JSON de datos (`plan_entregas.json`, `trazabilidad.json`). La plantilla HTML del tablero (`plan_sprints_plantilla.html`) nunca se copia: si difiere de la de DevSkills (porque la personalizaste o porque quedó vieja), el comando la compara, te da el `git diff --no-index` para revisarla y lo decides tú. Si un script de la plantilla trae marcadores `{{...}}`, se comparan ya sustituidos con los datos de `CONTEXTO.md`; uno con un marcador que no se puede resolver se omite y se avisa. Después revisa `git diff` y haz el commit.
+
 ## Desinstalar
 
 ```bash
@@ -181,6 +192,10 @@ En la prueba real, una historia **pequeña** costó **unos 17 USD** con el model
 - Fija siempre `--max-budget-usd` y `--max-turns`.
 - Parte los elementos grandes (más de 13 puntos) antes de correrlos.
 
+### Tiempos: la suspensión del equipo cuenta como duración
+
+Si el equipo se suspende (tapa cerrada, reposo) mientras un agente trabaja, el reloj sigue corriendo: la duración que Claude Code muestra para los agentes y para la sesión **incluye el tiempo dormido**. Un desarrollador que "tardó 9 horas" puede haber trabajado 40 minutos. No sirve para estimar esfuerzo ni para calibrar la velocidad del plan; para eso usa los puntos de cada reporte y su sección "Esfuerzo real". El costo en USD y los tokens no se ven afectados por la suspensión, así que son la medida confiable del gasto.
+
 ### Plugin engram en sesiones anidadas
 
 El plugin engram puede fallar en las sesiones anidadas (la de `claude -p` lanzada desde otra sesión) si falta `jq`: sus hooks lo usan para leer el evento. Instálalo (`winget install jqlang.jq`, `brew install jq`, `apt install jq`) o deshabilita engram en esa corrida; el ciclo sigue funcionando sin memoria, pero no se guardará el avance en engram.
@@ -238,7 +253,7 @@ Las imágenes de Docker de gitleaks y semgrep se fijan por **digest** (`etiqueta
 | Requisito | Para qué | Cómo instalarlo |
 |-----------|----------|-----------------|
 | Docker | Levantar el stack con Compose y construir la imagen en tu máquina | Docker Desktop o Docker Engine. Ver [Docker es opcional](#docker-es-opcional) |
-| semgrep | Análisis estático igual que el CI, en tu máquina | macOS y Linux: `pipx install semgrep==1.178.0` (la versión de `semgrep==` en el `ci.yml` del proyecto); Windows: WSL o Docker (`docker pull semgrep/semgrep:1.178.0@sha256:32e459968daabe7ab86968184a29109b9564aa00392401156f9788452b42786b`). En el CI de GitHub es obligatorio |
+| semgrep | Análisis estático igual que el CI, en tu máquina | macOS: `pipx install semgrep==1.178.0` (la versión de `semgrep==` en el `ci.yml` del proyecto); Linux y Windows con WSL, en un venv propio: `python3 -m venv ~/semgrep && ~/semgrep/bin/pip install semgrep==1.178.0` (en Windows se corre dentro de WSL, nunca en el Python de Windows); o Docker (`docker pull semgrep/semgrep:1.178.0@sha256:32e459968daabe7ab86968184a29109b9564aa00392401156f9788452b42786b`). En el CI de GitHub es obligatorio |
 | Node.js LTS | Presentación y mermaid-cli | <https://nodejs.org> |
 | mermaid-cli | Diagramas en los Word | En una carpeta local con versión fija, ver [generadores](generadores.md) |
 | GitHub CLI (`gh`) | Remoto privado y revisión del CI | Ver "GitHub CLI (`gh`) y el CI" |
