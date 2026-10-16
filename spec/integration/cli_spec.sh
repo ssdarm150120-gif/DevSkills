@@ -201,6 +201,61 @@ Describe 'CLI devskills'
       The path "$CARPETA/demo/.git" should be directory
     End
 
+    It 'sin --correo avisa qué correo quedó en el primer commit y cómo cambiarlo antes de publicar'
+      When call devskills init "$CARPETA/demo" --nombre "Demo" --slug demo --puerto-base 19100
+      The status should be success
+      The output should include 'Aviso: el primer commit quedó con el correo'
+      The output should include "$(git config --global user.email)"
+      The output should include 'users.noreply.github.com'
+      The output should include 'git config user.email'
+      The output should include '--correo'
+    End
+
+    It 'con --sin-git no avisa de ningún correo'
+      When call devskills init "$CARPETA/demo" --nombre "Demo" --slug demo --puerto-base 19100 --sin-git
+      The status should be success
+      The output should not include 'Aviso:'
+    End
+
+    # Corre init con --correo y muestra con qué correo quedó el primer commit y el user.email local.
+    init_con_correo() {
+      devskills init "$CARPETA/demo" --nombre "Demo" --slug demo --puerto-base 19100 --correo "$1" || return 1
+      echo "commit: $(git -C "$CARPETA/demo" log -1 --format=%ae)"
+      echo "local: $(git -C "$CARPETA/demo" config --local user.email)"
+    }
+
+    It 'con --correo fija user.email local antes del primer commit y no avisa'
+      When call init_con_correo '12345+ana@users.noreply.github.com'
+      The status should be success
+      The output should include 'correo del autor (user.email local): 12345+ana@users.noreply.github.com'
+      The output should include 'commit: 12345+ana@users.noreply.github.com'
+      The output should include 'local: 12345+ana@users.noreply.github.com'
+      The output should not include 'Aviso:'
+    End
+
+    Describe 'rechaza un correo inválido sin crear nada'
+      Parameters
+        'sin-arroba' 'Correo inválido'
+        'ana@sin-punto' 'Correo inválido'
+        'ana @x.com' 'Correo inválido'
+        '-ana@x.com' 'Correo inválido'
+        'ana@x.com#' 'no puede llevar'
+      End
+      It "correo: $1"
+        When call devskills init "$CARPETA/demo" --nombre "Demo" --slug demo --puerto-base 19100 --correo "$1"
+        The status should be failure
+        The stderr should include "$2"
+        The path "$CARPETA/demo/codigo" should not be exist
+      End
+    End
+
+    It 'rechaza un correo con salto de línea'
+      When call devskills init "$CARPETA/demo" --nombre "Demo" --slug demo --puerto-base 19100 --correo "$(printf 'a@x.com\nb@x.com')"
+      The status should be failure
+      The stderr should include 'caracteres de control'
+      The path "$CARPETA/demo/codigo" should not be exist
+    End
+
     It 'sustituye los marcadores con los datos del proyecto'
       devskills init "$CARPETA/demo" --nombre "Sistema Demo" --slug demo --puerto-base 19100 --autor "Pruebas" >/dev/null
       The contents of file "$CARPETA/demo/documentacion/SRS.md" should include 'Sistema Demo'

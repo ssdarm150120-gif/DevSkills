@@ -58,6 +58,9 @@ Uso:
       --puerto-base <N>              Inicio del rango de 50 puertos del host (por defecto 20000)
       --puertos-reservados <lista>   Puertos del host que nunca se usan (por defecto 5432)
       --autor "<Autor>"              Autor de los documentos (por defecto, git config user.name)
+      --correo <correo>              user.email local del repo nuevo, antes del primer commit. Sin él se usa el
+                                     correo global de git (puede ser corporativo) y se avisa cuál quedó; en un
+                                     repo público conviene el noreply de GitHub (<id>+<usuario>@users.noreply.github.com)
       --idioma <código>              Idioma de la interfaz y de Django: es, en, es-mx, pt-br... (por defecto es)
       --zona <zona>                  Zona horaria con que se muestran las fechas: UTC o Area/Ciudad,
                                      por ejemplo America/Bogota (por defecto UTC; se guardan siempre en UTC)
@@ -79,7 +82,7 @@ slug_de() {
 }
 
 cmd_init() {
-  local ruta="" nombre="" slug="" puerto_base="20000" reservados="5432" autor="" sin_git="" idioma="es" zona="UTC"
+  local ruta="" nombre="" slug="" puerto_base="20000" reservados="5432" autor="" correo="" sin_git="" idioma="es" zona="UTC"
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --nombre) nombre="${2:-}"; shift 2 ;;
@@ -87,6 +90,7 @@ cmd_init() {
       --puerto-base) puerto_base="${2:-}"; shift 2 ;;
       --puertos-reservados) reservados="${2:-}"; shift 2 ;;
       --autor) autor="${2:-}"; shift 2 ;;
+      --correo) correo="${2:-}"; shift 2 ;;
       --idioma) idioma="${2:-}"; shift 2 ;;
       --zona) zona="${2:-}"; shift 2 ;;
       --sin-git) sin_git="--sin-git"; shift ;;
@@ -125,6 +129,7 @@ cmd_init() {
   fi
   local args=(--destino "$ruta" --nombre "$nombre" --slug "$slug" --puerto-base "$puerto_base"
               --puertos-reservados "$reservados" --autor "$autor" --idioma "$idioma" --zona "$zona")
+  [[ -n "$correo" ]] && args+=("--correo=$correo")
   [[ -n "$sin_git" ]] && args+=("$sin_git")
   # shellcheck disable=SC2086
   $python "$script" "${args[@]}"

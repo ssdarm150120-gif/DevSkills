@@ -1,7 +1,7 @@
 """Crea la carpeta de un proyecto nuevo a partir de las plantillas de DevSkills.
 
     python crear_proyecto.py --destino <ruta> --nombre "<Nombre>" --slug <slug> --puerto-base <N>
-        [--puertos-reservados 5432,...] [--autor "<Autor>"] [--idioma es] [--zona UTC] [--sin-git]
+        [--puertos-reservados 5432,...] [--autor "<Autor>"] [--correo <correo>] [--idioma es] [--zona UTC] [--sin-git]
 
 Qué hace:
 
@@ -11,7 +11,9 @@ Qué hace:
 2. Sustituye los marcadores `{{...}}` en todos los archivos de texto (ver `MARCADORES`).
 3. Fija el idioma y la zona horaria por defecto del proyecto en `codigo/configuracion/localizacion.py`
    (neutrales: `es` y `UTC`; el entorno los sobrescribe con `APP_IDIOMA` y `APP_ZONA_HORARIA`).
-4. Salvo con `--sin-git`: `git init -b main`, `git add -A` y un primer commit.
+4. Salvo con `--sin-git`: `git init -b main`, `git add -A` y un primer commit. Con `--correo` se fija
+   `user.email` local del repositorio nuevo antes de ese commit; sin él se usa el correo global de git y se
+   avisa cuál quedó, porque en un repositorio público el correo del autor queda visible en el historial.
 
 Reglas del host que valida: el proyecto recibe un rango propio de 50 puertos, `[N, N+49]`, que no
 puede incluir puertos privilegiados (menores a 1024), pasar de 65535 ni contener ninguno de los
@@ -54,6 +56,15 @@ MENSAJE_DEL_COMMIT = "chore: bootstrap project from devskills"
 # marcadores `{{...}}`), `#` (comentarios de YAML y `.env`) y el acento grave.
 CARACTERES_PROHIBIDOS = '"\\$#{}`'
 LARGO_MAXIMO_DEL_TEXTO = 100
+PATRON_CORREO = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
+AVISO_CORREO = (
+    "Aviso: el primer commit quedó con el correo {correo}, tomado de la configuración global de git.\n"
+    "  Si el repositorio será público, ese correo quedará visible en el historial. Usa el correo noreply de\n"
+    "  GitHub (<id>+<usuario>@users.noreply.github.com; lo ves en https://github.com/settings/emails) y\n"
+    "  cámbialo ANTES de publicar:\n"
+    "    git config user.email <noreply> && git commit --amend --reset-author --no-edit\n"
+    "  (el amend sirve mientras el bootstrap sea el único commit), o vuelve a correr init con --correo."
+)
 
 
 class ErrorDeCreacion(Exception):
@@ -95,6 +106,14 @@ def validar_texto(etiqueta: str, valor: str, *, obligatorio: bool) -> str:
                 f"El {etiqueta} no puede llevar {caracter!r}: se escribe sin escapar en archivos TOML, JSON, "
                 f"YAML y .env, y rompería alguno. Prohibidos: {' '.join(CARACTERES_PROHIBIDOS)}"
             )
+    return limpio
+
+
+def validar_correo(valor: str) -> str:
+    """El correo del autor para git (vacío si no se dio), o `ErrorDeCreacion` si no tiene forma de correo."""
+    limpio = validar_texto("correo", valor, obligatorio=False)
+    if limpio and (not PATRON_CORREO.fullmatch(limpio) or limpio.startswith("-")):
+        raise ErrorDeCreacion(f"Correo inválido: {limpio!r}. Usa la forma usuario@dominio.tld")
     return limpio
 
 
@@ -221,8 +240,11 @@ def copiar(origen: Path, destino: Path) -> int:
     return sum(1 for ruta in destino.rglob("*") if ruta.is_file())
 
 
-def iniciar_git(destino: Path) -> str:
-    """`git init -b main`, `git add -A` y el primer commit. Devuelve el hash corto."""
+def iniciar_git(destino: Path, correo: str = "") -> tuple[str, str]:
+    """`git init -b main`, `git add -A` y el primer commit.
+
+    Con `correo` fija `user.email` local antes del commit. Devuelve (hash corto, correo del autor del commit).
+    """
 
     def git(*argumentos: str) -> str:
         resultado = subprocess.run(  # noqa: S603
@@ -242,9 +264,11 @@ def iniciar_git(destino: Path) -> str:
     if shutil.which("git") is None:
         raise ErrorDeCreacion("No se encontró `git`; instálalo o usa --sin-git")
     git("init", "-b", "main")
+    if correo:
+        git("config", "user.email", correo)
     git("add", "-A")
     git("commit", "-m", MENSAJE_DEL_COMMIT)
-    return git("rev-parse", "--short", "HEAD")
+    return git("rev-parse", "--short", "HEAD"), git("log", "-1", "--format=%ae")
 
 
 def crear(
@@ -256,6 +280,7 @@ def crear(
     reservados: Sequence[int],
     autor: str,
     con_git: bool,
+    correo: str = "",
     plantillas: Path = PLANTILLAS,
     fecha: str | None = None,
     idioma: str = IDIOMA_PREDETERMINADO,
@@ -264,6 +289,7 @@ def crear(
     """Crea el proyecto y devuelve un resumen. Lanza `ErrorDeCreacion` si algo no es válido."""
     nombre = validar_texto("nombre del proyecto", nombre, obligatorio=True)
     autor = validar_texto("autor", autor, obligatorio=False)
+    correo = validar_correo(correo)
     validar_slug(slug)
     idioma = validar_idioma(idioma)
     zona = validar_zona(zona)
@@ -289,13 +315,15 @@ def crear(
     )
     sustituidos = sustituir_en(destino, valores)
     fijar_localizacion(destino, idioma, zona)
-    commit = iniciar_git(destino) if con_git else None
+    commit, correo_del_commit = iniciar_git(destino, correo) if con_git else (None, "")
     return {
         "destino": destino,
         "copiados": copiados,
         "sustituidos": sustituidos,
         "rango": rango,
         "commit": commit,
+        "correo": correo_del_commit,
+        "correo_explicito": bool(correo),
         "idioma": idioma,
         "zona": zona,
     }
@@ -328,6 +356,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument("--autor", default="", help="autor de los documentos")
     parser.add_argument(
+        "--correo",
+        default="",
+        help="correo del autor del primer commit (user.email local); sin él se usa el global de git",
+    )
+    parser.add_argument(
         "--idioma",
         default=IDIOMA_PREDETERMINADO,
         help="idioma de la interfaz y de Django (es, en, es-mx...); el entorno lo sobrescribe con APP_IDIOMA",
@@ -348,6 +381,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             puerto_base=args.puerto_base,
             reservados=leer_puertos(args.puertos_reservados),
             autor=args.autor,
+            correo=args.correo,
             con_git=not args.sin_git,
             idioma=args.idioma,
             zona=args.zona,
@@ -370,8 +404,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     print(f"  idioma: {resumen['idioma']}; zona horaria: {resumen['zona']}")
     if resumen["commit"]:
         print(f"  primer commit: {resumen['commit']} ({MENSAJE_DEL_COMMIT})")
+        if resumen["correo_explicito"]:
+            print(f"  correo del autor (user.email local): {resumen['correo']}")
+        else:
+            print(AVISO_CORREO.format(correo=resumen["correo"]))
     else:
         print("  sin repositorio de git (--sin-git)")
+        if args.correo:
+            print("  --correo se ignoró: sin repositorio no hay user.email que fijar")
     return 0
 
 
