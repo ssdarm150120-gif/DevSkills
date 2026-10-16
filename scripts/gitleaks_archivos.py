@@ -37,6 +37,12 @@ import sys
 import tempfile
 from pathlib import Path
 
+# En Windows la consola y las tuberías usan la página de códigos local (cp1252): sin esto los acentos
+# salen corruptos. La salida de DevSkills siempre es UTF-8.
+for _flujo in (sys.stdout, sys.stderr):
+    if hasattr(_flujo, "reconfigure"):
+        _flujo.reconfigure(encoding="utf-8")
+
 IMAGEN_PREDETERMINADA = "zricethezav/gitleaks:v8.21.2@sha256:0e99e8821643ea5b235718642b93bb32486af9c8162c8b8731f7cbdc951a7f46"
 COMO_INSTALAR = (
     "Instala gitleaks: Windows `winget install Gitleaks.Gitleaks`, macOS `brew install gitleaks`, "
@@ -151,6 +157,7 @@ def main() -> int:
             check=True,
             capture_output=True,
             text=True,
+            encoding="utf-8",
         ).stdout.strip()
     )
     rutas = archivos_del_repo(raiz)

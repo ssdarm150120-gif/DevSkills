@@ -13,6 +13,12 @@ import re
 import sys
 from pathlib import Path
 
+# En Windows la consola y las tuberías usan la página de códigos local (cp1252): sin esto los acentos
+# salen corruptos. La salida de DevSkills siempre es UTF-8.
+for _flujo in (sys.stdout, sys.stderr):
+    if hasattr(_flujo, "reconfigure"):
+        _flujo.reconfigure(encoding="utf-8")
+
 RAIZ = Path(__file__).resolve().parent.parent
 
 

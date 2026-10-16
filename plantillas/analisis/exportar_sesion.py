@@ -22,6 +22,12 @@ import pathlib
 import re
 import sys
 
+# En Windows la consola y las tuberías usan la página de códigos local (cp1252): sin esto los acentos
+# salen corruptos. La salida de DevSkills siempre es UTF-8.
+for _flujo in (sys.stdout, sys.stderr):
+    if hasattr(_flujo, "reconfigure"):
+        _flujo.reconfigure(encoding="utf-8")
+
 RECORDATORIO = re.compile(r"<system-reminder[^>]*>.*?</system-reminder[^>]*>", re.S)
 NOTIFICACION = re.compile(r"<task-notification>.*?</task-notification>", re.S)
 COMANDO_LOCAL = re.compile(r"<(local-command-[a-z]+|command-[a-z]+)>.*?</\1>", re.S)
