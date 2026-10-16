@@ -13,7 +13,9 @@
 # Vetado para subagentes:
 #   git push · git branch -D · gh que escribe (issue, pr, repo, release, workflow,
 #   secret, variable, run rerun/cancel/delete, api con método o campos de escritura,
-#   auth token/login) · docker push/login · prune de Docker.
+#   auth token/login) · docker push/login · prune de Docker · instalaciones de software
+#   (curl o wget a un shell, get-pip, pip --user o --break-system-packages, winget/brew/apt
+#   install, npm -g, pip/apt/curl dentro de wsl).
 #
 # Sin jq: la lectura del JSON es con grep, para no añadir dependencias.
 # Límite conocido: es una barrera de patrones, no un análisis completo del shell.
@@ -33,6 +35,11 @@ fi
 # Solo el campo "command" de la herramienta.
 comando="$(grep -oE '"command"[[:space:]]*:[[:space:]]*"([^"\\]|\\.)*"' <<<"$entrada" | head -n 1 || true)"
 [[ -z "$comando" ]] && exit 0
+
+vetar_instalacion() {
+  echo "DevSkills: bloqueado para subagentes (${1}). Ningún agente instala software: si falta una herramienta, detente e infórmalo en tu reporte (nombre y versión); el orquestador se lo pregunta al usuario." >&2
+  exit 2
+}
 
 vetar() {
   echo "DevSkills: bloqueado para subagentes (${1}). Publicar o destruir es decisión del usuario: deja el comando propuesto en tu reporte y el orquestador lo ejecuta solo con su confirmación explícita." >&2
@@ -54,5 +61,16 @@ grep -Eq "${inicio}gh[[:space:]]+api[[:space:]]" <<<"$comando" && \
 
 grep -Eq "${inicio}docker([[:space:]]+[^|;&]*)?[[:space:]](push|login)${fin}" <<<"$comando" && vetar "docker push/login"
 grep -Eq "${inicio}docker[[:space:]]+(system|volume|network|image|container|builder)[[:space:]]+prune${fin}" <<<"$comando" && vetar "docker prune"
+
+# Instalaciones de software: nadie instala nada sin que el usuario lo autorice (lo pregunta el orquestador).
+grep -Eq "${inicio}(curl|wget)[[:space:]][^;&]*\|[[:space:]]*(sudo[[:space:]]+)?(ba|z|da)?sh${fin}" <<<"$comando" && vetar_instalacion "curl o wget hacia un shell"
+grep -Eq "${inicio}(curl|wget)[[:space:]][^|;&]*get-pip" <<<"$comando" && vetar_instalacion "descarga de get-pip"
+grep -Eq "${inicio}python[0-9.]*[[:space:]]+[^|;&]*get-pip" <<<"$comando" && vetar_instalacion "get-pip"
+grep -Eq "${inicio}winget[[:space:]]+(install|upgrade)${fin}" <<<"$comando" && vetar_instalacion "winget install"
+grep -Eq "${inicio}brew[[:space:]]+(install|reinstall|upgrade|tap)${fin}" <<<"$comando" && vetar_instalacion "brew install"
+grep -Eq "${inicio}apt(-get)?[[:space:]]+([^|;&]*[[:space:]])?install${fin}" <<<"$comando" && vetar_instalacion "apt install"
+grep -Eq "${inicio}npm[[:space:]]+(i|install|add)[[:space:]]+([^|;&]*[[:space:]])?(-g|--global)${fin}" <<<"$comando" && vetar_instalacion "npm install -g"
+grep -Eq "${inicio}pip[0-9.]*[[:space:]]+install[[:space:]]+[^|;&]*(--user|--break-system-packages)" <<<"$comando" && vetar_instalacion "pip install fuera de un venv"
+grep -Eq "${inicio}wsl([[:space:]]+[^|;&]*)?[[:space:]](pip[0-9.]*|apt(-get)?|curl|wget|sudo)${fin}" <<<"$comando" && vetar_instalacion "instalación dentro de WSL"
 
 exit 0
