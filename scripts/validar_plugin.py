@@ -82,6 +82,30 @@ def main() -> int:
             if any(patron in linea for patron in amplios) and "No uses" not in linea:
                 raise SystemExit(f"permiso demasiado amplio recomendado en {archivo.relative_to(RAIZ)}:{numero}")
 
+    # Los subagentes no tienen las herramientas MCP de engram (no llegan a los agentes del plugin): ninguno
+    # que no sea el orquestador llama `mem_save`; todos terminan su reporte con la sección "Para engram".
+    for nombre in sorted(agentes - {"orquestador"}):
+        texto = (RAIZ / "agents" / f"{nombre}.md").read_text(encoding="utf-8")
+        if "mem_save" in texto:
+            raise SystemExit(f"el agente {nombre} menciona mem_save: solo el orquestador guarda en engram")
+        if "Para engram" not in texto:
+            raise SystemExit(f"el agente {nombre} no pide la sección 'Para engram' al final de su reporte")
+        if "No instalas software" not in texto:
+            raise SystemExit(f"el agente {nombre} no prohíbe instalar software")
+    orquestador = (RAIZ / "agents" / "orquestador.md").read_text(encoding="utf-8")
+    if "mem_save" not in orquestador or ".devskills/engram_pendiente.md" not in orquestador:
+        raise SystemExit("el orquestador debe guardar con mem_save o dejar .devskills/engram_pendiente.md")
+
+    # El borrador de lecciones vive en una carpeta ignorada, nunca en documentacion/avance (el punto de control la añadiría).
+    for archivo in [*RAIZ.glob("agents/*.md"), *RAIZ.glob("skills/**/*.md")]:
+        if "lecciones_devskills" in archivo.read_text(encoding="utf-8"):
+            raise SystemExit(f"{archivo.relative_to(RAIZ)} usa el borrador de lecciones fuera de .devskills/")
+    if ".devskills/" not in (RAIZ / "plantillas/raiz/.gitignore").read_text(encoding="utf-8").splitlines():
+        raise SystemExit("plantillas/raiz/.gitignore no ignora .devskills/")
+    claude_md = (RAIZ / "plantillas/raiz/CLAUDE.md").read_text(encoding="utf-8")
+    if not claude_md.startswith("@AGENTS.md" + chr(10)) or "prevalece sobre el estilo personal del usuario" not in claude_md:
+        raise SystemExit("plantillas/raiz/CLAUDE.md debe importar @AGENTS.md y fijar que el idioma del proyecto prevalece")
+
     print(f"plugin {plugin['version']}: {len(agentes)} agentes, {len(skills)} skills, referencias correctas")
     return 0
 

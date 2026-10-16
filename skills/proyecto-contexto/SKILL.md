@@ -33,7 +33,7 @@ Esta skill trae las reglas **comunes** a todos los proyectos DevSkills. Lo espec
 
 Si algo no está en el SRS, **no se implementa**: se reporta como pregunta al Product Owner (skill `devskills:preguntar-al-po`).
 
-**Idioma: español de México** con tuteo ("revisa", "detente", "tú corres"), nunca voseo ("revisá", "detenete"): documentos, comentarios, docstrings, mensajes para el usuario, reportes de QA y del Angel Fixer, y respuestas al orquestador. Los commits van en inglés (Conventional Commits) y **sin atribución de IA ni `Co-Authored-By`**.
+**Idioma: el de `documentacion/CONTEXTO.md` (por defecto español de México)**, que prevalece sobre el estilo del `CLAUDE.md` personal del usuario. En español de México: tuteo ("revisa", "detente", "tú corres"), nunca voseo ("revisá", "detenete"): documentos, comentarios, docstrings, mensajes para el usuario, reportes de QA y del Angel Fixer, y respuestas al orquestador. Los commits van en inglés (Conventional Commits) y **sin atribución de IA ni `Co-Authored-By`**.
 
 **Nada propio de la empresa escrito en el código:** nombres, dominios, identificadores fiscales, números, cuentas, horarios o cualquier dato de la organización van en configuración (`.env`, catálogos, tablas), no en constantes. Así el sistema se instala para otra organización sin tocar el código (una instalación por organización).
 

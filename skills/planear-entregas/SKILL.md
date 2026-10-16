@@ -55,6 +55,7 @@ metadata:
 
 ### 3. Entregas
 - **Entrega 0, Cimientos:** sin esto nada funciona. Aquí van la adaptación del esqueleto de DevSkills al proyecto (módulos, contratos, CI, Compose), los adaptadores falsos de las integraciones, la identidad y lo que el diseño pide como base.
+- **Cierre de cada entrega:** además de que todos sus elementos estén `Listo`, se exige correr localmente con Docker lo que solo cubre el CI (imagen, hadolint, trivy, pruebas de despliegue); sin Docker se le pide al usuario y queda como verificación pendiente (ver "Cierre de entrega" en `devskills:ciclo-historia`). Sin remoto, el reporte marca "CI no ejecutado (sin remoto)".
 - Cada entrega siguiente tiene un **objetivo medible** ligado a las metas del SRS 1.1.1 y busca **el camino más corto al valor**: si una entrega pasa muchos sprints sin valor para el negocio, se divide.
 - Escribe en P.2.1 por qué van en ese orden, y en P.3 cómo se mide cada una.
 

@@ -49,5 +49,9 @@
 
 **Tareas de personas (no del código):** {…}
 
+**CI:** {ejecutado (enlace o número de corrida) / **CI no ejecutado (sin remoto)**}
+
+**Verificación pendiente (solo la cubre el CI o Docker):** {Ninguna / semgrep, hadolint, trivy, imagen, pruebas de despliegue}
+
 ## 6. Preguntas abiertas para el Product Owner
 - {Ninguna / lista}

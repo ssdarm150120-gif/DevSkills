@@ -77,7 +77,7 @@ Delegar en el subagente que corresponda; si la historia cruza capas, empezar por
 1. **No hacer commit:** el orquestador hace los puntos de control (`devskills:ciclo-historia`).
 2. Marcar `En validación` en `documentacion/avance/estado_backlog.json`.
 3. Devolver al orquestador: archivos tocados, pruebas agregadas (y cuántas en total pasan), decisiones tomadas (para que el orquestador las registre como suyas o las lleve al Product Owner), texto para `.env.ejemplo` si hace falta, y dudas abiertas.
-4. Guardar en engram (`mem_save`, project de `CONTEXTO.md`) cualquier decisión o hallazgo no obvio.
+4. Terminar el reporte con la sección **Para engram** (título, tipo y contenido de cada decisión o hallazgo no obvio, o "nada que guardar"); no tienes `mem_save`, el orquestador la guarda.
 
 ## Code Examples
 

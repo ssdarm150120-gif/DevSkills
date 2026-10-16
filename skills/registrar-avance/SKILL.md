@@ -40,7 +40,8 @@ La única excepción es una **decisión explícita del Product Owner** de cerrar
    Estados válidos: `En proceso`, `En validación`, `Listo`, `Bloqueado`.
 2. **Regenerar el plan y el tablero:** `python documentacion/analisis/plan_sprints.py` desde la raíz del proyecto. El script **tacha** los elementos Listo en `documentacion/PLAN.md`, actualiza los porcentajes por entrega y regenera el tablero `documentacion/plan_sprints.html`. **Nunca editar `documentacion/PLAN.md` a mano.** Comprueba que quedó tachado.
 3. Agregar una línea al índice `documentacion/avance/README.md` (fecha, ID, sprint, veredicto de QA con rondas, resultado del Angel Fixer, estado, enlace al reporte).
-4. Guardar en engram (`mem_save`, project de `CONTEXTO.md`, topic_key `<project>/avance/<ID>`) el resultado y los hallazgos no obvios.
+4. Guardar en engram (el orquestador, con `mem_save`; project de `CONTEXTO.md`, topic_key `<project>/avance/<ID>`) el resultado y los hallazgos no obvios.
+5. **CI sin remoto:** si `git remote` no lista ninguno, el reporte marca **"CI no ejecutado (sin remoto)"** y enumera como **verificación pendiente** lo que solo cubre el CI (semgrep sin vía local, hadolint, trivy, construcción de la imagen, pruebas de despliegue). Al cerrar una entrega, esa lista exige correr las pruebas localmente con Docker (ver "Cierre de entrega" en `devskills:ciclo-historia`).
 
 ## Commands
 
