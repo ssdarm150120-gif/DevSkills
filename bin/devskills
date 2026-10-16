@@ -70,6 +70,12 @@ Uso:
   devskills version                  Muestra la versión
   devskills update [--si]            Muestra los cambios del clon de origen, pide confirmación y reinstala
                                      (--si confirma sin preguntar; sin terminal es obligatorio)
+  devskills sync-scripts [ruta] [--si]
+                                     Actualiza los scripts .py de documentacion/analisis/ de un proyecto creado antes
+                                     con los de la plantilla actual: muestra la lista y el diff --stat, pide
+                                     confirmación (--si sin terminal) y copia solo esos scripts. No toca codigo/, ni
+                                     documentacion/*.md, ni los JSON de datos; si la plantilla HTML del proyecto
+                                     difiere de la de DevSkills, la compara y avisa, pero no la copia
   devskills help                     Muestra esta ayuda
 
 Dentro de Claude Code, el mismo arranque se hace con /devskills:nuevo-proyecto.
@@ -165,8 +171,29 @@ revisar_opcional() {
   return 1
 }
 
+# Versión de semgrep que fija el CI de la plantilla (semgrep==X.Y.Z); 1.178.0 si no se puede leer.
+version_semgrep() {
+  local version
+  version="$(sed -n 's/.*semgrep==\([0-9][0-9.]*\).*/\1/p' "$DEVSKILLS_HOME/plantillas/raiz/.github/workflows/ci.yml" 2>/dev/null | head -n 1)"
+  echo "${version:-1.178.0}"
+}
+
 hay_semgrep() {
-  command -v semgrep || semgrep --version || (command -v wsl && wsl semgrep --version) || docker image inspect semgrep/semgrep:1.178.0@sha256:32e459968daabe7ab86968184a29109b9564aa00392401156f9788452b42786b
+  # shellcheck disable=SC2016  # el $HOME de wsl sh -c debe expandirse dentro de WSL, no aquí
+  command -v semgrep || semgrep --version || test -x "$HOME/semgrep/bin/semgrep" \
+    || (command -v wsl && wsl sh -c '"$HOME/semgrep/bin/semgrep" --version') || (command -v wsl && wsl semgrep --version) \
+    || docker image inspect semgrep/semgrep:1.178.0@sha256:32e459968daabe7ab86968184a29109b9564aa00392401156f9788452b42786b
+}
+
+# Cómo instalar semgrep según el sistema. Lo instala la persona: ningún agente instala software.
+como_instalar_semgrep() {
+  local version
+  version="$(version_semgrep)"
+  case "$(detectar_so)" in
+    windows) echo "En Windows corre dentro de WSL, en un venv (no en el Python de Windows): abre 'wsl' y ahí 'python3 -m venv ~/semgrep && ~/semgrep/bin/pip install semgrep==${version}'; se usa como '~/semgrep/bin/semgrep'. O con Docker (imagen fijada en docs/stack.md)." ;;
+    macos) echo "En macOS: 'pipx install semgrep==${version}' (o 'python3 -m venv ~/semgrep && ~/semgrep/bin/pip install semgrep==${version}')." ;;
+    *) echo "En Linux: 'python3 -m venv ~/semgrep && ~/semgrep/bin/pip install semgrep==${version}' (o 'pipx install semgrep==${version}')." ;;
+  esac
 }
 
 hay_mmdc() {
@@ -203,7 +230,7 @@ cmd_doctor() {
   # Docker NO es requisito: se desarrolla y se prueba con PostgreSQL embebido y Celery local.
   revisar_opcional "Docker (cliente)" "Sin él no puedes levantar el stack con Compose ni construir la imagen en tu máquina; se sigue desarrollando y probando sin Docker. Para desplegar: Docker Desktop (Windows/macOS) o Docker Engine (Linux)." docker --version || opcionales=$((opcionales + 1))
   revisar_opcional "Docker (servicio en marcha)" "Sin el servicio, se omiten solas las pruebas de Compose y del certificado (corren en el CI). Arranca Docker Desktop o el servicio solo si necesitas el stack completo." docker info || opcionales=$((opcionales + 1))
-  revisar_opcional "semgrep (análisis estático local)" "Sin él no corres semgrep en tu máquina; el CI de GitHub lo corre siempre y es obligatorio ahí. Nativo en macOS/Linux ('pipx install semgrep==1.178.0'); en Windows, por WSL o Docker." hay_semgrep || opcionales=$((opcionales + 1))
+  revisar_opcional "semgrep (análisis estático local)" "Sin él no corres semgrep en tu máquina; el CI de GitHub lo corre siempre y es obligatorio ahí. $(como_instalar_semgrep) Instálalo tú: los agentes del equipo no instalan software y se detienen si falta." hay_semgrep || opcionales=$((opcionales + 1))
   revisar_opcional "Node.js (presentación y mermaid-cli)" "Sin él no generas la presentación ni los diagramas de los Word. Instala Node LTS: https://nodejs.org (o 'winget install OpenJS.NodeJS.LTS')." node --version || opcionales=$((opcionales + 1))
   revisar_opcional "mermaid-cli (diagramas de los Word)" \
     "Sin él los diagramas de los Word quedan como bloque de código. Instálalo en una carpeta local: 'npm install --save-exact --prefix ~/.devskills/doc @mermaid-js/mermaid-cli@12.0.0' y úsalo con 'md_a_word.py --mermaid ~/.devskills/doc' (ver docs/generadores.md)." hay_mmdc || opcionales=$((opcionales + 1))
@@ -286,6 +313,144 @@ cmd_update() {
   bash "$origen/install.sh" --si
 }
 
+# Valor de un marcador de plantilla leído de documentacion/CONTEXTO.md del proyecto (vacío si no se puede).
+valor_de_marcador() {
+  local contexto="$1" marcador="$2" valor=""
+  # shellcheck disable=SC2016  # los acentos graves de las expresiones de sed son literales de Markdown
+  case "$marcador" in
+    NOMBRE_PROYECTO) valor="$(sed -n '1s/^# Contexto del proyecto: *//p' "$contexto" | tr -d '\r')" ;;
+    SLUG | SLUG_GUION_BAJO)
+      valor="$(sed -n 's/^| Slug (carpetas, Docker, engram) | `\(.*\)` |.*$/\1/p' "$contexto" | head -n 1 | tr -d '\r')"
+      [[ "$marcador" == "SLUG_GUION_BAJO" ]] && valor="${valor//-/_}"
+      ;;
+    PUERTO_BASE) valor="$(sed -n 's/^| Rango de puertos del host | `\([0-9][0-9]*\)` a.*$/\1/p' "$contexto" | head -n 1 | tr -d '\r')" ;;
+  esac
+  echo "$valor"
+}
+
+# Escribe en $3 la plantilla $1 con los marcadores {{...}} sustituidos con los datos del proyecto ($2 = CONTEXTO.md).
+# Si algún marcador no se puede resolver, imprime cuál y devuelve 1.
+resolver_plantilla() {
+  local origen="$1" contexto="$2" salida="$3" texto marcador nombre valor
+  shopt -u patsub_replacement 2>/dev/null || true # bash 5.2: "&" en el reemplazo no debe expandirse
+  texto="$(cat "$origen"; printf x)"
+  texto="${texto%x}"
+  while IFS= read -r marcador; do
+    [[ -z "$marcador" ]] && continue
+    nombre="${marcador#'{{'}"
+    nombre="${nombre%'}}'}"
+    valor="$(valor_de_marcador "$contexto" "$nombre")"
+    if [[ -z "$valor" ]]; then
+      echo "$marcador"
+      return 1
+    fi
+    texto="${texto//"$marcador"/$valor}"
+  done < <(grep -oE '\{\{[A-Z_]+\}\}' "$origen" | sort -u || true)
+  printf '%s' "$texto" >"$salida"
+}
+
+cmd_sync_scripts() {
+  local si=false ruta=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --si|-y) si=true; shift ;;
+      -h|--help) mostrar_ayuda; return 0 ;;
+      -*) error "Opción desconocida: $1"; return 2 ;;
+      *) if [[ -z "$ruta" ]]; then ruta="$1"; shift; else error "Argumento de más: $1"; return 2; fi ;;
+    esac
+  done
+  [[ -z "$ruta" ]] && ruta="."
+  local analisis="$ruta/documentacion/analisis" contexto="$ruta/documentacion/CONTEXTO.md"
+  if [[ ! -f "$contexto" || ! -d "$analisis" ]]; then
+    error "$ruta no es un proyecto DevSkills (falta documentacion/CONTEXTO.md o documentacion/analisis/). No cambié nada."
+    return 1
+  fi
+  local origen="$DEVSKILLS_HOME/plantillas/analisis"
+  if [[ ! -d "$origen" ]]; then
+    error "No encuentro las plantillas en $origen; reinstala DevSkills."
+    return 1
+  fi
+
+  local tmp
+  tmp="$(mktemp -d)"
+  local nuevos="" cambiados="" omitidos="" archivo nombre sin_resolver
+  for archivo in "$origen"/*.py; do
+    [[ -f "$archivo" ]] || continue
+    nombre="$(basename "$archivo")"
+    if grep -qE '\{\{[A-Z_]+\}\}' "$archivo"; then
+      if ! sin_resolver="$(resolver_plantilla "$archivo" "$contexto" "$tmp/$nombre")"; then
+        omitidos="${omitidos}${nombre} (marcador ${sin_resolver} que no se puede resolver desde CONTEXTO.md)"$'\n'
+        continue
+      fi
+    else
+      cp "$archivo" "$tmp/$nombre"
+    fi
+    if [[ ! -f "$analisis/$nombre" ]]; then
+      nuevos="${nuevos}${nombre}"$'\n'
+    elif ! cmp -s "$tmp/$nombre" "$analisis/$nombre"; then
+      cambiados="${cambiados}${nombre}"$'\n'
+    fi
+  done
+
+  local html="plan_sprints_plantilla.html"
+  if [[ -f "$analisis/$html" ]] && ! cmp -s "$origen/$html" "$analisis/$html"; then
+    aviso "La plantilla HTML del tablero ($html) difiere de la de DevSkills: no la toco (puede ser una personalización tuya). Compárala y decide:"
+    echo "  git diff --no-index \"$analisis/$html\" \"$origen/$html\""
+  elif [[ ! -f "$analisis/$html" ]]; then
+    aviso "El proyecto no tiene $html; cópiala a mano de $origen si quieres el tablero."
+  fi
+  if [[ -n "$omitidos" ]]; then
+    aviso "Scripts omitidos (compáralos a mano):"
+    printf '  %s' "$omitidos"
+  fi
+
+  if [[ -z "$nuevos$cambiados" ]]; then
+    ok "Los scripts de documentacion/analisis ya están al día; no cambié nada."
+    rm -rf "$tmp"
+    return 0
+  fi
+
+  echo -e "${NEGRITA}Scripts de documentacion/analisis que cambiarían:${NC}"
+  while IFS= read -r nombre; do
+    [[ -z "$nombre" ]] && continue
+    echo "  nuevo     $nombre"
+  done <<<"$nuevos"
+  while IFS= read -r nombre; do
+    [[ -z "$nombre" ]] && continue
+    echo "  cambiado  $nombre"
+  done <<<"$cambiados"
+  echo ""
+  while IFS= read -r nombre; do
+    [[ -z "$nombre" ]] && continue
+    git diff --no-index --stat -- "$analisis/$nombre" "$tmp/$nombre" || true
+  done <<<"$cambiados"
+  echo ""
+  aviso "Solo se copian estos scripts: no se toca codigo/, ni documentacion/*.md, ni los JSON de datos."
+
+  if [[ "$si" != true ]]; then
+    if [[ -t 0 ]]; then
+      local respuesta
+      read -r -p "¿Copiar estos scripts al proyecto? (s/N): " respuesta
+      if [[ "$respuesta" != "s" && "$respuesta" != "S" ]]; then
+        echo "Cancelado; no cambié nada."
+        rm -rf "$tmp"
+        return 0
+      fi
+    else
+      error "Sin terminal no se copia nada. Revisa los cambios y repite con --si: devskills sync-scripts --si"
+      rm -rf "$tmp"
+      return 1
+    fi
+  fi
+  while IFS= read -r nombre; do
+    [[ -z "$nombre" ]] && continue
+    cp "$tmp/$nombre" "$analisis/$nombre"
+    ok "Copiado $nombre"
+  done <<<"$nuevos$cambiados"
+  rm -rf "$tmp"
+  echo "Revisa el resultado con 'git diff' y haz el commit tú o pídeselo al orquestador."
+}
+
 main() {
   local comando="${1:-help}"
   [[ $# -gt 0 ]] && shift
@@ -294,6 +459,7 @@ main() {
     doctor) cmd_doctor "$@" ;;
     version|--version|-v) echo "devskills $VERSION" ;;
     update) cmd_update "$@" ;;
+    sync-scripts) cmd_sync_scripts "$@" ;;
     help|--help|-h) mostrar_ayuda ;;
     *) error "Comando desconocido: $comando"; mostrar_ayuda; return 2 ;;
   esac

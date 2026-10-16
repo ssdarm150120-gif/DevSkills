@@ -77,6 +77,30 @@ Describe 'CLI devskills'
       End
     End
 
+    Describe 'doctor explica cómo instalar semgrep sin que lo instale un agente'
+      setup_sin_semgrep() {
+        FALSOS="$(mktemp -d)"
+        CASA_SIN="$(mktemp -d)"
+        printf '%s\n' '#!/usr/bin/env bash' 'exit 1' >"$FALSOS/docker"
+        printf '%s\n' '#!/usr/bin/env bash' 'exit 1' >"$FALSOS/wsl"
+        chmod +x "$FALSOS/docker" "$FALSOS/wsl"
+      }
+      cleanup_sin_semgrep() { rm -rf "$FALSOS" "$CASA_SIN"; }
+      BeforeEach 'setup_sin_semgrep'
+      AfterEach 'cleanup_sin_semgrep'
+
+      doctor_sin_semgrep() { HOME="$CASA_SIN" PATH="$FALSOS:$PATH" bash "$PROJECT_ROOT/bin/devskills" doctor; }
+
+      It 'da el comando con la versión del CI de la plantilla y avisa que los agentes no instalan'
+        When call doctor_sin_semgrep
+        The status should be success
+        The output should include 'semgrep (análisis estático local) (opcional)'
+        The output should include "semgrep==$(sed -n 's/.*semgrep==\([0-9][0-9.]*\).*/\1/p' "$PROJECT_ROOT/plantillas/raiz/.github/workflows/ci.yml" | head -n 1)"
+        The output should include 'python3 -m venv ~/semgrep'
+        The output should include 'los agentes del equipo no instalan software'
+      End
+    End
+
     Describe 'doctor y mermaid-cli en la carpeta fija ~/.devskills/doc'
       setup_mmdc() {
         CASA_FALSA="$(mktemp -d)"
@@ -160,6 +184,125 @@ Describe 'CLI devskills'
       When call actualizar --otra
       The status should eq 2
       The stderr should include 'Opción desconocida'
+    End
+  End
+
+  Describe 'sync-scripts'
+    setup_sync() {
+      CARPETA="$(mktemp -d)"
+      export CARPETA
+      bash "$PROJECT_ROOT/bin/devskills" init "$CARPETA/demo" --nombre "Demo" --slug demo --puerto-base 19100 --sin-git >/dev/null 2>&1
+      ANALISIS="$CARPETA/demo/documentacion/analisis"
+      export ANALISIS
+    }
+    cleanup_sync() {
+      cd / || true
+      rm -rf "$CARPETA"
+    }
+    BeforeEach 'setup_sync'
+    AfterEach 'cleanup_sync'
+
+    sincronizar() { bash "$PROJECT_ROOT/bin/devskills" sync-scripts "$@" </dev/null; }
+    # Plantillas falsas (con marcadores) para probar la sustitución sin tocar las reales.
+    sincronizar_falso() {
+      DEVSKILLS_HOME="$CARPETA/falso" bash "$PROJECT_ROOT/bin/devskills" sync-scripts "$@" </dev/null
+    }
+    preparar_falso() {
+      mkdir -p "$CARPETA/falso/plantillas/analisis"
+      printf '%s\n' 'SLUG = "{{SLUG}}"' 'NOMBRE = "{{NOMBRE_PROYECTO}}"' >"$CARPETA/falso/plantillas/analisis/con_marcador.py"
+      printf '%s\n' 'FECHA = "{{FECHA}}"' >"$CARPETA/falso/plantillas/analisis/con_fecha.py"
+      printf '%s\n' '<html>plantilla</html>' >"$CARPETA/falso/plantillas/analisis/plan_sprints_plantilla.html"
+      printf '%s\n' 'SLUG = "demo"' 'NOMBRE = "Demo"' >"$ANALISIS/con_marcador.py"
+      printf '%s\n' '<html>plantilla</html>' >"$ANALISIS/plan_sprints_plantilla.html"
+    }
+
+    It 'sin cambios dice que los scripts están al día y no copia nada'
+      When call sincronizar "$CARPETA/demo"
+      The status should be success
+      The output should include 'ya están al día'
+    End
+
+    It 'con cambios pero sin --si (y sin terminal) lista, muestra el diff --stat y no copia'
+      echo '# cambio local' >>"$ANALISIS/plan_sprints.py"
+      rm "$ANALISIS/porcentaje.py"
+      When call sincronizar "$CARPETA/demo"
+      The status should be failure
+      The output should include 'cambiado  plan_sprints.py'
+      The output should include 'nuevo     porcentaje.py'
+      The output should include '1 file changed'
+      The stderr should include '--si'
+      The contents of file "$ANALISIS/plan_sprints.py" should include '# cambio local'
+      The path "$ANALISIS/porcentaje.py" should not be exist
+    End
+
+    It 'con --si copia solo los scripts y no toca codigo/, los .md ni los JSON'
+      echo '# cambio local' >>"$ANALISIS/plan_sprints.py"
+      rm "$ANALISIS/porcentaje.py"
+      echo 'versión del proyecto' >>"$CARPETA/demo/documentacion/SRS.md"
+      echo '{"propio": true}' >"$ANALISIS/plan_entregas.json"
+      echo '# propio' >>"$CARPETA/demo/codigo/manage.py"
+      When call sincronizar "$CARPETA/demo" --si
+      The status should be success
+      The output should include 'Copiado plan_sprints.py'
+      The output should include 'Copiado porcentaje.py'
+      The contents of file "$ANALISIS/plan_sprints.py" should not include '# cambio local'
+      The path "$ANALISIS/porcentaje.py" should be file
+      The contents of file "$CARPETA/demo/documentacion/SRS.md" should include 'versión del proyecto'
+      The contents of file "$ANALISIS/plan_entregas.json" should eq '{"propio": true}'
+      The contents of file "$CARPETA/demo/codigo/manage.py" should include '# propio'
+    End
+
+    It 'no copia la plantilla HTML personalizada: la compara y avisa'
+      echo '<!-- mi tablero -->' >>"$ANALISIS/plan_sprints_plantilla.html"
+      When call sincronizar "$CARPETA/demo"
+      The status should be success
+      The output should include 'plan_sprints_plantilla.html'
+      The output should include 'difiere'
+      The output should include 'git diff --no-index'
+      The contents of file "$ANALISIS/plan_sprints_plantilla.html" should include '<!-- mi tablero -->'
+    End
+
+    It 'sin ruta usa la carpeta actual'
+      sincronizar_aqui() { (cd "$CARPETA/demo" && bash "$PROJECT_ROOT/bin/devskills" sync-scripts </dev/null); }
+      When call sincronizar_aqui
+      The status should be success
+      The output should include 'ya están al día'
+    End
+
+    It 'una ruta que no es un proyecto DevSkills falla sin tocar nada'
+      mkdir -p "$CARPETA/otro/documentacion/analisis"
+      echo 'x = 1' >"$CARPETA/otro/documentacion/analisis/plan_sprints.py"
+      When call sincronizar "$CARPETA/otro" --si
+      The status should be failure
+      The stderr should include 'no es un proyecto DevSkills'
+      The contents of file "$CARPETA/otro/documentacion/analisis/plan_sprints.py" should eq 'x = 1'
+    End
+
+    It 'rechaza una opción desconocida'
+      When call sincronizar --otra
+      The status should eq 2
+      The stderr should include 'Opción desconocida'
+    End
+
+    It 'sustituye los marcadores con los datos del proyecto antes de comparar'
+      preparar_falso
+      When call sincronizar_falso "$CARPETA/demo"
+      The status should be success
+      The output should not include 'cambiado'
+      The output should include 'Scripts omitidos'
+      The output should include '{{FECHA}}'
+      The output should include 'ya están al día'
+    End
+
+    It 'un script con marcadores que cambió se copia ya sustituido, y el que no se puede resolver se omite'
+      preparar_falso
+      printf '%s\n' 'SLUG = "otro"' 'NOMBRE = "Demo"' >"$ANALISIS/con_marcador.py"
+      When call sincronizar_falso "$CARPETA/demo" --si
+      The status should be success
+      The output should include 'Copiado con_marcador.py'
+      The output should include 'con_fecha.py'
+      The contents of file "$ANALISIS/con_marcador.py" should include 'SLUG = "demo"'
+      The path "$ANALISIS/con_fecha.py" should not be exist
     End
   End
 
@@ -358,6 +501,51 @@ print('ok')
 " "$CARPETA/demo"
       }
       The value "$(valida 2>&1)" should eq 'ok'
+    End
+
+    It 'crea CLAUDE.md que importa AGENTS.md y fija el idioma del proyecto desde --idioma'
+      When call devskills init "$CARPETA/demo" --nombre "Demo" --slug demo --puerto-base 19100 --sin-git
+      The status should be success
+      The output should include 'Siguientes pasos'
+      The contents of file "$CARPETA/demo/CLAUDE.md" should start with '@AGENTS.md'
+      The contents of file "$CARPETA/demo/CLAUDE.md" should include 'prevalece sobre el estilo personal del usuario'
+      The contents of file "$CARPETA/demo/CLAUDE.md" should include 'Español de México con tuteo'
+      The contents of file "$CARPETA/demo/documentacion/CONTEXTO.md" should include 'Español de México con tuteo (código `es`'
+    End
+
+    It 'el idioma de CLAUDE.md, de AGENTS.md y de CONTEXTO.md sale de --idioma'
+      When call devskills init "$CARPETA/demo" --nombre "Demo" --slug demo --puerto-base 19100 --sin-git --idioma en
+      The status should be success
+      The output should include 'idioma: en'
+      The contents of file "$CARPETA/demo/CLAUDE.md" should include 'English; código `en`'
+      The contents of file "$CARPETA/demo/AGENTS.md" should include 'English'
+      The contents of file "$CARPETA/demo/documentacion/CONTEXTO.md" should include 'English (código `en`'
+    End
+
+    It 'un archivo en .devskills/ no aparece en git status ni entra con el comando del punto de control'
+      punto_de_control() {
+        devskills init "$CARPETA/demo" --nombre "Demo" --slug demo --puerto-base 19100 --correo 'ana@example.invalid' >/dev/null
+        mkdir -p "$CARPETA/demo/.devskills"
+        echo 'borrador' >"$CARPETA/demo/.devskills/lecciones.md"
+        echo 'pendiente' >"$CARPETA/demo/.devskills/engram_pendiente.md"
+        echo "estado=[$(git -C "$CARPETA/demo" status --porcelain)]"
+        echo "ignorado=$(git -C "$CARPETA/demo" check-ignore .devskills/lecciones.md)"
+        echo 'reporte' >"$CARPETA/demo/documentacion/avance/reporte.md"
+        git -C "$CARPETA/demo" add -A -- codigo .github documentacion/avance
+        echo "preparado=[$(git -C "$CARPETA/demo" diff --cached --name-only)]"
+      }
+      When call punto_de_control
+      The status should be success
+      The line 1 of output should eq 'estado=[]'
+      The line 2 of output should eq 'ignorado=.devskills/lecciones.md'
+      The line 3 of output should eq 'preparado=[documentacion/avance/reporte.md]'
+    End
+
+    It 'el .gitignore del proyecto lista .devskills/'
+      When call devskills init "$CARPETA/demo" --nombre "Demo" --slug demo --puerto-base 19100 --sin-git
+      The status should be success
+      The output should include 'Proyecto creado'
+      The contents of file "$CARPETA/demo/.gitignore" should include '.devskills/'
     End
 
     It 'rechaza un rango de puertos que incluye uno reservado'
