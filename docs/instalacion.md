@@ -185,6 +185,16 @@ En la prueba real, una historia **pequeña** costó **unos 17 USD** con el model
 
 El plugin engram puede fallar en las sesiones anidadas (la de `claude -p` lanzada desde otra sesión) si falta `jq`: sus hooks lo usan para leer el evento. Instálalo (`winget install jqlang.jq`, `brew install jq`, `apt install jq`) o deshabilita engram en esa corrida; el ciclo sigue funcionando sin memoria, pero no se guardará el avance en engram.
 
+## Correo del autor en el primer commit
+
+`devskills init` hace el primer commit con el `user.email` de tu git, que puede ser el corporativo. En un repositorio público ese correo queda en el historial. Para evitarlo:
+
+```bash
+devskills init ~/proyectos/mi-sistema --nombre "Mi sistema" --correo 12345+usuario@users.noreply.github.com
+```
+
+`--correo` fija `user.email` **solo en el repositorio nuevo** (no toca tu configuración global) antes del primer commit. Sin `--correo`, `init` imprime un aviso con el correo que usó. Tu noreply está en <https://github.com/settings/emails> (`<id>+<usuario>@users.noreply.github.com`). Si ya hiciste el commit con otro correo y aún no publicas: `git config user.email <noreply> && git commit --amend --reset-author --no-edit` (solo mientras el bootstrap sea el único commit).
+
 ## GitHub CLI (`gh`) y el CI
 
 Un proyecto creado con DevSkills trae su CI en `.github/workflows/`, pero **solo corre cuando el repositorio tiene remoto** en GitHub. Crea el remoto privado desde el inicio y revisa el CI después de cada push, con `gh`. **Los agentes no suben nada por su cuenta:** proponen el comando y esperas tu "sí"; lo que sigue lo ejecutas tú (o lo apruebas cuando te lo propongan):

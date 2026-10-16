@@ -200,7 +200,9 @@ cd ~/proyectos/mi-sistema && claude                # abre Claude Code en el proy
 | `devskills version` | Muestra la versión |
 | `devskills help` | Muestra la ayuda |
 
-Opciones de `init`: `--nombre`, `--slug`, `--puerto-base`, `--puertos-reservados`, `--autor`, `--sin-git`. El nombre y el autor no admiten saltos de línea, comillas dobles, `\`, `$`, `#`, `{`, `}` ni acento grave (romperían TOML, JSON, YAML o `.env`).
+Opciones de `init`: `--nombre`, `--slug`, `--puerto-base`, `--puertos-reservados`, `--autor`, `--correo`, `--idioma`, `--zona`, `--sin-git`. El nombre y el autor no admiten saltos de línea, comillas dobles, `\`, `$`, `#`, `{`, `}` ni acento grave (romperían TOML, JSON, YAML o `.env`).
+
+**Correo del autor.** El primer commit usa el `user.email` de tu git. Con `--correo <correo>` `init` lo fija como `user.email` **local** del repositorio nuevo antes de ese commit (se valida como `--autor`, más la forma `usuario@dominio.tld`). Sin `--correo`, `init` imprime un aviso con el correo que quedó: si es corporativo y el repositorio será público, ese correo queda visible en el historial. Usa el noreply de GitHub (`<id>+<usuario>@users.noreply.github.com`, en <https://github.com/settings/emails>) y cámbialo **antes de publicar**: `git config user.email <noreply> && git commit --amend --reset-author --no-edit` (sirve mientras el bootstrap sea el único commit).
 
 ---
 

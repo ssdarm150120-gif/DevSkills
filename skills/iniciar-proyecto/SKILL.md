@@ -43,12 +43,13 @@ Todo lo que no se pueda responder queda como pregunta `P-nn` abierta para el SRS
 En cualquier otro caso, ejecuta el script del plugin (Python 3.12, solo librería estándar), con lo que salió del descubrimiento:
 
 ```bash
-python "${CLAUDE_SKILL_DIR}/scripts/crear_proyecto.py" --destino <ruta-del-proyecto> --nombre "<Nombre del sistema>" --slug <slug> --puerto-base <N> --puertos-reservados 5432 --autor "<Autor>"
+python "${CLAUDE_SKILL_DIR}/scripts/crear_proyecto.py" --destino <ruta-del-proyecto> --nombre "<Nombre del sistema>" --slug <slug> --puerto-base <N> --puertos-reservados 5432 --autor "<Autor>" --correo <correo-del-autor>
 ```
 
 - `--slug`: minúsculas, `[a-z][a-z0-9-]*`; es el prefijo de Docker, el nombre del proyecto de Compose y el project de engram.
 - `--puerto-base`: inicio de un rango de 50 puertos libres del host (no privilegiados y sin puertos reservados).
 - El script se niega si el destino existe y no está vacío; copia la estructura, sustituye los marcadores, hace `git init -b main` y el primer commit `chore: bootstrap project from devskills` (sin atribución de IA). Con `--sin-git` omite git.
+- `--correo`: `user.email` **local** del repo nuevo, fijado antes del primer commit. Pregúntaselo al usuario y, si el repositorio será público, sugiere el noreply de GitHub (`<id>+<usuario>@users.noreply.github.com`). Sin `--correo` el script usa el correo global de git (puede ser corporativo) y lo avisa; un correo corporativo en un repo público queda expuesto en el historial.
 
 Estructura resultante (la misma del proyecto modelo):
 ```
