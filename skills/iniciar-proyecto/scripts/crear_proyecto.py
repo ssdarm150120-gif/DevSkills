@@ -5,7 +5,7 @@
 
 Qué hace:
 
-1. Copia `plantillas/raiz/*` (incluidos los archivos ocultos) a la raíz del proyecto,
+1. Copia `plantillas/raiz/*` (incluidos los archivos ocultos y `CLAUDE.md`, que importa `AGENTS.md`) a la raíz del proyecto,
    `plantillas/codigo` a `codigo/`, `plantillas/documentacion` a `documentacion/` y
    `plantillas/analisis` a `documentacion/analisis/`.
 2. Sustituye los marcadores `{{...}}` en todos los archivos de texto (ver `MARCADORES`).
@@ -43,6 +43,14 @@ PATRON_IDIOMA = re.compile(r"[a-z]{2,3}(-[a-z0-9]{2,8})*")
 PATRON_ZONA = re.compile(r"UTC|[A-Z][A-Za-z]+(/[A-Za-z0-9_+-]+){1,2}")
 IDIOMA_PREDETERMINADO = "es"
 ZONA_PREDETERMINADA = "UTC"
+NOMBRES_DE_IDIOMA = {
+    "es": "Español",
+    "en": "English",
+    "pt": "Português",
+    "fr": "Français",
+    "de": "Deutsch",
+    "it": "Italiano",
+}
 ARCHIVO_DE_LOCALIZACION = Path("codigo") / "configuracion" / "localizacion.py"
 # Carpetas y archivos que nunca se copian (residuos de haber corrido algo dentro de las plantillas).
 IGNORADOS = shutil.ignore_patterns(
@@ -192,8 +200,26 @@ def validar_destino(destino: Path) -> Path:
     return destino
 
 
+def describir_idioma(idioma: str) -> str:
+    """El nombre legible del idioma para `CLAUDE.md`, `AGENTS.md` y `CONTEXTO.md` (sale de `--idioma`)."""
+    if idioma in ("es", "es-mx"):
+        return "Español de México con tuteo"
+    base = idioma.split("-")[0]
+    nombre = NOMBRES_DE_IDIOMA.get(base)
+    if nombre is None:
+        return f"Idioma `{idioma}`"
+    return f"{nombre} ({idioma})" if "-" in idioma else nombre
+
+
 def marcadores(
-    *, nombre: str, slug: str, rango: range, reservados: Sequence[int], autor: str, fecha: str
+    *,
+    nombre: str,
+    slug: str,
+    rango: range,
+    reservados: Sequence[int],
+    autor: str,
+    fecha: str,
+    idioma: str = IDIOMA_PREDETERMINADO,
 ) -> dict[str, str]:
     """Los marcadores `{{...}}` y su valor para este proyecto."""
     return {
@@ -208,6 +234,8 @@ def marcadores(
         "{{PUERTOS_RESERVADOS}}": ", ".join(map(str, reservados)) or "ninguno",
         "{{FECHA}}": fecha,
         "{{AUTOR}}": autor,
+        "{{IDIOMA}}": idioma,
+        "{{IDIOMA_DESCRIPCION}}": describir_idioma(idioma),
     }
 
 
@@ -312,6 +340,7 @@ def crear(
         reservados=reservados,
         autor=autor,
         fecha=fecha or datetime.date.today().isoformat(),
+        idioma=idioma,
     )
     sustituidos = sustituir_en(destino, valores)
     fijar_localizacion(destino, idioma, zona)

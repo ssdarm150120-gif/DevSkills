@@ -24,6 +24,9 @@ service-account*.json
 .pgpass
 .pypirc
 
+# Archivos de trabajo de DevSkills (borrador de lecciones, engram pendiente): nunca se versionan
+.devskills/
+
 # Python
 __pycache__/
 *.py[cod]

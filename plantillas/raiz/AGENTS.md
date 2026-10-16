@@ -10,7 +10,7 @@ Proyecto construido con **DevSkills**. El equipo implementa el plan de `document
 |---------|-----------|
 | `documentacion/` | SRS, diseño, plan, contexto, tablero de sprints, `analisis/` (generadores y mediciones), `avance/` (reportes), `presentacion/`, `sesiones/`, `ui/` y `word/` |
 | `codigo/` | El monolito Django. Todas las herramientas (pytest, ruff, mypy, lint-imports, bandit) se ejecutan desde aquí |
-| Raíz | Solo `.github/`, `AGENTS.md`, `.gitignore`, `.gitattributes`, `.venv/`, `.pgdata/` (dev) y `.pgdata_pruebas/` (pytest), que **tienen** que estar en la raíz para funcionar |
+| Raíz | Solo `.github/`, `AGENTS.md`, `CLAUDE.md` (importa `AGENTS.md`; Claude Code lee `CLAUDE.md`), `.gitignore`, `.gitattributes`, `.venv/`, `.devskills/` (borradores locales, ignorada por git), `.pgdata/` (dev) y `.pgdata_pruebas/` (pytest), que **tienen** que estar en la raíz para funcionar |
 
 Ningún archivo nuevo va en la raíz: lo que se lee va a `documentacion/` y lo que se ejecuta va a `codigo/`.
 
@@ -49,7 +49,7 @@ Desarrollo ──► punto de control ──► QA ──► Angel Fixer ──�
 
 ## Reglas del repositorio
 
-- **Idioma:** español de México con tuteo. Commits en inglés, Conventional Commits, sin atribución de IA.
+- **Idioma:** el del campo Idioma de `documentacion/CONTEXTO.md` ({{IDIOMA_DESCRIPCION}}); prevalece sobre el estilo personal del usuario (su `CLAUDE.md` global). Commits en inglés, Conventional Commits, sin atribución de IA.
 - **Git:** cada elemento en su rama `hu-xx` o `en-xx`; commit de punto de control antes de cada revisión; solo el orquestador ejecuta comandos de git que cambian el árbol o la historia; nadie reconstruye archivos de memoria (`git restore`); cierre con `merge --squash` a `main`.
 - **Docker (opcional):** se desarrolla y se prueba sin él. Si se usa: prefijo `{{SLUG}}` para el stack principal y `{{SLUG}}-<agente>` para cada agente; puertos del host solo entre `{{PUERTO_BASE}}` y el `{{PUERTO_BASE}}` + 49; nunca los puertos reservados (`{{PUERTOS_RESERVADOS}}`); nunca `down -v` ni `prune` sobre el stack principal.
 - **Herramientas locales = CI:** semgrep (misma versión que el CI) y las demás herramientas de revisión se corren igual que en `.github/workflows/ci.yml`; con código 0 y sin hallazgos. **Un CI en rojo es deuda:** después de cada push autorizado se revisa con `gh run list` y se corrige antes de seguir.
@@ -57,7 +57,8 @@ Desarrollo ──► punto de control ──► QA ──► Angel Fixer ──�
 - **Preguntar al Product Owner:** lo de negocio (alcance, reglas, prioridades, cerrar con pendientes) lo decide el Product Owner, con decisiones numeradas y una recomendada; nadie lo asume. Después de 3 rondas sin aprobar, también se le pregunta.
 - **Hacia afuera:** nada de `git push`, `gh` de escritura, `docker push` ni borrar ramas con `-D` sin la confirmación explícita del usuario; los subagentes no los ejecutan nunca.
 - **Secretos:** nadie lee ni escribe `.env` ni `.env.*`.
-- **Memoria:** engram con `project` = `{{SLUG}}`.
+- **Memoria:** engram con `project` = `{{SLUG}}`. Los subagentes no tienen `mem_save`: terminan su reporte con la sección **Para engram** y el orquestador la guarda (o la deja en `.devskills/engram_pendiente.md`).
+- **Instalaciones:** ningún agente instala software (pip fuera del venv, `curl ... | sh`, `winget`, `brew`, `apt`, `npm -g`, WSL); si falta una herramienta, se detiene y el orquestador se lo pregunta al usuario.
 
 ## Dónde queda el avance
 

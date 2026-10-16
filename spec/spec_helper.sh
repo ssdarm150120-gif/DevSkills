@@ -87,7 +87,7 @@ archivos_fuera_de_la_carga() {
 }
 
 marcadores_sin_sustituir() {
-  grep -rlE '\{\{(NOMBRE_PROYECTO|SLUG|SLUG_GUION_BAJO|PUERTO_BASE|PUERTOS_RESERVADOS|FECHA|AUTOR)\}\}' "$1" --exclude-dir=.git 2>/dev/null | wc -l | tr -d ' '
+  grep -rlE '\{\{(NOMBRE_PROYECTO|SLUG|SLUG_GUION_BAJO|PUERTO_BASE|PUERTOS_RESERVADOS|FECHA|AUTOR|IDIOMA|IDIOMA_DESCRIPCION)\}\}' "$1" --exclude-dir=.git 2>/dev/null | wc -l | tr -d ' '
 }
 
 version_del_plugin() {

@@ -15,7 +15,7 @@ DISEÑO, y lo actualiza en cada pasada documental. Nada de secretos ni datos per
 | Prefijo de Docker del stack principal (solo si usas Docker, que es opcional) | `{{SLUG}}` (los agentes usan `{{SLUG}}-<agente>`) |
 | Rango de puertos del host | `{{PUERTO_BASE}}` a `{{PUERTO_BASE}} + 49` |
 | Puertos reservados del host (nunca usarlos ni apuntar a ellos por defecto) | {{PUERTOS_RESERVADOS}} |
-| Idioma | Español de México con tuteo (documentos, código, reportes y respuestas) |
+| Idioma | {{IDIOMA_DESCRIPCION}} (código `{{IDIOMA}}`; documentos, código, reportes y respuestas; prevalece sobre el estilo personal del usuario) |
 | Canal de avisos | <!-- Telegram (claude --channels plugin:telegram@claude-plugins-official) o "ninguno" --> |
 | Product Owner | <!-- nombre o rol --> |
 

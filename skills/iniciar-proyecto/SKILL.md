@@ -55,7 +55,8 @@ Estructura resultante (la misma del proyecto modelo):
 ```
 <proyecto>/
 ├── AGENTS.md                      equipo de agentes y reglas del repositorio
-├── .gitignore  .gitattributes  .github/workflows/ci.yml  .github/dependabot.yml
+├── CLAUDE.md                      importa AGENTS.md (@AGENTS.md) y fija el idioma del proyecto
+├── .gitignore (incluye .devskills/)  .gitattributes  .github/workflows/ci.yml  .github/dependabot.yml
 ├── codigo/                        esqueleto del stack fijo (configuracion, nucleo, identidad, herramientas, despliegue…)
 └── documentacion/
     ├── SRS.md  DISENO.md  PLAN.md  CONTEXTO.md
@@ -69,8 +70,8 @@ No hace falta `.claude/`: el plugin aporta los agentes y las skills.
 ### Fase 3. Primeros documentos
 1. El `analista-arquitecto` llena `documentacion/CONTEXTO.md` con lo del descubrimiento (módulos y asignación Dev A / Dev B quedan "por definir" hasta el DISEÑO).
 2. Vuelca el descubrimiento al SRS versión 0.1 (skill `devskills:redactar-srs`): sección 1 (problema, línea base, metas), 2 (actores, restricciones, supuestos) y 6 (preguntas abiertas).
-3. Commit `docs: discovery and SRS 0.1` y `mem_save` con el resumen del descubrimiento.
-4. **Repositorio remoto privado desde el inicio** (solo con la **confirmación explícita del usuario**, que se pide aquí y se obtiene antes de ejecutar nada): el CI de la plantilla (`.github/workflows/ci.yml`) solo corre cuando el repositorio tiene remoto, y un CI que nunca se ha ejecutado se rompe en el peor momento. Se **propone** el comando exacto y, con el "sí", se ejecuta con GitHub CLI (`gh auth status`; instalación y autenticación en `docs/instalacion.md`), tras pasar gitleaks (`${CLAUDE_PLUGIN_ROOT}/scripts/gitleaks_archivos.py`): `gh repo create <organizacion>/<slug> --private --source . --remote origin --push`. Después de **cada push autorizado** revisa el CI (lectura): `gh run list --limit 3` y, si falla, `gh run view <id> --log-failed`. **Un CI en rojo es deuda**: se corrige antes de seguir con el siguiente elemento.
+3. Commit `docs: discovery and SRS 0.1` y, el orquestador, `mem_save` con el resumen del descubrimiento.
+4. **Repositorio remoto privado desde el inicio** (advierte el costo de no tenerlo: sin remoto no hay CI, así que semgrep sin vía local, hadolint, trivy, la imagen y las pruebas de despliegue no corren nunca salvo que se corran a mano con Docker; cada reporte lo marcará como "CI no ejecutado (sin remoto)" y cada cierre de entrega exigirá esas pruebas locales) (solo con la **confirmación explícita del usuario**, que se pide aquí y se obtiene antes de ejecutar nada): el CI de la plantilla (`.github/workflows/ci.yml`) solo corre cuando el repositorio tiene remoto, y un CI que nunca se ha ejecutado se rompe en el peor momento. Se **propone** el comando exacto y, con el "sí", se ejecuta con GitHub CLI (`gh auth status`; instalación y autenticación en `docs/instalacion.md`), tras pasar gitleaks (`${CLAUDE_PLUGIN_ROOT}/scripts/gitleaks_archivos.py`): `gh repo create <organizacion>/<slug> --private --source . --remote origin --push`. Después de **cada push autorizado** revisa el CI (lectura): `gh run list --limit 3` y, si falla, `gh run view <id> --log-failed`. **Un CI en rojo es deuda**: se corrige antes de seguir con el siguiente elemento.
 5. **Dependabot:** al subir el repositorio abrirá PR de dependencias que fallarán mientras el CI de `main` esté en rojo. Orden: primero el CI de `main` en verde, luego se **proponen** al usuario los `@dependabot rebase` y los merges de las **menores** (se ejecutan solo los que apruebe) y se revisan aparte las **versiones mayores** (cada una es un elemento del plan; ver el comentario de `.github/dependabot.yml`).
 6. **Runner fijo:** los flujos usan `ubuntu-24.04` y no `ubuntu-latest`, para que GitHub no cambie la imagen por debajo del CI; subir de versión es un cambio a mano, probado y con su commit.
 
