@@ -13,7 +13,7 @@ metadata:
 ## When to Use
 
 - Un desarrollador (`devskills:dev-a` o `devskills:dev-b`) recibe un ID del backlog (`HU-xx` o `EN-xx`) para implementarlo.
-- Una ronda de correcciones después de QA, del Angel Fixer o de la verificación final (con su lista exacta).
+- Una ronda de correcciones con su lista exacta: la lista congelada de la revisión por historia del Angel Fixer, los defectos del QA de cierre del sprint (`DEF-SNN-n`) o, en un elemento de la excepción, los de QA, del Angel Fixer o de la verificación final. En una lista congelada corriges **exactamente** esa lista, sin cambios fuera de ella.
 
 ## Critical Patterns
 
@@ -36,10 +36,10 @@ metadata:
 Delegar en el subagente que corresponda; si la historia cruza capas, empezar por el dominio. Un módulo nuevo se declara en `configuracion/modulos.py` (con sus dependencias del DISEÑO) y se regeneran los contratos de import-linter con `python -m herramientas.contratos_importlinter --escribir`.
 
 ### Paso 2. TDD (rojo → verde → refactor)
-- Escribir primero las **pruebas unitarias del dominio** derivadas de los escenarios Gherkin.
+- **Pruebas de aceptación primero:** copiar los escenarios de la historia (Anexo B) **tal cual** a su `.feature` (por defecto `codigo/<modulo>/pruebas/<id>_<titulo>.feature`; respeta la convención existente) e implementar sus pasos con pytest-bdd, con datos ficticios, adaptadores falsos y el reloj controlado. Empiezan en rojo. **Cada escenario del SRS debe tener su prueba:** es un punto de la lista mínima que revisa el Angel Fixer en la revisión por historia. QA las revisa (copia literal, comportamiento de punta a punta) y las refuerza en el cierre del sprint o, en la excepción, en su validación por historia; no se reescriben ni se suavizan para que pasen.
+- Escribir después las **pruebas unitarias del dominio** derivadas de los escenarios Gherkin.
 - Implementar lo mínimo para ponerlas en verde; refactorizar sin cambiar el comportamiento.
 - Los adaptadores se prueban contra **puertos falsos** y con su prueba de contrato.
-- Las pruebas de aceptación (pytest-bdd sobre el Gherkin del SRS) las escribe y ejecuta **QA**, no el desarrollador.
 - Las pruebas deben **morder**: comprueba en una copia del scratchpad que una mutación del código las hace fallar.
 
 ### Paso 3. Reglas que siempre se revisan antes de entregar
@@ -51,7 +51,7 @@ Delegar en el subagente que corresponda; si la historia cruza capas, empezar por
 - [ ] Sistemas de solo lectura: ningún puerto de escritura implementado; SQL siempre parametrizado.
 - [ ] Sin datos personales en logs ni en eventos; secretos por variables de entorno; nada de la empresa en constantes.
 - [ ] Tiempo con `Reloj` inyectado (UTC); dinero como monto + moneda.
-- [ ] `lint-imports`, `ruff check .`, `ruff format --check .`, `mypy .`, `pytest`, `bandit`, `pip-audit` y `makemigrations --check` en verde, con el Python del entorno virtual del proyecto (`../.venv`, ver el README de `codigo/`): un `python` suelto puede ser otro intérprete sin las dependencias.
+- [ ] **Lista mínima de la revisión por historia**, en verde y **sin advertencias**: `python manage.py check --fail-level WARNING`, `lint-imports`, `ruff check .`, `ruff format --check .`, `mypy .`, `pytest`, `bandit`, `pip-audit` y `makemigrations --check`, cada escenario Gherkin con su prueba, y nada que gitleaks pueda marcar (sin secretos ni llaves en el código), con el Python del entorno virtual del proyecto (`../.venv`, ver el README de `codigo/`): un `python` suelto puede ser otro intérprete sin las dependencias.
 
 ### Paso 3b. Lecciones aprendidas (checklist de incidentes reales)
 - [ ] **Transacciones propias:** un "un solo uso", un contador o un bloqueo que depende de que quien llama abra la transacción no es un control; el adaptador abre su transacción y su `select_for_update`.
@@ -75,7 +75,7 @@ Delegar en el subagente que corresponda; si la historia cruza capas, empezar por
 
 ### Paso 4. Entregar
 1. **No hacer commit:** el orquestador hace los puntos de control (`devskills:ciclo-historia`).
-2. Marcar `En validación` en `documentacion/avance/estado_backlog.json`.
+2. Marcar `En validación` en `documentacion/avance/estado_backlog.json`. En el ciclo normal el elemento se queda así después del merge, hasta el cierre del sprint; solo el orquestador lo pasa a `Listo`.
 3. Devolver al orquestador: archivos tocados, pruebas agregadas (y cuántas en total pasan), decisiones tomadas (para que el orquestador las registre como suyas o las lleve al Product Owner), texto para `.env.ejemplo` si hace falta, y dudas abiertas.
 4. Terminar el reporte con la sección **Para engram** (título, tipo y contenido de cada decisión o hallazgo no obvio, o "nada que guardar"); no tienes `mem_save`, el orquestador la guarda.
 

@@ -24,7 +24,7 @@ Eres el **Dev B** del proyecto. Implementas el elemento del backlog que te asign
 5. Marcas el elemento `En validación` en `documentacion/avance/estado_backlog.json` y devuelves al orquestador: archivos tocados, pruebas agregadas, decisiones tomadas y dudas abiertas.
 
 ## Límites
-- No escribes pruebas de aceptación (son de QA) ni marcas un elemento como Listo.
+- Escribes las pruebas de aceptación de tu historia (el Gherkin del SRS copiado tal cual a su `.feature`, con sus pasos pytest-bdd; ver `devskills:implementar-historia`): cada escenario debe tener su prueba antes de la revisión por historia. QA las revisa y refuerza; nunca las suavizas para que pasen. No marcas un elemento como Listo.
 - SQL siempre parametrizado; sin secretos en el código; ningún dato personal en logs; nada de la empresa (nombres, dominios, identificadores, horarios) escrito en el código: va en configuración.
 - Lo externo siempre detrás de un puerto, con su adaptador falso y su prueba de contrato. Los envíos hacia afuera salen siempre por el outbox.
 - Si el proyecto usa un adaptador de pruebas distinto al de producción para un sistema externo, se elige **por configuración**, nunca por código.
