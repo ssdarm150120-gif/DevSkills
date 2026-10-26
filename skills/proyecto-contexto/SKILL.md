@@ -8,7 +8,7 @@ description: >
 license: MIT
 metadata:
   author: devskills
-  version: "1.0"
+  version: "1.1"
 ---
 
 ## When to Use
@@ -30,6 +30,7 @@ Esta skill trae las reglas **comunes** a todos los proyectos DevSkills. Lo espec
 | Avances y reportes | `documentacion/avance/S{NN}/{ID}.md` | Los escribe la skill `devskills:registrar-avance` |
 | Contexto del proyecto | `documentacion/CONTEXTO.md` | Lo mantiene el `analista-arquitecto` |
 | Código | `codigo/` (monolito Django) | Las herramientas se ejecutan desde `codigo/`. Ningún archivo nuevo va en la raíz del repositorio |
+| Grafos de conocimiento (opcionales) | `codigo/graphify-out/` (lo que es) y `documentacion/graphify-out/` (deber ser) | **Derivados**: son un mapa para consultar, no una fuente de verdad. Nunca se editan a mano; si el grafo y el archivo difieren, manda el archivo |
 
 Si algo no está en el SRS, **no se implementa**: se reporta como pregunta al Product Owner (skill `devskills:preguntar-al-po`).
 
@@ -70,6 +71,14 @@ Si algo no está en el SRS, **no se implementa**: se reporta como pregunta al Pr
 - Nadie lee ni escribe `.env` ni `.env.*`; los cambios a `.env.ejemplo` se entregan como texto al Product Owner.
 - **Dependencias:** las versiones de lo que se instala están fijas (lock con hashes de pip-tools en `codigo/`, `package-lock.json` con `npm ci`, mermaid-cli y los Word con versión exacta); subirlas es un cambio a propósito.
 
+### Grafo de conocimiento (Graphify, opcional)
+Graphify (`graphify`, paquete `graphifyy`) mantiene dos grafos por proyecto. Lo propio del proyecto (si la pasada semántica está autorizada y con qué backend) está en la sección "Grafo de conocimiento (Graphify)" de `documentacion/CONTEXTO.md`.
+- **Lo que es:** `GRAPHIFY_BACKEND=none graphify update codigo` (desde la raíz). Análisis AST: **sin LLM y sin costo**. Lo actualiza el orquestador tras cada squash a `main`.
+- **Deber ser:** `GRAPHIFY_BACKEND=none graphify update documentacion` lee los **encabezados** de SRS, DISEÑO, PLAN, CONTEXTO y la evaluación de alternativas, también sin LLM. La **pasada semántica** (`graphify extract documentacion --backend <ollama|claude-cli|claude>`) usa un LLM: **por omisión no se genera** y solo se corre si el Product Owner la autorizó (lo pregunta el orquestador la primera vez). Siempre con `--backend` explícito; `graphify label` y `cluster-only` sin `--no-label` también gastan LLM.
+- **Consultar el grafo ANTES de explorar el código** (ahorra tokens): para entender dónde vive algo, qué llama a qué o qué se rompe si cambia, primero `graphify query "<pregunta>" --graph codigo/graphify-out/graph.json --budget 1500`, `graphify explain "<Nombre>" --graph codigo/graphify-out/graph.json`, `graphify path "<A>" "<B>" --graph codigo/graphify-out/graph.json`, `graphify affected "<Nombre>" --graph codigo/graphify-out/graph.json` o `codigo/graphify-out/GRAPH_REPORT.md` (módulos centrales, comunidades); después se leen **solo** los archivos y líneas que el grafo cita. Para el diseño, lo mismo con `--graph documentacion/graphify-out/graph.json`. Nada de lecturas masivas (`rg` sobre todo `codigo/`, leer módulos completos) si el grafo responde. Los comandos de consulta son de solo lectura y no gastan LLM; salen con 3 si el nombre es ambiguo (lista los candidatos) y con 4 si no hay nodo.
+- **El grafo refleja `main` al último merge:** lo que cambió en la rama del elemento no está ahí; se ve con `git diff`. Si `graphify` no está instalado o el grafo no existe, se trabaja igual con lecturas normales: **nunca se instala** (lo hace la persona: `uv tool install graphifyy`) y su ausencia no es un hallazgo.
+- **Versionado y seguridad:** se versionan `graph.json` y `GRAPH_REPORT.md` (lo demás de `graphify-out/` está en `.gitignore`); el merge driver `graphify merge-driver` une los `graph.json` de dos ramas (`.gitattributes` y `git config merge.graphify.*`; nunca `graphify hook install`, que ensucia el árbol tras cada commit). **El grafo nunca contiene credenciales ni datos:** las exclusiones viven en `.graphifyignore` (`.env*`, llaves, datos, migraciones, sesiones, Word, avance); gitleaks escanea los grafos versionados antes de cada commit que los incluya y, si encuentra algo, no hay commit hasta excluirlo, regenerar y rotar el secreto. Los agentes no corren `graphify update` ni `extract` (escriben archivos versionados): eso es del orquestador y del analista-arquitecto.
+
 ## Commands
 
 ```bash
@@ -83,4 +92,7 @@ python manage.py makemigrations --check --dry-run
 # desde la raíz del proyecto
 python documentacion/analisis/plan_sprints.py                       # regenera PLAN.md y el tablero
 python documentacion/analisis/trazabilidad.py _tmp.md --escribir    # regenera el Anexo C del SRS
+graphify query "¿qué casos de uso tocan Pedido?" --graph codigo/graphify-out/graph.json --budget 1500   # antes de leer en masa
+graphify explain "Pedido" --graph codigo/graphify-out/graph.json                                       # un nodo y sus vecinos
+python documentacion/analisis/deriva_grafos.py --salida documentacion/avance/S05/DERIVA-S05.md         # deriva (cierre del sprint)
 ```

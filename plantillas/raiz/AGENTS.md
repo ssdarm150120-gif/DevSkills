@@ -65,11 +65,13 @@ QA completo sobre el diff del sprint ──► lista congelada ──► correcc
 - **Secretos:** nadie lee ni escribe `.env` ni `.env.*`.
 - **Memoria:** engram con `project` = `{{SLUG}}`. Los subagentes no tienen `mem_save`: terminan su reporte con la sección **Para engram** y el orquestador la guarda (o la deja en `.devskills/engram_pendiente.md`).
 - **Instalaciones:** ningún agente instala software (pip fuera del venv, `curl ... | sh`, `winget`, `brew`, `apt`, `npm -g`, WSL); si falta una herramienta, se detiene y el orquestador se lo pregunta al usuario.
+- **Grafo de conocimiento (Graphify, opcional):** `codigo/graphify-out/` (lo que es) y `documentacion/graphify-out/` (deber ser) se versionan (`graph.json` y `GRAPH_REPORT.md`) y se consultan **antes** de leer archivos en masa (`graphify query`, `explain`, `path`, `affected`). El del código lo actualiza el orquestador tras cada merge y el del deber ser el analista-arquitecto en cada pasada documental, sin LLM; la pasada semántica solo con permiso del Product Owner. Nunca contienen credenciales ni datos (`.graphifyignore`) y pasan por gitleaks antes de cada commit. Detalle en `documentacion/CONTEXTO.md`.
 
 ## Dónde queda el avance
 
 - `documentacion/avance/estado_backlog.json`: estado oficial de cada ID (lo escribe `devskills:registrar-avance`).
 - `documentacion/avance/S{NN}/{ID}.md`: reporte de cada elemento (Angel Fixer + QA + decisiones; parcial y `En validación` hasta el cierre del sprint en el ciclo normal).
 - `documentacion/avance/S{NN}/CIERRE-S{NN}.md`: reporte del QA de cierre de cada sprint.
+- `documentacion/avance/S{NN}/DERIVA-S{NN}.md`: deriva entre el deber ser y lo que es al cerrar el sprint (si hay Graphify).
 - `documentacion/avance/README.md`: índice de reportes.
 - `documentacion/PLAN.md` y `documentacion/plan_sprints.html`: se regeneran con `python documentacion/analisis/plan_sprints.py` y **tachan** lo terminado.

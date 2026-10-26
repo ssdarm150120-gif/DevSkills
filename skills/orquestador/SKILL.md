@@ -8,7 +8,7 @@ description: >
 license: MIT
 metadata:
   author: devskills
-  version: "1.0"
+  version: "1.1"
 ---
 
 ## When to Use
@@ -22,13 +22,17 @@ metadata:
 1. `mem_context` y `mem_search` (project de `documentacion/CONTEXTO.md`) para recuperar el estado anterior; revisar `git status`, `git stash list`, rama actual y `documentacion/avance/estado_backlog.json`.
 2. Cargar `devskills:proyecto-contexto` y leer `documentacion/CONTEXTO.md`.
 3. Si quedó un ciclo a medias o un agente cortado: `devskills:recuperar-corte`.
-4. Si el usuario trabaja desde el celular, recordarle que abra la sesión con el canal de Telegram (`claude-tg` o `claude --channels plugin:telegram@claude-plugins-official`) y que cierre las demás sesiones de Claude Code, porque todas leen el mismo bot y se reparten los mensajes.
+4. **Grafo de conocimiento (Graphify, opcional):** si `graphify --version` responde, revisa la sección "Grafo de conocimiento (Graphify)" de `documentacion/CONTEXTO.md`.
+   - Si faltan los grafos, genera los dos que no gastan LLM, desde la raíz: `GRAPHIFY_BACKEND=none graphify update codigo` y `GRAPHIFY_BACKEND=none graphify update documentacion`, y haz su commit (`chore(graph): build code and design graphs`, tras gitleaks).
+   - Si la decisión "Pasada semántica del deber ser" está vacía, **pregúntasela al Product Owner** (skill `devskills:preguntar-al-po`) con las opciones: no autorizarla (recomendada si no hay Ollama; el deber ser queda en encabezados), **Ollama local** (gratis, nada sale del equipo), **claude-cli** (cuota de su suscripción de Claude Code) o **API key** (cobro por tokens; los documentos salen al proveedor). Hasta que responda, no se corre ningún comando de Graphify que use LLM (`extract` sobre documentos, `label`, `cluster-only` sin `--no-label`). Su respuesta la registra el analista-arquitecto en `CONTEXTO.md` como decisión del Product Owner.
+   - Si `graphify` no está instalado, no lo instales ni lo pidas como requisito: el método sigue con lecturas normales; puedes mencionarle al usuario que `devskills doctor` explica cómo instalarlo.
+5. Si el usuario trabaja desde el celular, recordarle que abra la sesión con el canal de Telegram (`claude-tg` o `claude --channels plugin:telegram@claude-plugins-official`) y que cierre las demás sesiones de Claude Code, porque todas leen el mismo bot y se reparten los mensajes.
 
 ### 2. Delegar, no ejecutar
 | Acción | El orquestador | Delegado en |
 |--------|----------------|-------------|
 | Leer 1 a 3 archivos para decidir o verificar | Sí | — |
-| Explorar el código o los documentos (4 o más archivos) | — | un agente |
+| Explorar el código o los documentos (4 o más archivos) | — | un agente (antes, si hay grafo, una consulta `graphify query`/`explain` puede bastar para decidir) |
 | Escribir código o pruebas | **Nunca** | `devskills:dev-a`, `devskills:dev-b` (y sus subagentes) |
 | Redactar SRS, DISEÑO, PLAN, CONTEXTO | — | `devskills:analista-arquitecto` |
 | Clasificar cada elemento: ciclo normal o excepción (seguridad, plataforma, crítico) | **Sí** (decisión del orquestador, con motivo) | — |
@@ -36,10 +40,12 @@ metadata:
 | Validar el comportamiento (cierre de sprint o excepción) | — | `devskills:qa` |
 | Verificar una lista (ligera o final) | — | `devskills:verificador` |
 | Commits, ramas, squash, puntos de control | **Sí, exclusivo** | — |
+| Actualizar el grafo del código tras cada squash a `main` y generar el reporte de deriva al cerrar el sprint | Sí (`graphify update codigo` sin LLM y `deriva_grafos.py`) | — |
+| Actualizar el grafo del deber ser | — | `devskills:analista-arquitecto` (en la pasada documental) |
 | Estado del backlog, reporte, plan | Sí (skill `devskills:registrar-avance`) | o el analista |
 | Ediciones mecánicas mínimas (una palabra con voseo, un BAJO de configuración) | Sí, y se registra como "corregido por el orquestador" | — |
 
-- Cada prompt a un agente lleva: el ID, la rama y el commit de punto de control, la lista exacta de lo que debe hacer (en rondas: la lista de pendientes con sus IDs), las decisiones ya tomadas que aplican, el **prefijo y subrango de puertos de Docker** que le tocan, la instrucción de responder en el idioma de `CONTEXTO.md` (no en el estilo del usuario) y de **terminar su reporte con la sección "Para engram"** (título, tipo y contenido), porque los subagentes no tienen `mem_save`; tú guardas esas secciones con `mem_save` (o, si no existe, las anexas a `.devskills/engram_pendiente.md`).
+- Cada prompt a un agente lleva: si hay grafos, sus rutas (`codigo/graphify-out/graph.json` y `documentacion/graphify-out/graph.json`) y la instrucción de **consultarlos antes de explorar el código o los documentos** (`graphify query`, `explain`, `path`, `affected` y `GRAPH_REPORT.md`; después solo los archivos citados), lo que ahorra tokens en cada ronda; el ID, la rama y el commit de punto de control, la lista exacta de lo que debe hacer (en rondas: la lista de pendientes con sus IDs), las decisiones ya tomadas que aplican, el **prefijo y subrango de puertos de Docker** que le tocan, la instrucción de responder en el idioma de `CONTEXTO.md` (no en el estilo del usuario) y de **terminar su reporte con la sección "Para engram"** (título, tipo y contenido), porque los subagentes no tienen `mem_save`; tú guardas esas secciones con `mem_save` (o, si no existe, las anexas a `.devskills/engram_pendiente.md`).
 - Agentes independientes se lanzan **en paralelo** (por ejemplo, QA y Angel Fixer sobre el mismo punto de control en un elemento de la excepción). En el ciclo normal la revisión por historia es solo del Angel Fixer, y QA corre una vez por sprint, en su cierre.
 - **Ciclo híbrido** (reglas completas en `devskills:ciclo-historia`): el Angel Fixer revisa el código y QA el comportamiento, sin traslape; quien verifica una corrección es siempre un agente distinto del que la hizo.
 - El orquestador **sintetiza**: al usuario le llega el veredicto, las decisiones y las preguntas, no los volcados de archivos.
@@ -60,6 +66,7 @@ metadata:
 - El plan y el tablero se **regeneran** (`python documentacion/analisis/plan_sprints.py`) en cada merge, en cada cierre de sprint y en cada pasada documental; nunca se editan a mano.
 - Cada merge: reporte en `documentacion/avance/S{NN}/{ID}.md` (parcial en el ciclo normal) y línea en el índice; cada cierre de sprint: `documentacion/avance/S{NN}/CIERRE-S{NN}.md` y los reportes de sus elementos completos.
 - Al empezar un sprint, etiqueta local `inicio-sNN` en `main` (base del diff del QA de cierre).
+- **Grafos (si hay `graphify`):** el del código se actualiza tras cada squash a `main` (commit aparte `chore(graph): ...`), el del deber ser en cada pasada documental, y al cerrar el sprint se mide la **deriva** entre los dos (`devskills:ciclo-historia`, sección 5). Cada commit que incluya `graphify-out/` pasa antes por gitleaks: el grafo nunca contiene credenciales ni datos. Nunca `graphify hook install` (regenera tras cada commit y ensucia el árbol de los puntos de control).
 
 ### 6. Memoria (engram)
 - Los subagentes no tienen `mem_save`: cada uno termina su reporte con una sección **Para engram** (título, tipo y contenido) y **tú** la guardas con `mem_save`. Si `mem_save` no existe en tu sesión, la anexas a `.devskills/engram_pendiente.md` (ignorada por git) y se lo dices al usuario.

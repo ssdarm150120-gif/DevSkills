@@ -51,7 +51,8 @@ Por cada punto: **qué existe hoy** (con IDs), **impacto** en SRS, DISEÑO y PLA
 4. **PLAN.** Si cambiaron historias, habilitadores o puntos: actualiza `plan_entregas.json`, sube la versión de `PLAN.md` con su fila de historial (total de puntos y sprints antes y después) y regenera.
 5. **CONTEXTO y prototipos.** Actualiza `documentacion/CONTEXTO.md` si cambian módulos, reglas o integraciones; si cambian pantallas, agrega un prompt de actualización o de correcciones con `devskills:prompts-figma`.
 6. **Word.** Regenera con `md_a_word.py`. Los `.md` son la fuente de verdad: nunca se edita un Word.
-7. **Commit `docs:`**, separado del código.
+7. **Grafo del deber ser (si `graphify` está instalado).** Con los documentos ya en su versión nueva, desde la raíz: `GRAPHIFY_BACKEND=none graphify update documentacion` (encabezados de SRS, DISEÑO, PLAN, CONTEXTO y evaluación de alternativas; **sin LLM y sin costo**). La pasada **semántica** (`graphify extract documentacion --backend <backend>`) solo si la decisión "Pasada semántica del deber ser" de `CONTEXTO.md` la autoriza, con **ese** backend y nunca sin `--backend`; si está vacía, no se corre y se avisa al orquestador para que la pregunte al Product Owner. Revisa que `documentacion/graphify-out/graph.json` no contenga datos ni secretos (las exclusiones están en `.graphifyignore`). Sin `graphify`, este paso se omite y se dice en el reporte.
+8. **Commit `docs:`**, separado del código.
 
 ### 3. Versionado
 - Borradores: `0.x`. La **línea base** de requisitos sube la versión mayor (por ejemplo, `1.0`); cada pasada posterior sube la menor.
@@ -65,8 +66,8 @@ Por cada punto: **qué existe hoy** (con IDs), **impacto** en SRS, DISEÑO y PLA
 
 ### 5. Commit de documentación
 - Lo hace el **orquestador** (los agentes no ejecutan comandos de git que cambien el árbol ni la historia).
-- Un commit solo de `documentacion/`, separado del commit de código del elemento: mensaje en inglés, Conventional Commits, **sin atribución de IA ni `Co-Authored-By`**. Ejemplos: `docs: SRS 5.3 absolute session cap`, `docs: design 1.13 event bus decisions`, `docs: regenerate Word documents after EN-03`.
-- Antes del commit, el escaneo de secretos del cierre de sesión (`devskills:guarda-todo`) cubre también `documentacion/`.
+- Un commit solo de `documentacion/`, separado del commit de código del elemento: mensaje en inglés, Conventional Commits, **sin atribución de IA ni `Co-Authored-By`**. Ejemplos: `docs: SRS 5.3 absolute session cap`, `docs: design 1.13 event bus decisions`, `docs: regenerate Word documents after EN-03`. El grafo del deber ser va en su propio commit: `git add -- documentacion/graphify-out/graph.json documentacion/graphify-out/GRAPH_REPORT.md && git commit -m "docs(graph): refresh design graph for SRS 5.3"`.
+- Antes del commit, el escaneo de secretos del cierre de sesión (`devskills:guarda-todo`) cubre también `documentacion/`, incluido `documentacion/graphify-out/` (gitleaks escanea lo versionado y lo nuevo no ignorado).
 
 ### 6. Verificación de la pasada
 - [ ] Versión, fecha y estado del encabezado coinciden con la última fila del historial, en cada documento tocado.
@@ -74,6 +75,7 @@ Por cada punto: **qué existe hoy** (con IDs), **impacto** en SRS, DISEÑO y PLA
 - [ ] `trazabilidad.py` sin faltantes; `plan_sprints.py` sin errores.
 - [ ] Los Word se generaron y ningún diagrama quedó como bloque de código (si hay mermaid-cli).
 - [ ] No se dejó `_tmp.md` ni otros temporales en el repositorio.
+- [ ] Si hay `graphify`: el grafo del deber ser se regeneró después de los documentos, sin LLM salvo autorización del Product Owner, y gitleaks quedó limpio.
 - [ ] Todo en español de México con tuteo; sin datos personales ni datos reales del negocio.
 
 ## Commands
@@ -83,6 +85,8 @@ python documentacion/analisis/trazabilidad.py _tmp.md --escribir   # Anexo C (bo
 python documentacion/analisis/plan_sprints.py                      # PLAN.md (P.2.2) y plan_sprints.html
 "$PYDOC" documentacion/analisis/md_a_word.py --mermaid <carpeta_mermaid_cli>   # todos los Word
 "$PYDOC" documentacion/analisis/md_a_word.py --solo SRS              # solo un documento
+GRAPHIFY_BACKEND=none graphify update documentacion                 # grafo del deber ser, encabezados (sin LLM)
+graphify extract documentacion --backend ollama                     # semántico: SOLO si CONTEXTO.md lo autoriza (y con ese backend)
 ```
 
 ### Instalar las dependencias de los Word (una vez, sin tocar nada global)
