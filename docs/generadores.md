@@ -11,6 +11,7 @@ DevSkills es una metodología y un stack para construir cualquier sistema. Cada 
 | Transcripción de la sesión | `python documentacion/analisis/exportar_sesion.py --ultima documentacion/sesiones/<archivo>.md "<título>"` | `guarda-todo` | Python 3.12 |
 | Prompts de Figma Make | (plantilla) `documentacion/ui/prompts_figma_make.md` | `prompts-figma` | — |
 | Evaluación de alternativas | (plantilla) `documentacion/EVALUACION_ALTERNATIVAS.md` | `evaluacion-alternativas` | — |
+| Reporte de deriva entre el deber ser y lo que es | `python documentacion/analisis/deriva_grafos.py --salida documentacion/avance/S{NN}/DERIVA-S{NN}.md` | `ciclo-historia`, `validar-historia` | Python 3.12 y los dos grafos de Graphify (ver [graphify](graphify.md)) |
 
 ## Plan y tablero de sprints
 
@@ -20,6 +21,13 @@ DevSkills es una metodología y un stack para construir cualquier sistema. Cada 
 - **Porcentaje de avance:** menos de 10 % se muestra con un decimal truncado (3 de 327 puntos es `0.9 %`, no `0 %`; `<0.1 %` si ni una décima) y 10 % o más como entero truncado. La misma regla vive en `porcentaje.py` (PLAN.md) y en la plantilla HTML (tablero).
 - **Proyectos ya creados:** los scripts quedan copiados en el proyecto; para recibir las correcciones usa `devskills sync-scripts` (ver [instalación](instalacion.md#actualizar-los-scripts-de-un-proyecto-ya-creado)).
 - **Errores claros:** una historia vigente sin planificar, un elemento duplicado, un habilitador sin definir, una historia inexistente o retirada, o un ID del estado que no está en el plan.
+
+## Deriva entre el deber ser y lo que es
+
+- **Datos:** `codigo/graphify-out/graph.json` (lo que es: `graphify update codigo`, sin LLM) y `documentacion/graphify-out/graph.json` (deber ser: `graphify update documentacion`, sin LLM, o la pasada semántica si el Product Owner la autorizó).
+- **Salida:** Markdown con lo que el diseño dice y el código no tiene (`D-n`), lo que el código tiene sin estar en el diseño (`C-n`) y las correspondencias débiles. Son candidatos que QA confirma en el cierre del sprint.
+- **Opciones:** `--codigo` y `--deber-ser` (rutas de los grafos), `--salida`, `--todas-las-clases` (no solo las de `dominio/`), `--con-funciones`, `--ignorar-modulo <nombre>` y `--estricto` (sale con 1 si hay deriva).
+- **Sin grafos:** sale con 3 y explica cómo generarlos; el cierre lo anota como verificación omitida. Detalle en [graphify](graphify.md).
 
 ## Anexo C de trazabilidad
 
