@@ -5,7 +5,7 @@
 <p align="center">
   <strong>Metodología y stack para construir cualquier sistema, nacida de un proyecto real</strong><br>
   Del descubrimiento al Listo con un equipo de agentes de Claude Code y cero deuda: inventarios, una plataforma escolar, una app interna de recursos humanos o lo que necesites.<br>
-  SRS ISO/IEC/IEEE 29148 · DISEÑO IEEE 1016 · plan por sprints · Dev → QA → Angel Fixer.
+  SRS ISO/IEC/IEEE 29148 · DISEÑO IEEE 1016 · plan por sprints · Dev → Angel Fixer por historia → QA al cerrar el sprint.
 </p>
 
 <p align="center">
@@ -39,13 +39,20 @@
                                                        │
         ┌──────────────────────────────────────────────┘
         ▼
-┌───────────────┐   ┌──────────┐   ┌─────────────┐   ┌──────────────┐   ┌───────────┐
-│  Desarrollo   │──▶│    QA    │──▶│ Angel Fixer │──▶│ Verificación │──▶│ ✅ Listo  │
-│ (Dev A / B)   │   │ Gherkin  │   │ evaluación  │   │ final, solo  │   │ (tachado) │
-└───────────────┘   └──────────┘   └──────┬──────┘   │ si corrigió  │   └───────────┘
-        ▲                                 │          └──────────────┘
-        └──── cualquier hallazgo ◄────────┘   máximo 3 rondas
+┌───────────────┐   ┌─────────────┐   ┌──────────────┐   ┌──────────────┐
+│  Desarrollo   │──▶│ Angel Fixer │──▶│ Verificación │──▶│ 🔍 Merge, En │
+│ TDD (Dev A/B) │   │ por historia│   │ ligera, solo │   │  validación  │
+└───────────────┘   │  (código)   │   │ si corrigió  │   └──────┬───────┘
+        ▲           └──────┬──────┘   └──────────────┘          │ al cerrar el sprint
+        └─ lista congelada ┘  máximo 3 rondas                   ▼
+                                     ┌──────────────┐   ┌──────────────┐   ┌───────────┐
+                                     │ QA de cierre │──▶│ Verificación │──▶│ ✅ Listo  │
+                                     │ diff sprint  │   │ final, solo  │   │ (tachado) │
+                                     │(comportam.)  │   │ si corrigió  │   └───────────┘
+                                     └──────────────┘   └──────────────┘
 ```
+
+Los elementos de seguridad, de plataforma o núcleo compartido y los críticos llevan el ciclo completo por historia (QA y Angel Fixer en paralelo) antes del merge.
 
 ```console
 $ devskills init ~/proyectos/inventarios --nombre "Sistema de Inventarios" --puerto-base 21000
@@ -69,7 +76,7 @@ Tienes una idea de sistema. Le pides código a un agente y sale rápido… hasta
 **DevSkills** pone orden antes y durante: requisitos y diseño por escrito, un equipo de agentes con roles separados, y un ciclo de calidad en el que nada se da por terminado con hallazgos abiertos. Es el método con el que ya se construyó un sistema real, empaquetado para el siguiente, **sea del dominio que sea**: el método no presupone actores, procesos ni integraciones; todo eso sale del descubrimiento y del SRS de cada proyecto.
 
 - 📋 **Requisitos antes que código** — SRS con historias en Gherkin y trazabilidad generada (requisito → caso de uso → historia)
-- 👥 **Un equipo, no un agente** — analista, dos desarrolladores, QA, Angel Fixer y verificador, coordinados por un orquestador que no escribe código
+- 👥 **Un equipo, no un agente** — analista, dos desarrolladores, QA (comportamiento), Angel Fixer (código) y verificador, coordinados por un orquestador que no escribe código
 - 🚫 **Cero deuda** — todo hallazgo, de cualquier severidad, se corrige antes de tachar
 - 💾 **Ningún trabajo sin respaldo** — rama por elemento y commit de punto de control antes de cada revisión
 - 🧱 **Stack fijo y probado** — Django modular hexagonal con identidad, permisos, outbox y despliegue ya hechos y con sus pruebas
@@ -132,7 +139,7 @@ cd ~/proyectos/mi-sistema && claude                # abre Claude Code en el proy
 #   /devskills:nuevo-proyecto     detecta la carpeta ya creada, salta ese paso y hace el descubrimiento con el
 #                                 Product Owner, el CONTEXTO y el SRS 0.1
 #   (el analista-arquitecto redacta el SRS, el DISEÑO y el PLAN)
-#   /devskills:ciclo EN-01        desarrollo → QA → Angel Fixer → Listo
+#   /devskills:ciclo EN-01        desarrollo → revisión → merge; /devskills:ciclo cierre-S01 → QA del sprint → Listo
 #   /devskills:guarda-todo        commit, transcripción, gitleaks y memoria al cerrar la sesión
 ```
 
@@ -152,11 +159,11 @@ cd ~/proyectos/mi-sistema && claude                # abre Claude Code en el proy
 | `dev-integraciones` | Adaptadores, outbox, Celery y migraciones |
 | `dev-interfaz` | Vistas Django + HTMX, accesibilidad y formatos |
 | `dev-servicios` | Servicios internos separados del monolito |
-| `qa` | Valida contra el Gherkin del SRS y los requisitos no funcionales; emite el veredicto |
-| `qa-bdd` | Convierte los escenarios Gherkin en pruebas pytest-bdd |
-| `qa-no-funcional` | Verifica seguridad, rendimiento, accesibilidad y privacidad |
-| `angel-fixer` | Evalúa cumplimiento, buenas prácticas y seguridad; corrige lo crítico y lo alto |
-| `verificador` | Verificación final de una sola pasada o de una lista congelada |
+| `qa` | Valida el comportamiento: Gherkin de punta a punta, regresiones, RNF, mutaciones y ataques, al cerrar el sprint (o por historia en la excepción); emite el veredicto |
+| `qa-bdd` | Revisa y refuerza las pruebas pytest-bdd de los escenarios Gherkin; agrega regresiones entre historias |
+| `qa-no-funcional` | Verifica seguridad, rendimiento, accesibilidad y privacidad; corre los ataques que apliquen |
+| `angel-fixer` | Revisa el código: seguridad, arquitectura, buenas prácticas y deuda; por historia con la lista mínima, o evaluación completa en la excepción |
+| `verificador` | Verificación ligera (por historia) o final (cierre de sprint y excepción) de una lista congelada |
 
 > 📖 Ver [docs/agentes.md](docs/agentes.md) para la jerarquía, las skills precargadas y las reglas de cada uno.
 
@@ -174,11 +181,11 @@ cd ~/proyectos/mi-sistema && claude                # abre Claude Code en el proy
 | `evaluacion-alternativas` | Comprar o construir: evaluar un producto existente |
 | `prompts-figma` | Prompts de Figma Make derivados del SRS |
 | `generar-presentacion` | Presentación de la propuesta en `.pptx` |
-| `ciclo` · `ciclo-historia` | Ciclo completo de un elemento o de un sprint |
+| `ciclo` · `ciclo-historia` | Ciclo de calidad híbrido de un elemento, de un sprint o de su cierre |
 | `implementar-historia` | Desarrollo con TDD, arquitectura hexagonal y lecciones aprendidas |
-| `validar-historia` | Validación de QA con veredicto |
+| `validar-historia` | Validación de QA (cierre de sprint o por historia) con veredicto |
 | `registrar-avance` | Reporte, estado oficial y plan tachado |
-| `angel-fixer` | Evaluación y remediación |
+| `angel-fixer` | Revisión por historia, evaluación y remediación |
 | `gga` | Auditoría de seguridad con dos auditores ciegos |
 | `judgment-day` | Revisión adversarial con dos jueces ciegos |
 | `preguntar-al-po` | Decisiones numeradas con opción recomendada, por terminal o Telegram |
@@ -225,10 +232,13 @@ Opciones de `init`: `--nombre`, `--slug`, `--puerto-base`, `--puertos-reservados
 
 ## 🔁 Cómo funciona el ciclo
 
-- **Rondas:** desarrollo → QA → Angel Fixer. Cualquier hallazgo vuelve al desarrollador con la lista exacta. Máximo 3 rondas; después decide el Product Owner.
-- **Lista congelada:** una ronda extra solo resuelve y verifica lo pendiente, sin abrir búsquedas nuevas.
+- **Roles sin traslape:** el Angel Fixer revisa el código (seguridad, arquitectura, buenas prácticas, deuda); QA revisa el comportamiento (Gherkin de punta a punta, regresiones entre historias, RNF, mutaciones y ataques).
+- **Por historia:** desarrollo con TDD → revisión por historia del Angel Fixer (código más lista mínima: build sin advertencias, pruebas en verde, gitleaks limpio, cada escenario con su prueba) → lista congelada → correcciones (máximo 3 rondas) → verificación ligera por otro agente → merge. El elemento queda **En validación**.
+- **Al cerrar el sprint:** QA completo sobre todo el diff del sprint → lista congelada → correcciones → verificación final independiente → todos los elementos pasan a **Listo** con su reporte.
+- **Excepción:** seguridad, plataforma o núcleo compartido, o lo que el orquestador marque como crítico, llevan QA y Angel Fixer en paralelo por historia antes del merge.
+- **Rondas:** máximo 3; después decide el Product Owner. Una ronda extra solo resuelve y verifica la lista congelada, sin abrir búsquedas nuevas.
 - **Cero deuda:** hallazgos críticos, altos, medios y bajos bloquean el Listo. Lo que es de otro elemento se anota con su ID.
-- **Puntos de control:** rama por elemento, commit `wip` antes de cada revisión, y squash a `main` al cerrar. Nadie reconstruye un archivo de memoria.
+- **Puntos de control:** rama por elemento (y `cierre-sNN` por sprint), commit `wip` antes de cada revisión, y squash a `main` al cerrar. Nadie reconstruye un archivo de memoria.
 - **Quién decide:** el Product Owner lo de negocio; el orquestador lo técnico. Todo queda registrado con quién lo decidió.
 
 > 📖 Ver [docs/metodologia.md](docs/metodologia.md) · [docs/stack.md](docs/stack.md) · [docs/telegram.md](docs/telegram.md)

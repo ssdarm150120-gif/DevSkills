@@ -20,12 +20,12 @@ DevSkills, metodología y stack para construir cualquier sistema, trae 22 skills
 
 | Skill | Quién la usa | Qué hace |
 |-------|--------------|----------|
-| `ciclo` (atajo) | Tú | `/devskills:ciclo HU-35` o `/devskills:ciclo S05` → invoca `ciclo-historia` (sin reglas propias; es la única fuente) |
-| `ciclo-historia` | Orquestador | Rama y puntos de control, desarrollo, QA, Angel Fixer, rondas (máximo 3), pregunta al Product Owner, lista congelada, verificación final, reporte, plan, gitleaks y squash a `main` |
-| `implementar-historia` | dev-a, dev-b | TDD, ubicación en la arquitectura, checklist de reglas y de lecciones aprendidas, entrega sin commit |
-| `validar-historia` | qa, verificador | Gherkin del SRS a pytest-bdd, RNF, batería y mutaciones, veredicto |
-| `angel-fixer` | angel-fixer, verificador | Modo evaluación (historia, buenas prácticas, seguridad) y modo remediación (hallazgos de GGA) |
-| `registrar-avance` | Orquestador | Reporte con la plantilla, `estado_backlog.json`, índice, y regeneración del plan y el tablero |
+| `ciclo` (atajo) | Tú | `/devskills:ciclo HU-35`, `/devskills:ciclo S05` o `/devskills:ciclo cierre-S05` → invoca `ciclo-historia` (sin reglas propias; es la única fuente) |
+| `ciclo-historia` | Orquestador | Ciclo híbrido: clasificación (normal o excepción), rama y puntos de control, desarrollo, revisión por historia del Angel Fixer, lista congelada, verificación ligera, merge En validación, QA de cierre del sprint y verificación final; en la excepción, QA y Angel Fixer en paralelo por historia. Rondas (máximo 3), pregunta al Product Owner, reporte, plan, gitleaks y squash a `main` |
+| `implementar-historia` | dev-a, dev-b | TDD (con el Gherkin del SRS copiado tal cual a pytest-bdd), ubicación en la arquitectura, checklist de reglas y de lecciones aprendidas, lista mínima, entrega sin commit |
+| `validar-historia` | qa, verificador | Comportamiento: modo cierre de sprint (todo el diff del sprint, regresiones entre historias, RNF, 10 a 15 mutaciones, ataques) y modo por historia para la excepción; veredicto |
+| `angel-fixer` | angel-fixer, verificador | Código: modo revisión por historia (lista mínima, sin mutaciones, ataques ni fixes), modo evaluación (excepción) y modo remediación (hallazgos de GGA) |
+| `registrar-avance` | Orquestador | Reporte con la plantilla (parcial y En validación hasta el cierre del sprint), reporte `CIERRE-S{NN}`, `estado_backlog.json`, índice, y regeneración del plan y el tablero |
 
 ## Calidad adicional
 
