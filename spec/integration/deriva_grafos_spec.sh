@@ -169,8 +169,29 @@ PY
     The output should include '| Nota de crédito | documentacion/DISENO.md |'
   End
 
+  # Éxito (0) = NO hay un Graphify utilizable: falta el binario, su versión no es 0.9.x o superior (otro paquete
+  # que también se llame `graphify`), o `graphify update` no funciona sobre un directorio de prueba.
+  sin_graphify_compatible() {
+    local version mayor menor prueba
+    command -v graphify >/dev/null 2>&1 || return 0
+    version="$(graphify --version 2>/dev/null | tr -d '\r' | sed -n 's/^graphify \([0-9][0-9]*\)\.\([0-9][0-9]*\)\..*$/\1 \2/p' | head -n 1)"
+    [[ -n "$version" ]] || return 0
+    read -r mayor menor <<<"$version"
+    if [[ "$mayor" -eq 0 && "$menor" -lt 9 ]]; then return 0; fi
+    prueba="$(mktemp -d)"
+    mkdir -p "$prueba/codigo/ventas"
+    printf 'class Pedido:\n    pass\n' >"$prueba/codigo/ventas/pedido.py"
+    if (cd "$prueba" && GRAPHIFY_BACKEND=none GRAPHIFY_NO_TIPS=1 graphify update codigo >/dev/null 2>&1) \
+      && [[ -f "$prueba/codigo/graphify-out/graph.json" ]]; then
+      rm -rf "$prueba"
+      return 1
+    fi
+    rm -rf "$prueba"
+    return 0
+  }
+
   It 'con graphify real: los grafos de un proyecto nuevo excluyen sesiones, datos y migraciones'
-    Skip if 'no hay graphify' ! command -v graphify >/dev/null 2>&1
+    Skip if 'no hay un graphify 0.9.x o superior que funcione' sin_graphify_compatible
     proyecto_real() {
       bash "$PROJECT_ROOT/bin/devskills" init "$TMP_D/demo" --nombre "Demo" --slug demo --puerto-base 19100 \
         --correo 'ana@example.invalid' >/dev/null || return 1
