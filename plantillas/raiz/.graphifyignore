@@ -7,6 +7,9 @@
 .env
 .env.*
 *.env.local
+.envrc
+**/secrets/
+**/credentials/
 *.pem
 *.key
 *.p12
@@ -35,6 +38,33 @@ __pycache__/
 htmlcov/
 .pgdata/
 .pgdata_pruebas/
+**/staticfiles/
+venv/
+dist/
+build/
+coverage/
+
+# Datos reales, respaldos y bitácoras (mismo criterio que el .graphifyignore del repositorio DevSkills)
+data/
+datos/
+uploads/
+media/
+backups/
+respaldos/
+logs/
+*.xlsx
+*.xls
+*.csv
+*.parquet
+*.db
+*.sqlite
+*.sqlite3
+*.bak
+*.dump
+*.log
+
+# Salidas de Graphify (los grafos no se leen a sí mismos)
+graphify-out/
 
 # Lo que es (codigo/): migraciones generadas y despliegue no describen el diseño
 codigo/**/migraciones/
