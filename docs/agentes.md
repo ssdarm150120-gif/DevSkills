@@ -33,11 +33,11 @@ Sesión principal (orquestador)
 | `dev-integraciones` | Adaptadores, outbox, Celery, migraciones | `proyecto-contexto` | `adaptadores/salida/` e infraestructura |
 | `dev-interfaz` | Vistas Django + HTMX, accesibilidad | `proyecto-contexto` | `adaptadores/entrada/` y plantillas |
 | `dev-servicios` | Servicios internos separados (por ejemplo, FastAPI) | `proyecto-contexto` | La carpeta del servicio |
-| `qa` | Valida contra Gherkin y RNF, emite el veredicto | `proyecto-contexto`, `validar-historia` | Pruebas de aceptación. **No** corrige producción |
-| `qa-bdd` | Gherkin del SRS → pytest-bdd | `proyecto-contexto` | Archivos `.feature` y pasos |
-| `qa-no-funcional` | RNF con la verificación técnica del Anexo C | `proyecto-contexto` | Medir y reportar |
-| `angel-fixer` | Evalúa cumplimiento, buenas prácticas y seguridad | `proyecto-contexto`, `angel-fixer` | Fixes quirúrgicos de CRÍTICO y ALTO |
-| `verificador` | Verificación final o de lista congelada | `proyecto-contexto`, `validar-historia`, `angel-fixer` | Confirmar y corregir de forma quirúrgica |
+| `qa` | Valida el **comportamiento** (Gherkin de punta a punta, regresiones entre historias, RNF, mutaciones, ataques) al cerrar el sprint, o por historia en la excepción; emite el veredicto | `proyecto-contexto`, `validar-historia` | Pruebas de aceptación. **No** corrige producción |
+| `qa-bdd` | Revisa que el Gherkin del SRS esté copiado tal cual en pytest-bdd, lo refuerza y agrega regresiones entre historias | `proyecto-contexto` | Archivos `.feature` y pasos |
+| `qa-no-funcional` | RNF con la verificación técnica del Anexo C y ataques (solo contra la base de pruebas) | `proyecto-contexto` | Medir y reportar |
+| `angel-fixer` | Revisa el **código** (seguridad, arquitectura, buenas prácticas, deuda): por historia con la lista mínima, o evaluación completa en la excepción | `proyecto-contexto`, `angel-fixer` | Por historia, solo reportar; en la evaluación, fixes quirúrgicos de CRÍTICO y ALTO |
+| `verificador` | Verificación ligera (por historia) o final (cierre de sprint y excepción) de una lista congelada | `proyecto-contexto`, `validar-historia`, `angel-fixer` | Confirmar; en el modo final, corregir de forma quirúrgica |
 
 ## Qué generaliza cada uno
 

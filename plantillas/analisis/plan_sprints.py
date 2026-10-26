@@ -160,7 +160,7 @@ for num, nombre, pts, a, b, h, _ in resumen:
 tabla_res.append(f"| **Total** | | **{total}** | **{total_hechos} ({formatear_porcentaje(total_hechos, total)})** | **{n_sprints} sprints** | **{fmt(INICIO)} a {fmt(fechas(n_sprints)[1])} ({n_sprints * DIAS_SPRINT // 7} semanas)** |")
 
 cuerpo = (f"> Velocidad supuesta: **{VELOCIDAD} puntos por sprint** de {DIAS_SPRINT // 7} semanas. Cada entrega cierra en su propio sprint. "
-          f"Los elementos ~~tachados~~ pasaron el ciclo de calidad (desarrollo → QA → Angel Fixer) y tienen su reporte en `documentacion/avance/`.\n\n"
+          f"Los elementos ~~tachados~~ pasaron el ciclo de calidad (revisión del Angel Fixer y QA, por historia o en el cierre del sprint) y tienen su reporte en `documentacion/avance/`; los marcados 🔍 En validación ya están integrados y esperan el QA de cierre de su sprint.\n\n"
           + "\n".join(tabla_res) + "\n" + "\n".join(out))
 escribir_bloque(cuerpo)
 print(f"Terminados: {total_hechos} de {total} puntos | Historias: {len(planificadas)} | Habilitadores: {sum(1 for f in filas_sprint if f[2].startswith('EN-'))} | Puntos: {total} | Sprints: {n_sprints}")

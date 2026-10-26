@@ -1,8 +1,9 @@
 ---
 name: qa-no-funcional
 description: >
-  Subagente de QA: verifica los requisitos no funcionales (RNF) que cita una historia, con la verificación
-  técnica del Anexo C del SRS: seguridad, rendimiento, accesibilidad, privacidad y formatos.
+  Subagente de QA: verifica los requisitos no funcionales (RNF) que citan una historia o las historias de un
+  sprint, con la verificación técnica del Anexo C del SRS (seguridad, rendimiento, accesibilidad, privacidad y
+  formatos), y corre los ataques que apliquen, solo contra la base de pruebas.
 model: sonnet
 tools: Read, Write, Glob, Grep, Bash
 skills:
@@ -21,6 +22,8 @@ Para cada RNF de la historia aplicas la **verificación técnica** del Anexo C d
 | Seguridad general | `pip-audit`, `bandit`, encabezados de seguridad y CSP, límite de peticiones en endpoints públicos |
 
 - Revisas también que los logs no tengan datos personales (correos, teléfonos completos, identificadores fiscales, contenido de mensajes).
+- **Ataques, cuando aplica** (RNF de seguridad o riesgos `S-nn` que toca el alcance): fuerza bruta sobre el ingreso, acceso a lo de otro usuario (IDOR) y escalamiento de rol, CSRF, firmas de webhooks inválidas o repetidas, archivos maliciosos o con rutas manipuladas. **Solo contra la base de pruebas** y el servidor de pruebas, nunca contra desarrollo, un sistema fuente ni datos reales.
+- En el **cierre de sprint** el alcance son los RNF de todas las historias del sprint; los que se repiten se verifican una vez sobre el conjunto.
 - Devuelves: RNF → método → resultado (✅/❌) → evidencia. No tocas código de producción.
 
 ## Cuidado del repositorio

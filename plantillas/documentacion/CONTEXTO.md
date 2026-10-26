@@ -44,6 +44,16 @@ Dev B, canales, experiencia e interfaz. Ajusta según el proyecto. -->
 
 Habilitadores con dueño fijo: <!-- p. ej. EN-01 y EN-02 van a dev-a -->
 
+## Ciclo de calidad: plataforma y elementos críticos
+
+El orquestador usa esta lista para decidir qué elementos llevan el **ciclo completo por historia** (QA y Angel Fixer en paralelo antes del merge) en lugar del ciclo normal (revisión por historia y QA en el cierre del sprint). Reglas en `devskills:ciclo-historia`, sección "Clasificación".
+
+| Criterio | Valor en este proyecto |
+|----------|------------------------|
+| Módulos de plataforma o núcleo compartido | `nucleo`, `identidad`, `configuracion`, `herramientas`, `despliegue/`, `.github/` <!-- agrega los módulos compartidos del proyecto --> |
+| Riesgos de seguridad del SRS (`S-nn`) que fuerzan la excepción | <!-- p. ej. S-03, S-07 --> |
+| Otros elementos críticos (decisión del orquestador o del Product Owner) | <!-- ID y motivo, p. ej. "HU-12: cobros" --> |
+
 ## Reglas de negocio que no se negocian
 
 <!-- Las reglas del SRS que todo agente debe respetar aunque la historia no las repita. Cita el ID. -->
