@@ -33,8 +33,12 @@ QA revisa el **comportamiento**; el código (estilo, arquitectura, límites de m
 | Mutaciones | **10 a 15**, dirigidas a lo más riesgoso del diff (reglas de negocio, permisos, transiciones de estado, dinero, concurrencia) | Las reglas importantes del elemento |
 | Ataques | Cuando aplica: los RNF de seguridad y los riesgos `S-nn` que toca el sprint | Siempre que el elemento sea de seguridad |
 | Entradas extra | Las notas que dejaron las verificaciones ligeras de cada elemento | El veredicto anterior, si es re-validación |
+| Deriva (deber ser frente a lo que es) | Confirma cada candidato de `documentacion/avance/S{NN}/DERIVA-S{NN}.md`, si el orquestador lo generó | No aplica |
 
 Los defectos del cierre de sprint llevan el ID `DEF-SNN-n` (y `OBS-SNN-n` las observaciones), el elemento al que pertenecen y su desarrollador dueño; el orquestador los congela como lista.
+
+### 0b. Grafo primero (ahorra tokens)
+Si el proyecto tiene grafos de Graphify (`codigo/graphify-out/graph.json`, `documentacion/graphify-out/graph.json`), antes de explorar el código para ubicar una regla, un permiso o una transición: `graphify query "<pregunta>" --graph codigo/graphify-out/graph.json --budget 1500`, `graphify explain "<Nombre>"`, `graphify path "<A>" "<B>"` o `graphify affected "<Nombre>"` (con el mismo `--graph`), y `codigo/graphify-out/GRAPH_REPORT.md` para los módulos centrales. Para elegir las **mutaciones dirigidas** y los **escenarios que cruzan historias**, `graphify affected` sobre lo que tocó el sprint señala qué más depende de ello. Después se leen **solo** los archivos y líneas citados. El grafo refleja `main` al último merge; lo que no esté ahí se lee con `git diff`. Sin grafo o sin `graphify`, se trabaja igual con lecturas normales (no es un hallazgo y no se instala nada). Los comandos de consulta son de solo lectura.
 
 ### 1. Independencia
 QA **no corrige código de producción**. Escribe y mantiene las **pruebas de aceptación** y reporta defectos. Si una prueba falla, el defecto vuelve al desarrollador. QA trabaja sobre el commit de punto de control que le indica el orquestador y nunca ejecuta en el repositorio nada que escriba archivos de `codigo/` (las mutaciones van en una copia del scratchpad).
@@ -57,6 +61,13 @@ Revisar los RNF que cita la historia y su "verificación técnica" del Anexo C (
 - Pruebas destructivas o de permisos de base de datos (por ejemplo, el `INSERT` con un usuario de solo lectura) **solo contra la base de pruebas**, nunca contra la de desarrollo ni contra datos reales.
 - Mutaciones dirigidas **en una copia del scratchpad**: cada regla importante debe tener una prueba que falle si se rompe. En el cierre de sprint son **10 a 15**, elegidas por riesgo sobre el diff del sprint (no al azar ni repartidas por igual). Una mutación que sobrevive es una observación.
 - Ataques (cuando aplica, delegados en `devskills:qa-no-funcional`): fuerza bruta sobre el ingreso, acceso a lo de otro usuario (IDOR) y escalamiento de rol, CSRF, firmas de webhooks inválidas o repetidas, archivos maliciosos o con rutas manipuladas. **Solo contra la base de pruebas** y el servidor de pruebas, nunca contra desarrollo ni datos reales.
+
+### 4b. Deriva entre el deber ser y lo que es (cierre de sprint)
+Si existe `DERIVA-S{NN}.md` (lo genera el orquestador con `deriva_grafos.py` al abrir el cierre), cada fila es un **candidato**, no un hallazgo:
+- `D-n` (el diseño lo dice y el código no lo tiene): confirma con `graphify query`/`explain` sobre el grafo del código y, si hace falta, leyendo la sección citada del SRS o del DISEÑO. Si el elemento del diseño pertenece a una historia **de este sprint**, es una observación; si es de otro elemento del plan, se anota con su ID (no es deuda).
+- `C-n` (el código lo tiene y el diseño no lo dice): confirma leyendo el archivo citado y buscando el nombre en el DISEÑO (el nivel estructural solo ve encabezados: lo que el DISEÑO declara en tablas no aparece en el grafo).
+- Lo confirmado va como `OBS-SNN-n` con su causa probable (falta código, falta diseño o decisión de negocio); el orquestador asigna el dueño. Los falsos positivos se listan con su motivo.
+- Si el reporte dice "No se midió la deriva" o no existe, se anota **"deriva no medida (sin grafos)"** como verificación omitida; no cambia el veredicto.
 
 ### 5. Criterio de veredicto
 | Veredicto | Condición |
@@ -83,6 +94,7 @@ En el cierre de sprint el veredicto es del sprint y además se da **por elemento
 **Regresiones entre historias:** escenarios agregados y resultado (cierre de sprint)
 **Mutaciones:** N probadas, N detectadas (qué regla atacó cada una)
 **Ataques:** cuáles y resultado (o "no aplica")
+**Deriva:** D-n y C-n confirmados (como OBS-SNN-n) y descartados con motivo, o "deriva no medida (sin grafos)" (cierre de sprint)
 **Veredicto por elemento:** HU-xx APROBADA · HU-yy RECHAZADA (DEF-SNN-1) (cierre de sprint)
 **Defectos:** DEF-<ID>-1 (Alta) …
 **Observaciones:** OBS-1 …
@@ -95,5 +107,8 @@ En el cierre de sprint el veredicto es del sprint y además se da **por elemento
 # desde codigo/
 python -m pytest -k HU_35 --gherkin-terminal-reporter
 git diff --stat inicio-s05..main                       # alcance del cierre de sprint (solo lectura)
+# desde la raíz, si hay grafos (solo lectura, sin LLM)
+graphify affected "Pedido" --graph codigo/graphify-out/graph.json        # qué depende de lo que tocó el sprint
+graphify explain "Factura" --graph codigo/graphify-out/graph.json        # confirmar un candidato D-n de la deriva
 python -m pytest --cucumberjson=../documentacion/avance/_resultados.json
 ```

@@ -258,6 +258,7 @@ Las imágenes de Docker de gitleaks y semgrep se fijan por **digest** (`etiqueta
 | mermaid-cli | Diagramas en los Word | En una carpeta local con versión fija, ver [generadores](generadores.md) |
 | GitHub CLI (`gh`) | Remoto privado y revisión del CI | Ver "GitHub CLI (`gh`) y el CI" |
 | Plugin engram | Memoria entre sesiones | Como plugin de Claude Code |
+| Graphify | Grafos del deber ser y de lo que es, deriva en el cierre del sprint y consultas que ahorran tokens | `uv tool install graphifyy` (o `pipx install graphifyy`). Sin él, el método sigue con lecturas normales. Ver [graphify](graphify.md) |
 
 ### Docker es opcional
 

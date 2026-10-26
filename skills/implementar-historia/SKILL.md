@@ -7,7 +7,7 @@ description: >
 license: MIT
 metadata:
   author: devskills
-  version: "1.0"
+  version: "1.1"
 ---
 
 ## When to Use
@@ -20,9 +20,10 @@ metadata:
 ### Paso 0. Entender antes de tocar código
 1. Cargar `devskills:proyecto-contexto` y leer `documentacion/CONTEXTO.md`.
 2. Leer en `documentacion/SRS.md`: la historia (Anexo B) con sus escenarios Gherkin, los RF y RNF de su línea "Trazabilidad", y su caso de uso (Anexo A). Para un EN, leer el ADR o la sección de `documentacion/DISENO.md` que cita el plan.
-3. Verificar la **Definición de Listo**. Si falta algo, hay una contradicción o el DISEÑO no define lo que hace falta (por ejemplo, los métodos de un puerto o dónde vive), **detenerse antes de escribir código y reportarlo**: no inventar requisitos ni diseño.
-4. **Estimar contra el plan:** si el elemento excede claramente sus puntos (por ejemplo, 13 o más para algo estimado en 5), **detenerse y reportarlo** con la estimación y una propuesta para partirlo. Lección del proyecto modelo: dos habilitadores que no se detuvieron llevaron 3 y 6 rondas; los que se detuvieron cupieron en lo estimado.
-5. Marcar el elemento como `En proceso` en `documentacion/avance/estado_backlog.json`.
+3. **Ubicar con el grafo antes de leer (ahorra tokens):** si existe `codigo/graphify-out/graph.json`, para saber dónde vive lo que vas a tocar, quién lo usa y qué se rompe si cambia, consulta primero `graphify query "<pregunta>" --graph codigo/graphify-out/graph.json --budget 1500`, `graphify explain "<Nombre>"`, `graphify path "<A>" "<B>"` o `graphify affected "<Nombre>"` (con el mismo `--graph`) y `codigo/graphify-out/GRAPH_REPORT.md`; para el diseño, `--graph documentacion/graphify-out/graph.json`. Después lee **solo** los archivos y líneas que cita, en lugar de recorrer módulos completos. El grafo refleja `main` al último merge (lo de tu rama se ve con `git diff`). Sin grafo o sin `graphify`, lecturas normales: no lo instales ni corras `graphify update`/`extract` (los grafos los actualizan el orquestador y el analista-arquitecto).
+4. Verificar la **Definición de Listo**. Si falta algo, hay una contradicción o el DISEÑO no define lo que hace falta (por ejemplo, los métodos de un puerto o dónde vive), **detenerse antes de escribir código y reportarlo**: no inventar requisitos ni diseño.
+5. **Estimar contra el plan:** si el elemento excede claramente sus puntos (por ejemplo, 13 o más para algo estimado en 5), **detenerse y reportarlo** con la estimación y una propuesta para partirlo. Lección del proyecto modelo: dos habilitadores que no se detuvieron llevaron 3 y 6 rondas; los que se detuvieron cupieron en lo estimado.
+6. Marcar el elemento como `En proceso` en `documentacion/avance/estado_backlog.json`.
 
 ### Paso 1. Ubicar el trabajo en la arquitectura
 | Qué toca la historia | Dónde va | Subagente |
@@ -112,4 +113,7 @@ class ConfirmarSolicitud:
 python -m pytest <modulo>/pruebas -q
 lint-imports && ruff check . && ruff format --check . && mypy .
 python manage.py makemigrations --check --dry-run
+# desde la raíz, si hay grafo (solo lectura, sin LLM)
+graphify query "¿dónde se valida el estado del pedido?" --graph codigo/graphify-out/graph.json --budget 1500
+graphify affected "Pedido" --graph codigo/graphify-out/graph.json
 ```

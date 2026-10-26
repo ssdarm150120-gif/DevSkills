@@ -22,6 +22,8 @@
 
 **Entradas recibidas de las verificaciones ligeras:** {Ninguna / lista con su resultado}
 
+**Deriva entre el deber ser y lo que es:** {[DERIVA-S{NN}](DERIVA-S{NN}.md), nivel estructural o semántico: candidatos confirmados (OBS-S{NN}-n, con su causa: falta código, falta diseño o decisión de negocio) y descartados con su motivo / deriva no medida (sin grafos)}
+
 ## 3. Lista congelada y rondas
 | ID | Elemento | Severidad | Dueño | Ronda en que se corrigió | Estado |
 |----|----------|-----------|-------|--------------------------|--------|

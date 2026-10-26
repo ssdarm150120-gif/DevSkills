@@ -13,7 +13,7 @@ description: >
 license: MIT
 metadata:
   author: devskills
-  version: "3.0"
+  version: "3.1"
 ---
 
 ## Modos
@@ -116,6 +116,8 @@ if reporte.dueno_id != actor.id and not actor.puede("ver_todos_los_reportes"):
 
 ### Patrón 5: revisión del código — qué revisar (revisión por historia y evaluación)
 Primero lees: la historia (escenarios de aceptación), sus requisitos trazados y su caso de uso, las reglas de arquitectura y convenciones del proyecto (`devskills:proyecto-contexto`, `documentacion/CONTEXTO.md`, `SRS.md`, `DISENO.md`) y, en la evaluación, el veredicto de QA si ya existe.
+
+**Grafo primero (ahorra tokens):** si existe `codigo/graphify-out/graph.json`, antes de recorrer el código para revisar límites de módulos, dependencias o el alcance de un cambio, consulta `graphify affected "<Nombre>" --graph codigo/graphify-out/graph.json` (qué depende de lo que tocó el elemento), `graphify path "<A>" "<B>"` (si un módulo llega a otro sin pasar por `api_publica.py`), `graphify explain "<Nombre>"` y la sección de ciclos de importación y nodos centrales de `codigo/graphify-out/GRAPH_REPORT.md`. Después lees **solo** los archivos citados y el diff del punto de control (`git diff main...<rama>`), que es lo que el grafo todavía no tiene. Sin grafo o sin `graphify`, lecturas normales: no es un hallazgo y no se instala nada. Los comandos de consulta son de solo lectura; `graphify update` y `extract` no los corres tú.
 
 **A. Trazabilidad del código a la historia**
 - [ ] Cada escenario Gherkin del SRS tiene su `.feature` y su prueba automatizada (se comprueba leyendo; ejecutarla de punta a punta y juzgar el comportamiento es de QA).

@@ -9,7 +9,7 @@ description: >
 license: MIT
 metadata:
   author: devskills
-  version: "2.0"
+  version: "2.1"
 ---
 
 ## When to Use
@@ -33,7 +33,7 @@ La única excepción es una **decisión explícita del Product Owner** de cerrar
 - Ruta: `documentacion/avance/S{NN}/{ID}.md`, con `NN` = sprint del plan con dos dígitos (por ejemplo, `documentacion/avance/S05/HU-42.md`).
 - Usar la plantilla de [assets/plantilla_reporte.md](assets/plantilla_reporte.md), completa, sin dejar secciones vacías. El campo **Ciclo** dice si fue normal o excepción, y por qué.
 - **Ciclo normal, en el merge:** reporte **parcial**: la sección de QA dice "Pendiente del QA de cierre del sprint S{NN}" y el estado es `En validación`; todo lo demás (revisión por historia, rondas, verificación ligera, decisiones) va completo. **En el cierre del sprint** se completa: la parte del QA de cierre que le toca al elemento (su veredicto, escenarios, defectos `DEF-SNN-n`), las correcciones y la verificación final, y el estado `Listo`.
-- **Cierre del sprint:** además, `documentacion/avance/S{NN}/CIERRE-S{NN}.md` con la plantilla de [assets/plantilla_cierre_sprint.md](assets/plantilla_cierre_sprint.md): alcance del diff, QA de cierre completo, lista congelada, rondas, verificación final y estado de cada elemento.
+- **Cierre del sprint:** además, `documentacion/avance/S{NN}/CIERRE-S{NN}.md` con la plantilla de [assets/plantilla_cierre_sprint.md](assets/plantilla_cierre_sprint.md): alcance del diff, QA de cierre completo, **deriva entre el deber ser y lo que es** (enlace a `DERIVA-S{NN}.md`, candidatos confirmados y descartados, o "deriva no medida (sin grafos)"), lista congelada, rondas, verificación final y estado de cada elemento.
 - Incluir los resúmenes de QA, del Angel Fixer y del verificador **tal como los entregaron**, más el commit o la rama.
 - Separar siempre quién decidió: Product Owner, orquestador o desarrollador.
 
@@ -46,8 +46,9 @@ La única excepción es una **decisión explícita del Product Owner** de cerrar
    Estados válidos: `En proceso`, `En validación`, `Listo`, `Bloqueado`.
 2. **Regenerar el plan y el tablero:** `python documentacion/analisis/plan_sprints.py` desde la raíz del proyecto. El script **tacha** los elementos Listo en `documentacion/PLAN.md`, actualiza los porcentajes por entrega y regenera el tablero `documentacion/plan_sprints.html`. **Nunca editar `documentacion/PLAN.md` a mano.** Comprueba que quedó tachado.
 3. Agregar una línea al índice `documentacion/avance/README.md` (fecha, ID, sprint, veredicto de QA con rondas, resultado del Angel Fixer, estado, enlace al reporte). En el merge de un elemento normal, el veredicto de QA dice "Pendiente (cierre S{NN})"; en el cierre del sprint se actualiza esa misma línea (veredicto y estado) y se agrega una línea `CIERRE-S{NN}` con el enlace a su reporte.
-4. Guardar en engram (el orquestador, con `mem_save`; project de `CONTEXTO.md`, topic_key `<project>/avance/<ID>`) el resultado y los hallazgos no obvios.
-5. **CI sin remoto:** si `git remote` no lista ninguno, el reporte marca **"CI no ejecutado (sin remoto)"** y enumera como **verificación pendiente** lo que solo cubre el CI (semgrep sin vía local, hadolint, trivy, construcción de la imagen, pruebas de despliegue). Al cerrar una entrega, esa lista exige correr las pruebas localmente con Docker (ver "Cierre de entrega" en `devskills:ciclo-historia`).
+4. **Grafo (si hay `graphify`):** el grafo del código se actualiza **después** del squash (commit aparte `chore(graph): ...`), así que el reporte del elemento no lo cita; el reporte del cierre del sprint dice con qué grafos se midió la deriva o "deriva no medida (sin grafos)". Los grafos no son requisito del Listo.
+5. Guardar en engram (el orquestador, con `mem_save`; project de `CONTEXTO.md`, topic_key `<project>/avance/<ID>`) el resultado y los hallazgos no obvios.
+6. **CI sin remoto:** si `git remote` no lista ninguno, el reporte marca **"CI no ejecutado (sin remoto)"** y enumera como **verificación pendiente** lo que solo cubre el CI (semgrep sin vía local, hadolint, trivy, construcción de la imagen, pruebas de despliegue). Al cerrar una entrega, esa lista exige correr las pruebas localmente con Docker (ver "Cierre de entrega" en `devskills:ciclo-historia`).
 
 ## Commands
 

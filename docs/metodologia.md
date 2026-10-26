@@ -52,11 +52,13 @@ Desarrollo (TDD) ──► punto de control ──► Revisión por historia (An
 7. **Lista congelada → correcciones → verificación final independiente**, en la rama `cierre-sNN`. Lo que QA encuentra se corrige en el mismo sprint (cero deuda).
 8. **Listo.** Todos los elementos aprobados pasan a Listo, se completan sus reportes, se escribe `CIERRE-S{NN}.md` y se regenera el plan (quedan tachados).
 
+Si el proyecto usa Graphify, al abrir el cierre el orquestador genera el **reporte de deriva** entre el grafo del deber ser (documentación) y el de lo que es (código) y QA confirma cada candidato: lo confirmado entra a la lista congelada como observación (falta código, falta diseño o decisión de negocio). Ver [graphify](graphify.md).
+
 ### La excepción: ciclo completo por historia
 Los elementos de **seguridad** (riesgos `S-nn`, autenticación, autorización, archivos, secretos), de **plataforma o núcleo compartido** (los módulos que lista `CONTEXTO.md`) o que el orquestador marque como **críticos** no esperan al cierre del sprint: QA (por historia) y el Angel Fixer (evaluación, con fixes quirúrgicos de CRÍTICOS y ALTOS) corren en paralelo, se corrige, y la verificación final confirma **antes** del merge, que los deja en Listo. En la duda, excepción.
 
 ### Cierre, en este orden (cada merge y cada cierre de sprint)
-(1) En la rama: reporte, `estado_backlog.json`, índice y plan y tablero regenerados, en un punto de control. (2) gitleaks (código 0; el 2 significa que la herramienta no está disponible). (3) Squash a `main` en **un solo commit** que lleva el código **y** el reporte, el estado, el índice y el `PLAN.md`: `main` nunca muestra un elemento sin su evidencia. (4) Solo si cambió SRS o DISEÑO: Anexo C, plan y Word en commits `docs:` aparte sobre `main`, cada uno tras gitleaks. (5) Engram y respuesta; un `push`, solo con la confirmación del usuario y después de todo lo anterior.
+(1) En la rama: reporte, `estado_backlog.json`, índice y plan y tablero regenerados, en un punto de control. (2) gitleaks (código 0; el 2 significa que la herramienta no está disponible). (3) Squash a `main` en **un solo commit** que lleva el código **y** el reporte, el estado, el índice y el `PLAN.md`: `main` nunca muestra un elemento sin su evidencia. (3b) Si hay Graphify: grafo del código actualizado sin LLM en un commit aparte `chore(graph): ...`, tras gitleaks. (4) Solo si cambió SRS o DISEÑO: Anexo C, plan, Word y grafo del deber ser en commits `docs:` aparte sobre `main`, cada uno tras gitleaks. (5) Engram y respuesta; un `push`, solo con la confirmación del usuario y después de todo lo anterior.
 
 ## Reglas que no se negocian
 

@@ -71,6 +71,27 @@ El orquestador usa esta lista para decidir qué elementos llevan el **ciclo comp
 - <!-- formatos (moneda, identificadores, teléfonos), zonas horarias, países -->
 - **Nada propio de la empresa escrito en el código:** nombres, dominios, identificadores, horarios o cualquier dato del negocio van en configuración, no en constantes.
 
+## Grafo de conocimiento (Graphify)
+
+Dos grafos del proyecto con [Graphify](https://github.com/Graphify-Labs/graphify), para consultar antes de leer archivos en masa y para medir la **deriva** entre lo que el diseño dice y lo que el código hace. Son **opcionales**: sin `graphify` (lo instala la persona: `uv tool install graphifyy`) el método funciona igual, con lecturas normales, y el cierre del sprint anota la deriva como verificación omitida. Reglas completas en `devskills:proyecto-contexto`.
+
+| Grafo | Fuente | Comando (desde la raíz) | Costo | Se actualiza |
+|-------|--------|-------------------------|-------|--------------|
+| **Lo que es** | `codigo/` | `GRAPHIFY_BACKEND=none graphify update codigo` | Sin LLM (AST), 0 tokens | Tras el squash a `main` de cada elemento y del cierre del sprint (orquestador) |
+| **Deber ser** (estructural) | Encabezados de SRS, DISEÑO, PLAN, CONTEXTO y evaluación de alternativas | `GRAPHIFY_BACKEND=none graphify update documentacion` | Sin LLM, 0 tokens | En cada pasada documental (analista-arquitecto) |
+| **Deber ser** (semántico) | Conceptos y relaciones del texto de esos documentos | `graphify extract documentacion --backend <backend>` | **Usa un LLM** | Solo si el Product Owner lo autorizó (abajo) |
+
+| Decisión | Valor en este proyecto |
+|----------|------------------------|
+| Pasada semántica del deber ser | <!-- "no autorizada" (por omisión) / "ollama" / "claude-cli" / "API: <proveedor>"; quién decidió y fecha --> |
+
+- **Pasada semántica:** por omisión **no se genera**, para no gastar sin permiso. La primera vez el orquestador se la pregunta al Product Owner con las opciones: **Ollama local** (gratis, nada sale del equipo; `--backend ollama`, modelo con `OLLAMA_MODEL`), **claude-cli** (usa la suscripción de Claude Code, sin API key; consume cuota del plan; `--backend claude-cli`) o **API key** (`ANTHROPIC_API_KEY` con `--backend claude`, u otro proveedor; cobro por tokens y los documentos salen al proveedor). Siempre con `--backend` explícito: sin él, Graphify toma cualquier API key del entorno. `graphify label` y `graphify cluster-only` sin `--no-label` también llaman a un LLM: solo con la misma autorización.
+- **Versionado:** se versionan `graph.json` y `GRAPH_REPORT.md` de `codigo/graphify-out/` y `documentacion/graphify-out/`; `graph.html`, cachés y estado son locales (`.gitignore`). Commit aparte: `chore(graph): refresh code graph after <ID>` o `docs(graph): refresh design graph`.
+- **Merge driver:** `.gitattributes` une los `graph.json` de dos ramas con `graphify merge-driver`. `devskills init` deja la configuración local; en un clon nuevo: `git config merge.graphify.name "graphify graph.json union merge"` y `git config merge.graphify.driver "graphify merge-driver %O %A %B"`. **No** uses `graphify hook install`: regenera el grafo tras cada commit y ensucia el árbol después de cada punto de control.
+- **Nada sensible en el grafo:** `.graphifyignore` (raíz) deja fuera `.env*`, llaves, datos, migraciones, sesiones, Word y avance (`.graphifyrc` no sirve para excluir: solo admite `language.<ext>` y `viz_node_limit`). gitleaks (`gitleaks_archivos.py`) escanea los grafos versionados antes de cada commit que los incluya; si encuentra algo, no hay commit: se agrega la exclusión, se regenera el grafo y se rota el secreto.
+- **Consultar antes de leer:** `graphify query "<pregunta>" --graph codigo/graphify-out/graph.json --budget 1500`, `graphify explain "<Nombre>" --graph ...`, `graphify path "<A>" "<B>" --graph ...`, `graphify affected "<Nombre>" --graph ...` y `codigo/graphify-out/GRAPH_REPORT.md`; después, solo los archivos y líneas que citan. El grafo refleja `main` al último merge: lo que cambió en la rama del elemento se lee con `git diff`.
+- **Deriva (cierre del sprint):** `python documentacion/analisis/deriva_grafos.py --salida documentacion/avance/S{NN}/DERIVA-S{NN}.md`.
+
 ## Entorno local
 
 - El proyecto **nunca** apunta por defecto a un puerto reservado del host ({{PUERTOS_RESERVADOS}}).

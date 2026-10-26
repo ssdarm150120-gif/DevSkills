@@ -20,6 +20,9 @@ requirements-dev.txt
 .pytest_cache/
 .ruff_cache/
 
+# Grafo de conocimiento (Graphify): herramienta de desarrollo, no viaja en la imagen
+graphify-out/
+
 # Python
 **/__pycache__/
 **/*.py[cod]

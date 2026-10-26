@@ -39,7 +39,7 @@ DevSkills, metodología y stack para construir cualquier sistema, trae 22 skills
 | Skill | Qué hace |
 |-------|----------|
 | `orquestador` | Reglas de la sesión principal: delegar, decidir lo técnico, preguntar lo de negocio, puntos de control, estado, engram, Telegram |
-| `proyecto-contexto` | Reglas comunes (arquitectura fija, convenciones, DoR, DoD, cero deuda, entorno) y la orden de leer `documentacion/CONTEXTO.md` |
+| `proyecto-contexto` | Reglas comunes (arquitectura fija, convenciones, DoR, DoD, cero deuda, entorno, grafo de conocimiento con Graphify) y la orden de leer `documentacion/CONTEXTO.md` |
 | `preguntar-al-po` | Decisiones numeradas con opción recomendada; terminal (`AskUserQuestion`) o Telegram; esperar; registrar quién decidió |
 | `guarda-todo` | Commit, transcripción con `exportar_sesion.py`, gitleaks, commit y resumen en engram |
 | `recuperar-corte` | Diagnóstico, commit de respaldo, reanudar al mismo agente con `SendMessage` sin rehacer, y limpieza |
