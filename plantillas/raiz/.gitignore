@@ -24,6 +24,12 @@ service-account*.json
 .pgpass
 .pypirc
 
+# Graphify: se versionan solo graph.json y GRAPH_REPORT.md de cada grafo (codigo/ y documentacion/); las cachés, el
+# estado de la extracción, la memoria de consultas y graph.html (crece con el grafo y se regenera) son locales
+**/graphify-out/*
+!**/graphify-out/graph.json
+!**/graphify-out/GRAPH_REPORT.md
+
 # Archivos de trabajo de DevSkills (borrador de lecciones, engram pendiente): nunca se versionan
 .devskills/
 

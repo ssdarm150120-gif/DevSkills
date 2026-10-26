@@ -1,0 +1,51 @@
+# Exclusiones de Graphify (sintaxis de .gitignore; Graphify también respeta el .gitignore del proyecto).
+# Los grafos se versionan (codigo/graphify-out/graph.json y documentacion/graphify-out/graph.json): nada de lo que
+# entra al grafo puede ser una credencial ni un dato del negocio. Ver "Grafo de conocimiento (Graphify)" en
+# documentacion/CONTEXTO.md. Las rutas con barra se anclan en la raíz del proyecto.
+
+# Secretos y entorno (aunque ya estén en .gitignore: el grafo nunca los lee)
+.env
+.env.*
+*.env.local
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+id_rsa*
+id_ed25519*
+credentials*.json
+service-account*.json
+*.secret
+*.secrets
+.netrc
+.pgpass
+.pypirc
+.devskills/
+
+# Entornos, dependencias, cachés y datos locales
+.venv/
+node_modules/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.import_linter_cache/
+htmlcov/
+.pgdata/
+.pgdata_pruebas/
+
+# Lo que es (codigo/): migraciones generadas y despliegue no describen el diseño
+codigo/**/migraciones/
+codigo/despliegue/
+
+# Deber ser (documentacion/): solo SRS, DISEÑO, PLAN, CONTEXTO y la evaluación de alternativas.
+# Fuera: datos del negocio, transcripciones de sesiones (pueden traer datos pegados), generadores, Word y avance.
+documentacion/analisis/
+documentacion/sesiones/
+documentacion/presentacion/
+documentacion/word/
+documentacion/avance/
+documentacion/ui/
+documentacion/*.html
