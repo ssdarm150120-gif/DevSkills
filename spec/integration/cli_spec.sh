@@ -119,6 +119,45 @@ Describe 'CLI devskills'
         The output should include '✔ mermaid-cli'
       End
     End
+
+    Describe 'doctor trata Graphify como opcional'
+      # Un `graphify` falso que siempre falla simula una máquina sin Graphify.
+      setup_sin_graphify() {
+        FALSOS="$(mktemp -d)"
+        PROYECTO_G="$(mktemp -d)"
+        printf '%s\n' '#!/usr/bin/env bash' 'exit 1' >"$FALSOS/graphify"
+        chmod +x "$FALSOS/graphify"
+      }
+      cleanup_sin_graphify() {
+        cd / || true
+        rm -rf "$FALSOS" "$PROYECTO_G"
+      }
+      BeforeEach 'setup_sin_graphify'
+      AfterEach 'cleanup_sin_graphify'
+
+      doctor_sin_graphify() { PATH="$FALSOS:$PATH" bash "$PROJECT_ROOT/bin/devskills" doctor; }
+
+      It 'sin Graphify avisa que es opcional, dice cómo instalarlo y no falla'
+        When call doctor_sin_graphify
+        The status should be success
+        The output should include 'Graphify (grafo de conocimiento) (opcional)'
+        The output should include 'uv tool install graphifyy'
+        The output should include 'el método sigue funcionando igual'
+        The output should not include 'Merge driver de Graphify'
+      End
+
+      It 'dentro de un proyecto sin el merge driver dice cómo configurarlo'
+        doctor_en_proyecto() {
+          mkdir -p "$PROYECTO_G/documentacion" && : >"$PROYECTO_G/documentacion/CONTEXTO.md"
+          git -C "$PROYECTO_G" init -q
+          cd "$PROYECTO_G" && doctor_sin_graphify
+        }
+        When call doctor_en_proyecto
+        The status should be success
+        The output should include 'Merge driver de Graphify en este proyecto (opcional)'
+        The output should include 'graphify merge-driver %O %A %B'
+      End
+    End
   End
 
   Describe 'update'
@@ -539,6 +578,32 @@ print('ok')
       The line 1 of output should eq 'estado=[]'
       The line 2 of output should eq 'ignorado=.devskills/lecciones.md'
       The line 3 of output should eq 'preparado=[documentacion/avance/reporte.md]'
+    End
+
+    It 'prepara Graphify: exclusiones, grafos versionados sin cachés y merge driver local'
+      preparar_graphify() {
+        devskills init "$CARPETA/demo" --nombre "Demo" --slug demo --puerto-base 19100 --correo 'ana@example.invalid' >/dev/null
+        cd "$CARPETA/demo" || return 1
+        mkdir -p codigo/graphify-out/cache documentacion/graphify-out
+        echo '{}' >codigo/graphify-out/graph.json
+        echo '# r' >codigo/graphify-out/GRAPH_REPORT.md
+        echo '<html>' >codigo/graphify-out/graph.html
+        echo '{}' >codigo/graphify-out/cache/x.json
+        echo '{}' >codigo/graphify-out/manifest.json
+        echo '{}' >documentacion/graphify-out/graph.json
+        echo "driver=$(git config --get merge.graphify.driver)"
+        echo "atributo=$(git check-attr merge -- codigo/graphify-out/graph.json documentacion/graphify-out/graph.json | tr '\n' ' ')"
+        echo "estado=[$(git status --porcelain --untracked-files=all | LC_ALL=C sort | tr '\n' ' ')]"
+      }
+      When call preparar_graphify
+      The status should be success
+      The path "$CARPETA/demo/.graphifyignore" should be file
+      The contents of file "$CARPETA/demo/.graphifyignore" should include 'documentacion/sesiones/'
+      The contents of file "$CARPETA/demo/.graphifyignore" should include '.env.*'
+      The contents of file "$CARPETA/demo/codigo/.dockerignore" should include 'graphify-out/'
+      The line 1 of output should eq 'driver=graphify merge-driver %O %A %B'
+      The line 2 of output should eq 'atributo=codigo/graphify-out/graph.json: merge: graphify documentacion/graphify-out/graph.json: merge: graphify '
+      The line 3 of output should eq 'estado=[?? codigo/graphify-out/GRAPH_REPORT.md ?? codigo/graphify-out/graph.json ?? documentacion/graphify-out/graph.json ]'
     End
 
     It 'el .gitignore del proyecto lista .devskills/'

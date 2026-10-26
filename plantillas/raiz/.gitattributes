@@ -27,6 +27,11 @@
 .env.ejemplo text eol=lf
 Dockerfile text eol=lf
 
+# Grafos de Graphify (codigo/graphify-out y documentacion/graphify-out): si dos ramas regeneraron el grafo, el merge
+# driver de Graphify los une en vez de dejar un conflicto. Necesita la configuración local merge.graphify.* que deja
+# `devskills init`; en otro clon: ver "Grafo de conocimiento (Graphify)" en documentacion/CONTEXTO.md.
+**/graphify-out/graph.json merge=graphify
+
 # Binarios: no se tocan ni se comparan como texto.
 *.docx binary
 *.doc  binary

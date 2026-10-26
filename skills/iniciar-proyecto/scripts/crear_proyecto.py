@@ -11,7 +11,8 @@ Qué hace:
 2. Sustituye los marcadores `{{...}}` en todos los archivos de texto (ver `MARCADORES`).
 3. Fija el idioma y la zona horaria por defecto del proyecto en `codigo/configuracion/localizacion.py`
    (neutrales: `es` y `UTC`; el entorno los sobrescribe con `APP_IDIOMA` y `APP_ZONA_HORARIA`).
-4. Salvo con `--sin-git`: `git init -b main`, `git add -A` y un primer commit. Con `--correo` se fija
+4. Salvo con `--sin-git`: `git init -b main`, el merge driver local de Graphify (`merge.graphify.*`, para los
+   `graph.json` versionados), `git add -A` y un primer commit. Con `--correo` se fija
    `user.email` local del repositorio nuevo antes de ese commit; sin él se usa el correo global de git y se
    avisa cuál quedó, porque en un repositorio público el correo del autor queda visible en el historial.
 
@@ -58,6 +59,10 @@ IGNORADOS = shutil.ignore_patterns(
     ".pytest_cache", ".import_linter_cache",
 )
 MENSAJE_DEL_COMMIT = "chore: bootstrap project from devskills"
+MERGE_DRIVER_GRAPHIFY = (
+    ("merge.graphify.name", "graphify graph.json union merge"),
+    ("merge.graphify.driver", "graphify merge-driver %O %A %B"),
+)
 # El nombre y el autor se escriben tal cual en archivos de varios formatos (TOML, JSON, YAML, `.env`,
 # Markdown, Mermaid). En vez de escapar por tipo de archivo, se rechaza lo que rompería alguno:
 # comillas dobles y barra invertida (cadenas de TOML y JSON), `$`, `{` y `}` (interpolación de Compose y
@@ -292,6 +297,10 @@ def iniciar_git(destino: Path, correo: str = "") -> tuple[str, str]:
     if shutil.which("git") is None:
         raise ErrorDeCreacion("No se encontró `git`; instálalo o usa --sin-git")
     git("init", "-b", "main")
+    # Merge driver de Graphify para los graph.json versionados (`.gitattributes` de la plantilla): une los dos grafos
+    # en vez de dejar un conflicto. Es configuración local del clon; quien clone el repo la repite (ver CONTEXTO.md).
+    for clave, valor in MERGE_DRIVER_GRAPHIFY:
+        git("config", clave, valor)
     if correo:
         git("config", "user.email", correo)
     git("add", "-A")

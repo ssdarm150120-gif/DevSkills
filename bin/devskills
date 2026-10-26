@@ -66,7 +66,8 @@ Uso:
                                      por ejemplo America/Bogota (por defecto UTC; se guardan siempre en UTC)
       --sin-git                      No inicializa git ni hace el primer commit
   devskills doctor                   Revisa los requisitos: obligatorios (git, Python 3.12, Claude Code, gitleaks) y
-                                     opcionales con lo que pierdes sin ellos (Docker, semgrep, Node, mermaid-cli, gh, engram)
+                                     opcionales con lo que pierdes sin ellos (Docker, semgrep, Node, mermaid-cli, gh, Graphify,
+                                     engram); dentro de un proyecto, también el merge driver de Graphify
   devskills version                  Muestra la versión
   devskills update [--si]            Muestra los cambios del clon de origen, pide confirmación y reinstala
                                      (--si confirma sin preguntar; sin terminal es obligatorio)
@@ -144,6 +145,8 @@ cmd_init() {
   echo "  1. cd \"$ruta\" y abre Claude Code con el plugin DevSkills instalado."
   echo "  2. Pide el descubrimiento: el analista-arquitecto llena documentacion/CONTEXTO.md y el SRS 0.1."
   echo "  3. SRS → DISEÑO → PLAN → Entrega 0 de cimientos → /devskills:ciclo <ID> por historia."
+  echo "  4. Opcional, grafo de conocimiento sin LLM: graphify update codigo && graphify update documentacion"
+  echo "     (ver \"Grafo de conocimiento (Graphify)\" en documentacion/CONTEXTO.md)."
 }
 
 revisar() {
@@ -200,6 +203,16 @@ hay_mmdc() {
   command -v mmdc || test -e "$HOME/.devskills/doc/node_modules/.bin/mmdc" || test -e "$HOME/.devskills/doc/node_modules/.bin/mmdc.cmd"
 }
 
+# Graphify (grafo de conocimiento del proyecto): opcional. Sin él, los agentes exploran con lecturas normales.
+hay_graphify() {
+  graphify --version
+}
+
+# Merge driver local de Graphify para los graph.json versionados (lo deja `devskills init`; un clon nuevo lo repite).
+hay_merge_driver_graphify() {
+  git config --get merge.graphify.driver
+}
+
 hay_engram() {
   claude plugin list 2>/dev/null | grep -qi engram || command -v engram
 }
@@ -235,6 +248,14 @@ cmd_doctor() {
   revisar_opcional "mermaid-cli (diagramas de los Word)" \
     "Sin él los diagramas de los Word quedan como bloque de código. Instálalo en una carpeta local: 'npm install --save-exact --prefix ~/.devskills/doc @mermaid-js/mermaid-cli@12.0.0' y úsalo con 'md_a_word.py --mermaid ~/.devskills/doc' (ver docs/generadores.md)." hay_mmdc || opcionales=$((opcionales + 1))
   revisar_opcional "GitHub CLI (gh)" "Sin él no revisas el CI desde la terminal ni creas el remoto con un comando. Windows 'winget install GitHub.cli'; macOS 'brew install gh'." gh --version || opcionales=$((opcionales + 1))
+  revisar_opcional "Graphify (grafo de conocimiento)" \
+    "Sin él los agentes exploran el código con lecturas normales (más tokens) y el cierre del sprint omite la verificación de deriva entre el deber ser y el código; el método sigue funcionando igual. Instálalo tú: 'uv tool install graphifyy' (o 'pipx install graphifyy'; el paquete lleva doble y). Los agentes del equipo no instalan software. Ver docs/graphify.md." \
+    hay_graphify || opcionales=$((opcionales + 1))
+  if [[ -f documentacion/CONTEXTO.md ]] && git rev-parse --git-dir >/dev/null 2>&1; then
+    revisar_opcional "Merge driver de Graphify en este proyecto" \
+      "Sin él, dos ramas que regeneraron graph.json chocan en el merge. En este clon: git config merge.graphify.name 'graphify graph.json union merge' && git config merge.graphify.driver 'graphify merge-driver %O %A %B'" \
+      hay_merge_driver_graphify || opcionales=$((opcionales + 1))
+  fi
   revisar_opcional "Plugin engram (memoria persistente)" \
     "Sin él no hay memoria entre sesiones (el ciclo funciona, pero no se guarda el avance). Instálalo como plugin de Claude Code (ver README, sección Requisitos)." hay_engram || opcionales=$((opcionales + 1))
   echo ""
