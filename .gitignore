@@ -7,3 +7,9 @@ node_modules/
 .env
 .env.*
 !.env.ejemplo
+
+# Graphify: se versionan graph.json y GRAPH_REPORT.md; cachés, temporales y estado local no.
+graphify-out/*
+!graphify-out/graph.json
+!graphify-out/GRAPH_REPORT.md
+# graph.html no se versiona: pesa 4 MB (límite 2 MB); se regenera con 'graphify update .'

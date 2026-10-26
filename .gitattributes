@@ -3,3 +3,4 @@
 *.pptx binary
 *.docx binary
 *.ps1 text eol=crlf
+graphify-out/graph.json merge=graphify
