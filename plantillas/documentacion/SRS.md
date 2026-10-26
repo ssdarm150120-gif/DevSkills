@@ -331,7 +331,7 @@ retirado conserva su fila con "(**Retirado en X.Y**: lo reemplaza CU-nn)" en el 
 
 **Definición de Listo (DoR):** una historia entra a desarrollo solo si tiene trazabilidad a un RF, criterios de aceptación verificables y ningún pendiente abierto que la afecte.
 
-**Definición de Terminado (DoD):** la **común del método** vive en un solo lugar, la skill `devskills:proyecto-contexto` (escenarios Gherkin automatizados y en verde, análisis de seguridad y límites de módulos en verde, RNF verificados, QA sin observaciones, Angel Fixer sin hallazgos de ninguna severidad, verificación final y avance registrado); no se copia aquí para que no diverja. **Criterios propios de este proyecto** (si los hay, solo lo que se suma): <!-- p. ej. "la bitácora registra las acciones relevantes" SOLO si este proyecto construye una bitácora (el esqueleto no la trae) -->.
+**Definición de Terminado (DoD):** la **común del método** vive en un solo lugar, la skill `devskills:proyecto-contexto` (escenarios Gherkin automatizados y en verde, análisis de seguridad y límites de módulos en verde, RNF verificados, QA sin observaciones —en el cierre del sprint, o por historia en los elementos de seguridad, plataforma o críticos—, Angel Fixer sin hallazgos de ninguna severidad, verificación final y avance registrado); no se copia aquí para que no diverja. **Criterios propios de este proyecto** (si los hay, solo lo que se suma): <!-- p. ej. "la bitácora registra las acciones relevantes" SOLO si este proyecto construye una bitácora (el esqueleto no la trae) -->.
 
 **Orden de trabajo:** un módulo a la vez, en el orden del Anexo A. Cada módulo se valida antes de pasar al siguiente.
 

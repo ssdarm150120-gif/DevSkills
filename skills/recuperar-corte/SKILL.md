@@ -20,7 +20,7 @@ metadata:
 
 ### 1. Diagnóstico (sin tocar nada)
 1. `git status --short`, `git diff --stat` y `git stash list` en el repositorio: qué dejó a medias el agente. Si hay un `stash` que no hizo el orquestador, **no lo apliques ni lo borres** todavía: revisa su contenido con `git stash show -p` y repórtalo (ningún agente debe usar `stash`).
-2. `git log --oneline -5` y la rama actual: ¿sigue en la rama del elemento?
+2. `git log --oneline -5` y la rama actual: ¿sigue en la rama del elemento (o en `cierre-sNN` si cortó durante el cierre de un sprint)?
 3. Contenedores, redes y volúmenes con el prefijo que se le asignó al agente: `docker ps -a --filter "name=<prefijo>"`, `docker network ls --filter "name=<prefijo>"`, `docker volume ls --filter "name=<prefijo>"`. No toques los de otros prefijos (pueden ser de otro agente u otra sesión).
 4. Procesos huérfanos que el agente pudo dejar (por ejemplo, un PostgreSQL embebido de pruebas) y archivos temporales en su scratchpad.
 5. Engram: `mem_search` con el ID del elemento por si el agente guardó su avance.

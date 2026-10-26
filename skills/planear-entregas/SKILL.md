@@ -55,7 +55,8 @@ metadata:
 
 ### 3. Entregas
 - **Entrega 0, Cimientos:** sin esto nada funciona. Aquí van la adaptación del esqueleto de DevSkills al proyecto (módulos, contratos, CI, Compose), los adaptadores falsos de las integraciones, la identidad y lo que el diseño pide como base.
-- **Cierre de cada entrega:** además de que todos sus elementos estén `Listo`, se exige correr localmente con Docker lo que solo cubre el CI (imagen, hadolint, trivy, pruebas de despliegue); sin Docker se le pide al usuario y queda como verificación pendiente (ver "Cierre de entrega" en `devskills:ciclo-historia`). Sin remoto, el reporte marca "CI no ejecutado (sin remoto)".
+- **Cierre de cada sprint:** con el ciclo de calidad híbrido (`devskills:ciclo-historia`), los elementos normales quedan `En validación` al integrarse y pasan a `Listo` solo en el **QA de cierre del sprint**. Lo que no llegó a integrarse al cierre (`En proceso` o `Bloqueado`) se replanifica aquí al sprint siguiente, con la decisión del Product Owner.
+- **Cierre de cada entrega:** además de que todos sus elementos estén `Listo` (es decir, después del cierre del último sprint que la contiene), se exige correr localmente con Docker lo que solo cubre el CI (imagen, hadolint, trivy, pruebas de despliegue); sin Docker se le pide al usuario y queda como verificación pendiente (ver "Cierre de entrega" en `devskills:ciclo-historia`). Sin remoto, el reporte marca "CI no ejecutado (sin remoto)".
 - Cada entrega siguiente tiene un **objetivo medible** ligado a las metas del SRS 1.1.1 y busca **el camino más corto al valor**: si una entrega pasa muchos sprints sin valor para el negocio, se divide.
 - Escribe en P.2.1 por qué van en ese orden, y en P.3 cómo se mide cada una.
 
@@ -68,7 +69,7 @@ metadata:
 - Cuando un elemento absorbe trabajo de otro (o se lo deja), se ajustan los puntos de ambos y se anota en el historial del plan.
 
 ### 5. Velocidad y recalibración
-- La velocidad inicial es un **supuesto**. Hasta recalibrar, las fechas son una estimación, no un compromiso.
+- La velocidad inicial es un **supuesto**. La velocidad real de un sprint cuenta los puntos que quedaron `Listo` en su cierre (no los `En validación`). Hasta recalibrar, las fechas son una estimación, no un compromiso.
 - **Se recalibra después del sprint 3** con la velocidad real y se regenera el plan.
 - Si un elemento llevó mucho más esfuerzo que sus puntos, se anota en su reporte de avance ("Esfuerzo real") para la retrospectiva: si la velocidad se calcula solo con los puntos estimados, sale más baja de lo que el equipo trabajó.
 - Las fechas no descuentan feriados ni vacaciones: se absorben en la velocidad.
@@ -76,7 +77,8 @@ metadata:
 ### 6. Cuándo se regenera
 | Momento | Quién |
 |---------|-------|
-| Al cerrar cada elemento (queda **tachado** y suben los porcentajes) | `devskills:registrar-avance`, dentro de `devskills:ciclo-historia` |
+| En el merge de cada elemento (`En validación`, o **tachado** si es de la excepción) | `devskills:registrar-avance`, dentro de `devskills:ciclo-historia` |
+| Al cerrar cada sprint (sus elementos quedan **tachados** y suben los porcentajes) | `devskills:registrar-avance`, dentro de `devskills:ciclo-historia` |
 | En cada pasada documental que cambie historias, habilitadores o puntos | `devskills:pasada-documental` |
 | Al repriorizar, reestimar o recalibrar | Esta skill |
 
