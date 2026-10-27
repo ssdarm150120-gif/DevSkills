@@ -7,6 +7,8 @@
   ],
   "politica_rangos": "Bloques de 50 puertos a partir de 20000, evitando los puertos reservados.",
   "cuentas": [],
+  "raices_deteccion": [],
+  "usar_raices_defecto": true,
   "proyectos": [
     {
       "id": "ejemplo",

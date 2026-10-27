@@ -17,7 +17,8 @@ de datos del motor (variable DEVSKILLS_DATOS, o ~/.devskills; ver comun/rutas.py
            o <datos>/panel/estado-<puerto> (otras instancias).
 --claude-proyectos DIR / --claude-temp DIR: otras carpetas de transcripts (pruebas: así no se leen los reales).
 --raices DIR[;DIR]: raíces de la detección de proyectos en lugar de ~/Documents/Proyectos y ~/Desktop (pruebas); las
-           de `raices_deteccion` del registro se suman siempre. La detección es de solo lectura.
+           de `raices_deteccion` del registro se suman siempre (y con "usar_raices_defecto": false en el registro,
+           las dos de por omisión dejan de mirarse). La detección es de solo lectura.
 
 Chat con el orquestador (caja del centro de avisos): proxy servidor a servidor bajo /api/chat/...; el token del
            orquestador (su archivo .token) se relee en cada llamada y nunca llega al navegador. Solo para pruebas:
@@ -68,7 +69,7 @@ PUERTO_DEFAULT = 18950
 
 ACCIONES = {"levantar", "apagar"}
 TIPOS_ARRANQUE = {"dotnet", "npm", "django-devskills", "python-modulo", "docker-compose"}
-PROYECTOS_CLAUDE = Path.home() / ".claude" / "projects"
+PROYECTOS_CLAUDE = rutas.claude_dir() / "projects"
 TEMP_CLAUDE = Path(tempfile.gettempdir()) / "claude"
 COLA_BYTES = 256 * 1024
 MAX_TRANSCRIPTS = 30
@@ -548,7 +549,8 @@ def validar_registro(d):
             "servicios": {s["id"]: (p["id"], s) for p in proyectos for s in p["servicios"]},
             "reservados": reservados, "puerto_panel": puerto_panel, "prefijos": prefijos,
             "politica_rangos": str(d.get("politica_rangos") or ""), "cuentas": cuentas,
-            "raices_deteccion": validar_raices(d.get("raices_deteccion"))}
+            "raices_deteccion": validar_raices(d.get("raices_deteccion")),
+            "usar_raices_defecto": d.get("usar_raices_defecto") is not False}
 
 
 def detectar_conflictos(proyectos, reservados, puerto_panel):
@@ -2553,7 +2555,10 @@ def _comparar(reg_s, det):
 def detectar(forzar=False):
     """Detección completa con caché (DETECCION_CACHE_SEG o hasta que cambie el registro o las raíces)."""
     reg = registro()
-    raices = [Path(r) for r in (ESTADO.get("raices") or RAICES_DEFECTO)] + [Path(r) for r in reg["raices_deteccion"]]
+    # Por omisión se miran RAICES_DEFECTO; con "usar_raices_defecto": false en el registro solo se miran las
+    # de "raices_deteccion" (así cada equipo declara dónde guarda sus proyectos).
+    base = ESTADO.get("raices") or (RAICES_DEFECTO if reg["usar_raices_defecto"] else ())
+    raices = [Path(r) for r in base] + [Path(r) for r in reg["raices_deteccion"]]
     try:
         firma = (REGISTRO.stat().st_mtime, tuple(str(r) for r in raices))
     except OSError:

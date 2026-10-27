@@ -32,6 +32,21 @@ def datos() -> Path:
     return Path.home() / ".devskills"
 
 
+def claude_dir() -> Path:
+    """Carpeta de configuración de Claude Code: CLAUDE_CONFIG_DIR si existe y no está vacía; si no, ``~/.claude``."""
+    valor = os.environ.get("CLAUDE_CONFIG_DIR", "").strip()
+    if valor:
+        return Path(os.path.expandvars(os.path.expanduser(valor))).resolve()
+    return Path.home() / ".claude"
+
+
+def claude_json() -> Path:
+    """Archivo ``.claude.json`` de Claude Code: dentro de CLAUDE_CONFIG_DIR si está definida; si no, ``~/.claude.json``."""
+    if os.environ.get("CLAUDE_CONFIG_DIR", "").strip():
+        return claude_dir() / ".claude.json"
+    return Path.home() / ".claude.json"
+
+
 def registro() -> Path:
     return datos() / "proyectos.json"
 

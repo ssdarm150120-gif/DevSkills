@@ -49,8 +49,8 @@ class Ajustes:
     puerto: int = 18952
     rango: tuple[int, int] = (18950, 18999)
     registro: Path = field(default_factory=rutas.registro)
-    claude_home: Path = Path.home() / ".claude"
-    claude_json: Path = Path.home() / ".claude.json"
+    claude_home: Path = field(default_factory=rutas.claude_dir)
+    claude_json: Path = field(default_factory=rutas.claude_json)
     engram_db: Path = Path.home() / ".engram" / "engram.db"
     engram_alias: dict[str, list[str]] = field(default_factory=dict)
     trabajadores: int = 1

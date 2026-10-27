@@ -32,6 +32,15 @@ class Rutas(unittest.TestCase):
         with mock.patch.dict(os.environ, {"DEVSKILLS_DATOS": "  "}):
             self.assertEqual(rutas.datos(), Path.home() / ".devskills")
 
+    def test_carpeta_de_claude_code_respeta_claude_config_dir(self):
+        entorno = {k: v for k, v in os.environ.items() if k != "CLAUDE_CONFIG_DIR"}
+        with mock.patch.dict(os.environ, entorno, clear=True):
+            self.assertEqual(rutas.claude_dir(), Path.home() / ".claude")
+            self.assertEqual(rutas.claude_json(), Path.home() / ".claude.json")
+        with tempfile.TemporaryDirectory() as t, mock.patch.dict(os.environ, {"CLAUDE_CONFIG_DIR": t}):
+            self.assertEqual(rutas.claude_dir(), Path(t).resolve())
+            self.assertEqual(rutas.claude_json(), Path(t).resolve() / ".claude.json")
+
     def test_instancias_de_prueba_no_pisan_la_principal(self):
         with tempfile.TemporaryDirectory() as t, mock.patch.dict(os.environ, {"DEVSKILLS_DATOS": t}):
             self.assertEqual(rutas.panel_token(18950).name, ".token")
