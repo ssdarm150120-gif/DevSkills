@@ -1,0 +1,57 @@
+# Graphify: qué NO se indexa en el grafo de conocimiento (sintaxis de .gitignore).
+# Graphify ya omite por su cuenta node_modules, .venv, dist, build, .git y los
+# archivos que parecen secretos (.env*, *.pem, *.key, credentials*...); estas
+# reglas lo refuerzan y agregan carpetas de datos reales del proyecto.
+
+# Secretos y configuración local
+.env
+.env.*
+.envrc
+**/appsettings*.json
+**/secrets/
+**/credentials/
+*.pem
+*.key
+*.pfx
+*.p12
+
+# Dependencias, entornos y compilados
+node_modules/
+.venv/
+venv/
+env/
+bin/
+obj/
+dist/
+build/
+out/
+coverage/
+__pycache__/
+*.min.js
+**/bundle.js
+**/staticfiles/
+**/vendor/
+
+# Datos reales, respaldos y bitácoras
+data/
+datos/
+uploads/
+media/
+App_Data/
+backups/
+backup/
+respaldos/
+logs/
+*.xlsx
+*.xls
+*.csv
+*.parquet
+*.db
+*.sqlite
+*.sqlite3
+*.bak
+*.dump
+*.log
+
+# Salidas de Graphify
+graphify-out/

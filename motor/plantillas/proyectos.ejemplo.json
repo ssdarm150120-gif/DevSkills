@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "descripcion": "Registro central de proyectos locales. Fuente única del lanzador de servicios y del panel. Los comandos se arman a partir de campos estructurados (tipo de arranque en lista blanca); nunca se ejecuta texto libre.",
+  "panel": {"puerto": 18950, "rango": "18950-18999 (herramientas locales)"},
+  "puertos_reservados": [
+    {"puerto": 5432, "uso": "PostgreSQL local"}
+  ],
+  "politica_rangos": "Bloques de 50 puertos a partir de 20000, evitando los puertos reservados.",
+  "cuentas": [],
+  "proyectos": [
+    {
+      "id": "ejemplo",
+      "nombre": "Proyecto de ejemplo",
+      "descripcion": "API y cliente web de demostración",
+      "carpeta": "~/proyectos/ejemplo",
+      "rango": {"tipo": "asignado", "inicio": 20000, "fin": 20049},
+      "transcripts": [],
+      "servicios": [
+        {
+          "id": "ejemplo-api",
+          "nombre": "API",
+          "puertos": [20000],
+          "url": "http://localhost:20000",
+          "salud": "/health",
+          "abrir": "/docs",
+          "arranque": {
+            "tipo": "python-modulo",
+            "carpeta": ".",
+            "modulo": "uvicorn",
+            "argumentos": ["app.main:app", "--port=20000"]
+          }
+        },
+        {
+          "id": "ejemplo-web",
+          "nombre": "Cliente web",
+          "puertos": [20001],
+          "url": "http://localhost:20001",
+          "salud": "/",
+          "arranque": {
+            "tipo": "npm",
+            "carpeta": "web",
+            "script": "dev",
+            "instalar_si_falta": "node_modules"
+          }
+        }
+      ]
+    }
+  ]
+}

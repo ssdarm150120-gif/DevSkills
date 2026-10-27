@@ -74,6 +74,40 @@ jobs:
           if command -v cygpath >/dev/null 2>&1; then temporal="$(cygpath -u "$temporal")"; fi
           TMPDIR="$temporal" shellspec
 
+  # Motor gráfico (motor/): panel, lanzador de servicios, scripts de Graphify y orquestador opcional.
+  # Todo es biblioteca estándar de Python salvo las pruebas del orquestador, que usan pytest; las que necesitan
+  # claude-agent-sdk (opcional) se saltan solas si no está instalado.
+  motor:
+    name: Motor (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+        working-directory: motor
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Pruebas de rutas y migración
+        run: python -m unittest discover -s comun/pruebas -v
+      - name: Pruebas del lanzador de servicios (lista blanca y --simular)
+        run: python -m unittest discover -s servicios/pruebas -v
+      - name: Pruebas del panel
+        run: python -m unittest discover -s panel/pruebas -v
+      - name: Pruebas de la integración con Graphify (hook_guard.py, revisar_grafo.py, sesion_inicio.py)
+        run: python -m unittest discover -s graphify/pruebas -v
+      - name: Pruebas del orquestador (pytest; sin el SDK opcional)
+        run: |
+          python -m pip install pytest==9.1.1
+          cd orquestador && python -m pytest -q -p no:cacheprovider
+
   secretos:
     name: Secretos (gitleaks)
     runs-on: ubuntu-24.04
@@ -128,7 +162,7 @@ jobs:
   todo-en-verde:
     name: Todo en verde
     runs-on: ubuntu-24.04
-    needs: [lint, manifiestos, pruebas, secretos, esqueleto]
+    needs: [lint, manifiestos, pruebas, motor, secretos, esqueleto]
     if: always()
     steps:
       - name: Revisar resultados
@@ -136,6 +170,7 @@ jobs:
           if [[ "${{ needs.lint.result }}" != "success" ]] || \
              [[ "${{ needs.manifiestos.result }}" != "success" ]] || \
              [[ "${{ needs.pruebas.result }}" != "success" ]] || \
+             [[ "${{ needs.motor.result }}" != "success" ]] || \
              [[ "${{ needs.secretos.result }}" != "success" ]] || \
              [[ "${{ needs.esqueleto.result }}" != "success" ]]; then
             echo "Algo falló."

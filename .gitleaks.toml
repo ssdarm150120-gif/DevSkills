@@ -1,0 +1,7 @@
+# Configuración de gitleaks de DevSkills: amplía las reglas por omisión.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Las pruebas del orquestador siembran secretos FALSOS (VALOR-SECRETO-...) para comprobar que nunca se filtran"
+paths = ['''motor/orquestador/pruebas/(conftest|test_inventario)\.py''']

@@ -1,0 +1,18 @@
+{
+  "puerto": 18952,
+  "rango": [18950, 18999],
+  "trabajadores": 1,
+  "tiempo_limite_s": 600,
+  "max_turnos": 25,
+  "presupuesto_usd": {"lectura": 2.0, "cambios": 4.0},
+  "modelo": null,
+  "umbral_actividad_s": 120,
+  "politica_sesion_abierta": "nueva",
+  "lectura_permite_webfetch": false,
+  "pendiente_expira_h": 24,
+  "max_texto": 4000,
+  "max_consulta": 200,
+  "sesiones_protegidas": [],
+  "engram": {"alias": {}},
+  "alias_proyectos": {}
+}

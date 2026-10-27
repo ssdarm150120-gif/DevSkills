@@ -84,6 +84,24 @@ Uso:
                                      omisión o reactiva el existente sin tocar su tabla (--forzar la reescribe);
                                      desactivar lo apaga sin borrar la tabla; evaluar revisa si el proyecto encaja
                                      (pruebas y su comando, CI, tipos y lint, Gherkin) y da un veredicto
+  devskills panel [iniciar|apagar|estado] [--puerto N] [--no-abrir] [--simular]
+                                     Panel de control local (motor gráfico; solo biblioteca estándar de Python, escucha
+                                     en 127.0.0.1, puerto 18950 por omisión). iniciar es la acción por omisión
+  devskills servicios <levantar|apagar|listar> [objetivo] [--simular]
+                                     Lanzador multiplataforma de los servicios del registro de proyectos (lista blanca
+                                     de tipos: dotnet, npm, django-devskills, python-modulo, docker-compose);
+                                     --simular muestra qué haría sin ejecutar nada
+  devskills orquestador [instalar|iniciar|apagar|estado]
+                                     Orquestador local OPCIONAL (API para mandar instrucciones a las sesiones de Claude
+                                     Code). instalar crea un venv propio con claude-agent-sdk; sin instalarlo, el
+                                     panel y los servicios funcionan igual
+  devskills motor iniciar            Crea el registro de proyectos desde la plantilla si no existe y apunta a la
+                                     detección automática del panel
+  devskills motor migrar --desde <carpeta> [--forzar]
+                                     Copia los DATOS de una instalación previa (proyectos.json, preferencias, estado
+                                     del panel, historial y propuestas del orquestador) al directorio de datos, sin
+                                     sobrescribir lo existente (salvo --forzar) y sin tocar el origen
+                                     El directorio de datos es DEVSKILLS_DATOS o ~/.devskills (ver docs/motor.md)
   devskills help                     Muestra esta ayuda
 
 Dentro de Claude Code, el mismo arranque se hace con /devskills:nuevo-proyecto.
@@ -220,6 +238,18 @@ hay_merge_driver_graphify() {
   git config --get merge.graphify.driver
 }
 
+hay_motor() {
+  test -f "$DEVSKILLS_HOME/motor/panel/panel.py" && test -f "$DEVSKILLS_HOME/motor/servicios/servicios.py"
+}
+
+hay_registro_motor() {
+  test -f "$(datos_motor)/proyectos.json"
+}
+
+hay_orquestador() {
+  python_orquestador "$(datos_motor)"
+}
+
 hay_engram() {
   claude plugin list 2>/dev/null | grep -qi engram || command -v engram
 }
@@ -265,6 +295,14 @@ cmd_doctor() {
   fi
   if [[ -f documentacion/CONTEXTO.md ]]; then
     estado_enrutamiento "."
+  fi
+  revisar_opcional "Motor gráfico (panel y lanzador de servicios)" \
+    "Sin él no tienes el panel local ni 'devskills servicios'. Viene en la carpeta motor/ de DevSkills: reinstala o actualiza (devskills update)." hay_motor || opcionales=$((opcionales + 1))
+  if hay_motor; then
+    revisar_opcional "Registro de proyectos del motor ($(datos_motor)/proyectos.json)" \
+      "Sin él el panel no muestra proyectos. Créalo con 'devskills motor iniciar' o migra el de una instalación previa con 'devskills motor migrar --desde <carpeta>'." hay_registro_motor || opcionales=$((opcionales + 1))
+    revisar_opcional "Orquestador del motor (venv propio)" \
+      "Es opcional: sin él el panel y los servicios funcionan igual; solo pierdes mandar instrucciones a las sesiones de Claude Code desde el panel. Instálalo con 'devskills orquestador instalar'." hay_orquestador || opcionales=$((opcionales + 1))
   fi
   revisar_opcional "Plugin engram (memoria persistente)" \
     "Sin él no hay memoria entre sesiones (el ciclo funciona, pero no se guarda el avance). Instálalo como plugin de Claude Code (ver README, sección Requisitos)." hay_engram || opcionales=$((opcionales + 1))
@@ -726,6 +764,198 @@ cmd_enrutamiento() {
   esac
 }
 
+# ----------------------------------------------------------------------------
+# Motor gráfico (docs/motor.md): panel de control local, lanzador de servicios y orquestador OPCIONAL.
+# El código vive en $DEVSKILLS_HOME/motor; el ESTADO vive fuera del repositorio, en DEVSKILLS_DATOS o ~/.devskills.
+# (DEVSKILLS_HOME es la carpeta de la carga útil; por eso los datos usan otra variable.)
+# ----------------------------------------------------------------------------
+
+datos_motor() {
+  local d="${DEVSKILLS_DATOS:-$HOME/.devskills}"
+  if command -v cygpath >/dev/null 2>&1; then d="$(cygpath -m "$d")"; fi
+  echo "$d"
+}
+
+# Ruta nativa para pasársela a Python (en Windows, formato C:/...).
+ruta_nativa() {
+  if command -v cygpath >/dev/null 2>&1; then cygpath -m "$1"; else echo "$1"; fi
+}
+
+# Deja en PY el Python 3.12 y exporta DEVSKILLS_DATOS en formato nativo; devuelve 1 si falta Python o el motor.
+preparar_motor() {
+  if ! PY="$(buscar_python)"; then
+    error "Hace falta Python 3.12. Corre 'devskills doctor' para ver cómo instalarlo."
+    return 1
+  fi
+  MOTOR="$DEVSKILLS_HOME/motor"
+  if [[ ! -d "$MOTOR" ]]; then
+    error "No encuentro $MOTOR; reinstala DevSkills."
+    return 1
+  fi
+  DEVSKILLS_DATOS="$(datos_motor)"
+  export DEVSKILLS_DATOS
+}
+
+puerto_valido() { [[ "$1" =~ ^[0-9]+$ ]] && (( $1 >= 1024 && $1 <= 65535 )); }
+
+cmd_panel() {
+  local accion="" puerto="" no_abrir=false simular=false
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      iniciar|apagar|estado)
+        if [[ -z "$accion" ]]; then accion="$1"; shift; else error "Acción de más: $1"; return 2; fi ;;
+      --puerto)
+        puerto="${2:-}"
+        if ! puerto_valido "$puerto"; then error "--puerto necesita un número entre 1024 y 65535."; return 2; fi
+        shift 2 ;;
+      --no-abrir) no_abrir=true; shift ;;
+      --simular) simular=true; shift ;;
+      -h|--help) mostrar_ayuda; return 0 ;;
+      -*) error "Opción desconocida: $1"; return 2 ;;
+      *) error "Argumento de más: $1"; return 2 ;;
+    esac
+  done
+  [[ -z "$accion" ]] && accion="iniciar"
+  preparar_motor || return 1
+  local args=("$accion")
+  [[ -n "$puerto" ]] && args+=(--puerto "$puerto")
+  [[ "$no_abrir" == true ]] && args+=(--no-abrir)
+  [[ "$simular" == true ]] && args+=(--simular)
+  if [[ "$accion" == "iniciar" && ! -f "$DEVSKILLS_DATOS/proyectos.json" ]]; then
+    aviso "No hay registro de proyectos en $DEVSKILLS_DATOS. Créalo con 'devskills motor iniciar' (o migra uno previo con 'devskills motor migrar --desde <carpeta>')."
+  fi
+  "$PY" "$(ruta_nativa "$MOTOR/panel/panel.py")" "${args[@]}"
+  if [[ "$accion" == "estado" ]]; then
+    echo "Datos: $DEVSKILLS_DATOS"
+    echo "Status line de límites (opcional): python $(ruta_nativa "$MOTOR/panel/statusline_limites.py") (ver docs/motor.md)"
+  fi
+}
+
+cmd_servicios() {
+  local accion="" objetivo="" simular=false
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      levantar|apagar|detener|listar)
+        if [[ -z "$accion" ]]; then accion="$1"; shift; else error "Acción de más: $1"; return 2; fi ;;
+      --simular) simular=true; shift ;;
+      -h|--help) mostrar_ayuda; return 0 ;;
+      -*) error "Opción desconocida: $1"; return 2 ;;
+      *) if [[ -z "$objetivo" ]]; then objetivo="$1"; shift; else error "Argumento de más: $1"; return 2; fi ;;
+    esac
+  done
+  if [[ -z "$accion" ]]; then
+    error "Falta la acción. Uso: devskills servicios <levantar|apagar|listar> [objetivo] [--simular]"
+    return 2
+  fi
+  if [[ "$accion" != "listar" && -z "$objetivo" ]]; then
+    error "Falta el objetivo (id de proyecto o de servicio). Míralos con 'devskills servicios listar'."
+    return 2
+  fi
+  preparar_motor || return 1
+  local args=("$accion")
+  [[ -n "$objetivo" ]] && args+=("$objetivo")
+  [[ "$simular" == true ]] && args+=(--simular)
+  "$PY" "$(ruta_nativa "$MOTOR/servicios/servicios.py")" "${args[@]}"
+}
+
+# Python del venv del orquestador (falla si no existe).
+python_orquestador() {
+  local venv="$1/orquestador/.venv" p
+  for p in "$venv/Scripts/python.exe" "$venv/bin/python"; do
+    if [[ -x "$p" ]]; then echo "$p"; return 0; fi
+  done
+  return 1
+}
+
+cmd_orquestador() {
+  local accion=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      instalar|iniciar|apagar|estado)
+        if [[ -z "$accion" ]]; then accion="$1"; shift; else error "Acción de más: $1"; return 2; fi ;;
+      -h|--help) mostrar_ayuda; return 0 ;;
+      -*) error "Opción desconocida: $1"; return 2 ;;
+      *) error "Argumento de más: $1"; return 2 ;;
+    esac
+  done
+  [[ -z "$accion" ]] && accion="estado"
+  preparar_motor || return 1
+  local venv_py
+  if [[ "$accion" == "instalar" ]]; then
+    echo "El orquestador es OPCIONAL: el panel y los servicios funcionan sin él. Crea un venv en $DEVSKILLS_DATOS/orquestador/.venv e instala claude-agent-sdk (versión fijada)."
+    mkdir -p "$DEVSKILLS_DATOS/orquestador"
+    local venv="$DEVSKILLS_DATOS/orquestador/.venv"
+    if ! venv_py="$(python_orquestador "$DEVSKILLS_DATOS")"; then
+      "$PY" -m venv "$venv" || { error "No pude crear el venv."; return 1; }
+      venv_py="$(python_orquestador "$DEVSKILLS_DATOS")" || { error "El venv quedó sin intérprete."; return 1; }
+    fi
+    "$venv_py" -m pip install -r "$(ruta_nativa "$MOTOR/orquestador/requirements.txt")" || { error "Falló pip install."; return 1; }
+    ok "Orquestador instalado. Arráncalo con 'devskills orquestador iniciar'."
+    return 0
+  fi
+  if ! venv_py="$(python_orquestador "$DEVSKILLS_DATOS")"; then
+    if [[ "$accion" == "estado" ]]; then
+      echo "no instalado (es opcional; para usarlo: devskills orquestador instalar)"
+      return 0
+    fi
+    aviso "El orquestador es opcional y no está instalado. Instálalo con: devskills orquestador instalar"
+    return 1
+  fi
+  "$venv_py" "$(ruta_nativa "$MOTOR/orquestador/orquestador.py")" "$accion"
+}
+
+cmd_motor() {
+  local accion="" desde="" forzar=false
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      migrar|iniciar)
+        if [[ -z "$accion" ]]; then accion="$1"; shift; else error "Acción de más: $1"; return 2; fi ;;
+      --desde)
+        desde="${2:-}"
+        if [[ -z "$desde" ]]; then error "--desde necesita una carpeta."; return 2; fi
+        shift 2 ;;
+      --forzar) forzar=true; shift ;;
+      -h|--help) mostrar_ayuda; return 0 ;;
+      -*) error "Opción desconocida: $1"; return 2 ;;
+      *) error "Argumento de más: $1"; return 2 ;;
+    esac
+  done
+  if [[ -z "$accion" ]]; then
+    error "Falta la acción. Uso: devskills motor <iniciar|migrar --desde <carpeta> [--forzar]>"
+    return 2
+  fi
+  if [[ "$forzar" == true && "$accion" != "migrar" ]]; then error "--forzar solo aplica a 'migrar'."; return 2; fi
+  if [[ -n "$desde" && "$accion" != "migrar" ]]; then error "--desde solo aplica a 'migrar'."; return 2; fi
+  preparar_motor || return 1
+  case "$accion" in
+    migrar)
+      if [[ -z "$desde" ]]; then error "Falta --desde <carpeta> (la instalación previa)."; return 2; fi
+      local args=(--desde "$(ruta_nativa "$desde")" --destino "$DEVSKILLS_DATOS")
+      [[ "$forzar" == true ]] && args+=(--forzar)
+      "$PY" "$(ruta_nativa "$MOTOR/comun/migrar.py")" "${args[@]}"
+      ;;
+    iniciar)
+      mkdir -p "$DEVSKILLS_DATOS"
+      if [[ -f "$DEVSKILLS_DATOS/proyectos.json" ]]; then
+        ok "Ya hay un registro de proyectos en $DEVSKILLS_DATOS/proyectos.json; no lo toqué."
+      else
+        cp "$MOTOR/plantillas/proyectos.ejemplo.json" "$DEVSKILLS_DATOS/proyectos.json"
+        ok "Creé $DEVSKILLS_DATOS/proyectos.json desde la plantilla (un proyecto de ejemplo)."
+      fi
+      echo "Siguiente paso: la detección automática de tus proyectos está en el panel (vista Registro, 'Detectar')."
+      if [[ -t 0 ]]; then
+        local respuesta
+        read -r -p "¿Abrir el panel ahora? (s/N): " respuesta
+        if [[ "$respuesta" == "s" || "$respuesta" == "S" ]]; then
+          "$PY" "$(ruta_nativa "$MOTOR/panel/panel.py")" iniciar
+        fi
+      else
+        echo "Ábrelo con: devskills panel"
+      fi
+      ;;
+  esac
+}
+
 main() {
   local comando="${1:-help}"
   [[ $# -gt 0 ]] && shift
@@ -736,6 +966,10 @@ main() {
     update) cmd_update "$@" ;;
     sync-scripts) cmd_sync_scripts "$@" ;;
     enrutamiento) cmd_enrutamiento "$@" ;;
+    panel) cmd_panel "$@" ;;
+    servicios) cmd_servicios "$@" ;;
+    orquestador) cmd_orquestador "$@" ;;
+    motor) cmd_motor "$@" ;;
     help|--help|-h) mostrar_ayuda ;;
     *) error "Comando desconocido: $comando"; mostrar_ayuda; return 2 ;;
   esac

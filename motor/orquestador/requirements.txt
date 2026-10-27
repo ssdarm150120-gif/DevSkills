@@ -1,0 +1,4 @@
+# Versiones probadas con Python 3.12. El SDK trae su propio CLI de Claude Code.
+# Solo hace falta para el orquestador OPCIONAL (`devskills orquestador instalar`); el panel y el lanzador no
+# necesitan nada fuera de la biblioteca estándar. Para correr las pruebas: pip install pytest==9.1.1
+claude-agent-sdk==0.2.174

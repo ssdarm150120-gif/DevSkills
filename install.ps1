@@ -108,7 +108,7 @@ if ($Choques.Count -gt 0 -and -not $Forzar) {
 # Carga útil: se reemplaza completa (es nuestra, lo garantiza la marca).
 if (Test-Path -LiteralPath $ShareDir) { [IO.Directory]::Delete($ShareDir, $true) }
 New-Item -ItemType Directory -Force $ShareDir | Out-Null
-foreach ($elemento in '.claude-plugin', 'agents', 'skills', 'plantillas', 'scripts', 'bin', 'LICENSE', 'README.md', 'CHANGELOG.md') {
+foreach ($elemento in '.claude-plugin', 'agents', 'skills', 'plantillas', 'scripts', 'bin', 'motor', 'LICENSE', 'README.md', 'CHANGELOG.md') {
     $ruta = Join-Path $Origen $elemento
     if (Test-Path $ruta) { Copy-Item -Recurse -Force $ruta $ShareDir }
 }
