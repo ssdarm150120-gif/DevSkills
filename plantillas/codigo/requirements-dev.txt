@@ -1,7 +1,7 @@
 -r requirements.txt
 
 # Pruebas
-pytest>=9.0.3,<10  # 9.0.3 corrige PYSEC-2026-1845
+pytest>=9.0.3,<9.2  # 9.0.3 corrige PYSEC-2026-1845; 9.2 rompe pytest-bdd (8.1.0 y 9.0.0): FixtureManager ya no tiene _arg2fixturedefs. Subir el tope cuando salga un pytest-bdd compatible
 pytest-django>=4.9,<5
 pytest-bdd>=8,<9
 fakeredis>=2.26,<3

@@ -40,6 +40,8 @@ _PARAMS_RUTA = {"Read": ("file_path",), "Edit": ("file_path",), "Write": ("file_
                 "MultiEdit": ("file_path",), "NotebookEdit": ("notebook_path",), "Grep": ("path",), "Glob": ("path",)}
 _PARAMS_PATRON = {"Grep": ("glob",), "Glob": ("pattern",)}
 _ABSOLUTA = re.compile(r"^([a-zA-Z]:|[\\/]{1,2}|~)")
+_UNIDAD_O_UNC = re.compile(r"^([a-zA-Z]:|//)")
+_ES_WINDOWS = os.name == "nt"
 
 
 def herramientas(modo: str, permite_webfetch: bool = False) -> tuple[str, ...]:
@@ -64,6 +66,18 @@ def es_sensible(ruta: Path) -> bool:
         return True
     nombre = partes[-1] if partes else ""
     return any(fnmatch.fnmatch(nombre, p) for p in SENSIBLES)
+
+
+def _ruta_insegura(ruta: str) -> bool:
+    """Chequeo léxico independiente del SO: la barra invertida es separador en cualquier plataforma.
+
+    Niega cualquier componente `..` y, fuera de Windows, las formas que solo existen en Windows (letra de unidad,
+    UNC, raíz con barra invertida): en POSIX serían relativas y pasarían la comprobación de contención.
+    """
+    norm = ruta.replace("\\", "/")
+    if ".." in norm.split("/"):
+        return True
+    return not _ES_WINDOWS and (bool(_UNIDAD_O_UNC.match(norm)) or ruta.startswith("\\"))
 
 
 def dentro_de(ruta: str, carpeta: Path) -> Path | None:
@@ -107,7 +121,7 @@ def decidir(herramienta: str, entrada: dict, modo: str, carpeta: Path, permite_w
             return False, f"falta {param}"
         if not isinstance(valor, str):
             return False, f"{param} inválido"
-        real = dentro_de(valor, carpeta)
+        real = None if _ruta_insegura(valor) else dentro_de(valor, carpeta)
         if real is None:
             return False, "ruta fuera de la carpeta del proyecto"
         if es_sensible(real):
