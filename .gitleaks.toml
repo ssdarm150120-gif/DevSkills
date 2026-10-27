@@ -2,6 +2,6 @@
 [extend]
 useDefault = true
 
-[[allowlists]]
+[allowlist]
 description = "Las pruebas del orquestador siembran secretos FALSOS (VALOR-SECRETO-...) para comprobar que nunca se filtran"
 paths = ['''motor/orquestador/pruebas/(conftest|test_inventario)\.py''']
