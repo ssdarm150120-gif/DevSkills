@@ -12,7 +12,7 @@ description: >
 license: MIT
 metadata:
   author: devskills
-  version: "2.1"
+  version: "2.2"
 arguments: [id]
 argument-hint: "HU-35 | EN-04 | S05 (todo un sprint) | cierre-S05 (solo el cierre del sprint)"
 ---
@@ -39,7 +39,7 @@ Cada pasada la hace un agente **distinto** del que corrigió: el desarrollador c
 2. Si el argumento es un sprint (`SNN`), tomar sus elementos de `documentacion/PLAN.md` **en orden de prioridad**, repetir el ciclo por elemento para cada uno y terminar con el **cierre del sprint** (sección 5). Si es `cierre-SNN`, ir directo a la sección 5. Si es un ID, verificar que exista en el plan, que cumpla la Definición de Listo y que sus dependencias anteriores estén Listas o `En validación` (ya integradas en `main`).
 3. **Inicio del sprint:** antes del primer elemento de un sprint, el orquestador marca en `main` el punto de partida con una etiqueta local: `git tag inicio-sNN` (por ejemplo `inicio-s05`). Es la base del diff que revisa el QA de cierre. La etiqueta no se publica sin la confirmación del usuario.
 4. **Clasificar el elemento** (sección "Clasificación: ciclo normal o excepción") y anotar la clase y su motivo; va al reporte.
-5. Asignar el desarrollador según el módulo del elemento (tabla "Asignación de módulos" de `documentacion/CONTEXTO.md`): `devskills:dev-a` o `devskills:dev-b`. Los habilitadores de cimientos van a `devskills:dev-a` salvo que `CONTEXTO.md` diga otra cosa.
+5. Asignar el desarrollador según el módulo del elemento (tabla "Asignación de módulos" de `documentacion/CONTEXTO.md`): `devskills:dev-a` o `devskills:dev-b`. Los habilitadores de cimientos van a `devskills:dev-a` salvo que `CONTEXTO.md` diga otra cosa. Si `.devskills/enrutamiento.json` está activo, cada lanzamiento del ciclo lleva el `model` y el `effort` de su rol (sección 6).
 6. Crear la rama del elemento y el primer punto de control (sección "Puntos de control").
 7. Si algún agente va a usar Docker (es opcional: ver `devskills:proyecto-contexto`), asignarle un **prefijo `<slug>-<agente>`** (por ejemplo `miapp-dev-a`; el `<slug>` es el de `CONTEXTO.md`) y un **subrango de puertos** propios dentro del rango del proyecto, sin puertos reservados del host. El prefijo del stack principal es solo `<slug>`: los agentes **no** lo usan, y sobre ese stack nunca corren `docker compose down -v`, `docker volume prune` ni `docker system prune`.
 
@@ -116,8 +116,40 @@ Rama cierre-sNN ──► QA de cierre (diff inicio-sNN..main) ──► ¿halla
 5. **Verificación final:** lanzar `devskills:verificador` en **modo final con lista congelada** (agente distinto de QA y de los desarrolladores): la lista, las regresiones y la batería completa igual que el CI. Si quedan pendientes, ronda 2 y 3; después de 3 rondas, **preguntar al Product Owner** (por defecto, los elementos afectados quedan `Bloqueado` y los demás pasan a Listo). **Cero deuda:** lo que el QA de cierre encuentra se corrige en el mismo sprint; solo lo que pertenece a otro elemento del plan se anota con el ID que lo absorbe. Un hallazgo nuevo del verificador sobre código del sprint (no regresión) se suma a la ronda siguiente del cierre, no se deja para otro sprint.
 6. **Avance, en la rama `cierre-sNN`** (`devskills:registrar-avance`): reporte del cierre `documentacion/avance/S{NN}/CIERRE-S{NN}.md`, **completar** el reporte de cada elemento (su parte del QA de cierre, correcciones y verificación final), estado **`Listo`** de todos los elementos aprobados en `estado_backlog.json`, índice actualizado y **regeneración del plan y del tablero** (quedan tachados). Un punto de control: `git add -A -- codigo .github documentacion/avance documentacion/PLAN.md documentacion/plan_sprints.html && git commit -m "wip(s05): cierre del sprint"`.
 7. **gitleaks** (paso 2 de la sección 4) y **squash a `main`:** un solo commit `fix(s05): ...` si hubo correcciones de código, o `chore(s05): close sprint quality cycle` si solo cambia el avance. La rama `cierre-sNN` se borra como la de un elemento. Si hubo correcciones de código, el grafo del código se actualiza igual que tras el merge de un elemento (`chore(graph): refresh code graph after s05 close`). Después, los pasos 4 y 5 de la sección 4 (documentación si cambió SRS o DISEÑO, engram con topic_key `<project>/s05/cierre`).
-8. **Si el sprint cierra una entrega**, seguir la sección "Cierre de entrega" antes de declararla cerrada.
-9. Responder al usuario (y por Telegram si el canal está activo) con: veredicto del QA de cierre, rondas, elementos que pasaron a Listo, enlace al reporte del cierre, commits y avance de la entrega en puntos.
+8. **Enrutamiento (si está activo):** revisar `.devskills/enrutamiento-fallos.md` del sprint y, si procede, ajustar la tabla como decisión del orquestador (sección 6, paso 6); el ajuste y su motivo van a `CIERRE-S{NN}.md`.
+9. **Si el sprint cierra una entrega**, seguir la sección "Cierre de entrega" antes de declararla cerrada.
+10. Responder al usuario (y por Telegram si el canal está activo) con: veredicto del QA de cierre, rondas, elementos que pasaron a Listo, enlace al reporte del cierre, commits y avance de la entrega en puntos.
+
+### 6. Enrutamiento de modelo y esfuerzo (opcional, por proyecto)
+Base: el *Model Routing Playbook* (ajustar el esfuerzo antes que el modelo; por omisión un escalón abajo del modelo más caro y el caro para escalar; reglas simples por tipo de tarea y riesgo; verificar con código y escalar UNA vez ante una falla; registrar cada fallo y volverlo regla). Detalle y formato del archivo en `docs/enrutamiento.md` del plugin y en la sección "Enrutamiento de modelos" de `documentacion/CONTEXTO.md`.
+1. **Cuándo aplica:** solo si existe `.devskills/enrutamiento.json` (archivo **local**, ignorado por git) con `"activo": true`. Si no existe, está en `false` o no se puede leer, el ciclo es el de siempre: **no se pasa `model` ni `effort`** y cada agente usa su frontmatter. El orquestador lo lee al preparar el elemento (sección 1) y al abrir el cierre del sprint; `devskills enrutamiento estado` lo muestra.
+2. **Quién enruta:** la sesión principal (el orquestador), y solo al **lanzar cada subagente** con la herramienta Agent, pasando sus parámetros `model` (alias `haiku`, `sonnet` u `opus`) y `effort` (`low`, `medium` o `high`). En Claude Code un hook no puede cambiar el modelo por mensaje, y el `model` de la invocación tiene prioridad sobre el frontmatter del agente. **El orquestador no se enruta ni cambia de modelo:** cambiar el modelo de la sesión principal rompe la caché de su contexto.
+3. **Rol según el paso del ciclo** (clave de `tabla`):
+   | Paso | Clave |
+   |------|-------|
+   | `dev-a` / `dev-b` en el ciclo normal (desarrollo y rondas) | `desarrollo` |
+   | `dev-a` / `dev-b` en un elemento de la excepción | `desarrollo-excepcion` |
+   | Angel Fixer, revisión por historia | `angel-fixer-revision` |
+   | Angel Fixer, evaluación de la excepción (y remediación de `devskills:gga`) | `angel-fixer-excepcion` |
+   | QA por historia (excepción) | `qa-excepcion` |
+   | QA de cierre de sprint | `qa-cierre-sprint` |
+   | Verificador, modo ligero | `verificador-ligero` |
+   | Verificador, modo final | `verificador-final` |
+   | `analista-arquitecto` redactando SRS, DISEÑO o PLAN | `analista-arquitecto` |
+   | `analista-arquitecto` en una pasada documental (versiones, Anexo C, Word) | `pasada-documental` |
+   | Reporte de avance, estado y plan (`devskills:registrar-avance`) delegados | `registrar-avance` |
+   | Otras tareas mecánicas delegadas (regenerar, copiar, renombrar) | `mecanico` |
+
+   Si una clave falta en la tabla, ese subagente se lanza sin `model` ni `effort` (su frontmatter). Cada prompt enrutado lleva la línea **"Enrutamiento: modelo X, esfuerzo Y"**: `dev-a`, `dev-b` y `qa` lanzan a sus subagentes (`dev-dominio`, `dev-integraciones`, `dev-interfaz`, `dev-servicios`, `qa-bdd`, `qa-no-funcional`) con ese mismo `model` y `effort`.
+4. **Verificar con código y escalar UNA vez.** La verificación la da el código, no la opinión del modelo: build, pruebas, tipos y lint (la lista mínima), gitleaks y `plan_sprints.py`. Un subagente enrutado **falla** cuando:
+   - **desarrollador:** entrega con la lista mínima en rojo (build, pruebas, tipos, lint o gitleaks), o en una ronda de corrección el verificador reporta puntos de la lista congelada sin resolver. Los hallazgos de código de una revisión (buenas prácticas, arquitectura) **no** son una falla de enrutamiento: siguen el ciclo normal de rondas;
+   - **revisor (Angel Fixer, QA, verificador):** su reporte llega incompleto (sin la lista mínima corrida, sin veredicto, sin la evidencia de las herramientas o sin revisar lo pedido). Un corte por límite de uso no es una falla: va por `devskills:recuperar-corte`;
+   - **tarea mecánica:** el script falla o el resultado queda inconsistente (estado, índice o plan que no cuadran).
+
+   Ante la falla, el orquestador hace el punto de control del intento (nadie trabaja sin respaldo en git) y **reintenta una sola vez** (`escalamiento.max_reintentos`) el mismo rol, con la evidencia de la falla y **un escalón más** en el orden de `escalamiento.orden`: primero el **esfuerzo** (`low` → `medium` → `high`); si ya estaba en `high`, el **modelo** (`haiku` → `sonnet` → `opus`). Si ya estaba en `opus`/`high`, no hay a dónde escalar: sigue el ciclo normal. En el desarrollador, el reintento **es la ronda siguiente** lanzada ya escalada (no suma rondas); en un revisor o una tarea mecánica, el reintento repite el mismo paso sobre el mismo punto de control y no cuenta como ronda. Después del reintento, ese rol se queda en el nivel escalado hasta cerrar el elemento (o el cierre del sprint) y no se vuelve a escalar: si falla otra vez, rigen las rondas (máximo 3) y la pregunta al Product Owner.
+5. **Registrar cada fallo.** Cada falla (con o sin reintento) se anexa a `.devskills/enrutamiento-fallos.md` (local, ignorado por git; lo crea el orquestador con su encabezado si no existe) como una fila: `| fecha ISO | elemento | rol (clave) | modelo/esfuerzo | motivo (qué verificación falló) | escalado a | resultado del reintento |`. Un fallo que se descubre tarde (por ejemplo, una regresión que el QA de cierre encuentra y el verificador ligero dejó pasar) se registra igual, con "escalado a: sin reintento". Además va en la sección **Para engram** del cierre del elemento (tipo `discovery`, título "Routing failure: <rol> on <modelo>/<esfuerzo>").
+6. **Volver el fallo regla (en la pasada documental y en el cierre del sprint).** El orquestador revisa `.devskills/enrutamiento-fallos.md` del sprint y **propone ajustar la tabla** como **decisión del orquestador**: subir un escalón el rol que falló dos o más veces por la misma causa (o una vez en un elemento de la excepción), y bajar uno el rol que lleva dos sprints sin fallos si su verificación es completa. El ajuste se aplica editando `.devskills/enrutamiento.json` (campo `actualizado` en ISO), se anota en `CIERRE-S{NN}.md` con su motivo y se guarda en engram (`mem_save`, tipo `decision`). El Product Owner puede revertirlo.
+7. **Antes de activarlo:** `devskills enrutamiento evaluar` dice si el proyecto encaja (pruebas y su comando, CI, tipos y lint, Gherkin). Sin pruebas automatizadas **no se activa**: no hay cascada segura porque nada detecta la falla del modelo menor.
 
 ### Reglas
 - **Nunca marcar Listo** un elemento del ciclo normal antes del QA de cierre de su sprint (y de su verificación final cuando hubo correcciones); ni uno de la excepción sin el veredicto de QA **y** la evaluación del Angel Fixer (y la verificación final cuando hubo correcciones).
@@ -171,6 +203,9 @@ git diff --stat inicio-s05..main                           # alcance del QA de c
 python documentacion/analisis/deriva_grafos.py --salida documentacion/avance/S05/DERIVA-S05.md   # deriva (si hay graphify); 3 = sin grafos
 git add -A -- codigo .github documentacion/avance documentacion/PLAN.md documentacion/plan_sprints.html && git commit -m "wip(s05): cierre del sprint"
 git switch main && git merge --squash cierre-s05 && git commit -m "fix(s05): sprint quality findings"   # tras gitleaks
+# Enrutamiento de modelo y esfuerzo (sección 6; archivo local .devskills/enrutamiento.json):
+devskills enrutamiento estado                              # activo o no, y la tabla rol → modelo / esfuerzo
+devskills enrutamiento evaluar                             # ¿encaja? recomendado / parcial / no recomendado
 # 4. solo si cambió SRS o DISEÑO, en commits docs: aparte sobre main (cada uno tras gitleaks):
 python documentacion/analisis/trazabilidad.py _tmp.md --escribir
 "$PYDOC" documentacion/analisis/md_a_word.py --mermaid ~/.devskills/doc   # regenera los Word (ver devskills:pasada-documental)

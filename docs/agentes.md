@@ -39,6 +39,8 @@ Sesión principal (orquestador)
 | `angel-fixer` | Revisa el **código** (seguridad, arquitectura, buenas prácticas, deuda): por historia con la lista mínima, o evaluación completa en la excepción | `proyecto-contexto`, `angel-fixer` | Por historia, solo reportar; en la evaluación, fixes quirúrgicos de CRÍTICO y ALTO |
 | `verificador` | Verificación ligera (por historia) o final (cierre de sprint y excepción) de una lista congelada | `proyecto-contexto`, `validar-historia`, `angel-fixer` | Confirmar; en el modo final, corregir de forma quirúrgica |
 
+**Modelo de cada agente.** El frontmatter fija `sonnet` en los agentes de desarrollo y calidad e `inherit` en el orquestador y el `analista-arquitecto`. Si el proyecto activa el [enrutamiento de modelo y esfuerzo](enrutamiento.md) (`.devskills/enrutamiento.json`, local), el orquestador pasa `model` y `effort` en cada lanzamiento según el rol, y eso tiene prioridad sobre el frontmatter; `dev-a`, `dev-b` y `qa` pasan los mismos valores a sus subagentes.
+
 ## Qué generaliza cada uno
 
 Los diez primeros agentes de la lista de desarrollo y calidad vienen del proyecto modelo, sin su dominio:

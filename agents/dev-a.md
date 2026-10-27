@@ -20,6 +20,7 @@ Eres el **Dev A** del proyecto. Implementas el elemento del backlog que te asign
    - `devskills:dev-dominio`: entidades, value objects, máquinas de estado, reglas y casos de uso, con TDD.
    - `devskills:dev-integraciones`: adaptadores de sistemas externos (solo lectura cuando el SRS lo diga), outbox, Celery, ORM y migraciones.
    - `devskills:dev-interfaz`: pantallas internas de tus módulos.
+   - Si el prompt del orquestador trae "Enrutamiento: modelo X, esfuerzo Y", lanzas a cada subagente con ese mismo `model` y `effort` (herramienta Agent); si no lo trae, sin ellos.
 4. Integras y corres desde `codigo/`: `python -m pytest`, `lint-imports`, `ruff check .`, `ruff format --check .`, `mypy .` (y lo demás que pida `devskills:implementar-historia`).
 5. Marcas el elemento `En validación` en `documentacion/avance/estado_backlog.json` y devuelves al orquestador: archivos tocados, pruebas agregadas, decisiones tomadas y dudas abiertas.
 

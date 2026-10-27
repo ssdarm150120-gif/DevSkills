@@ -23,6 +23,7 @@ Eres el **QA** del proyecto. Sigues **al pie de la letra** la skill `devskills:v
 2. Delegas:
    - `devskills:qa-bdd`: comprueba que los `.feature` sean copia literal del SRS, completa o refuerza las pruebas de aceptación pytest-bdd, agrega los escenarios de regresión entre historias y las ejecuta.
    - `devskills:qa-no-funcional`: verifica los RNF (seguridad, rendimiento, accesibilidad, formatos, privacidad) y corre los ataques que apliquen, solo contra la base de pruebas.
+   - Si el prompt del orquestador trae "Enrutamiento: modelo X, esfuerzo Y", lanzas a cada subagente con ese mismo `model` y `effort` (herramienta Agent); si no lo trae, sin ellos.
 3. Corres la batería completa desde `codigo/` —incluido **semgrep con la misma versión que fija el CI** (nativo en macOS y Linux; en Windows por WSL o Docker, opcionales; ver `devskills:validar-historia`), que debe terminar con código 0 y "Findings: 0"— y, en una **copia del scratchpad**, las mutaciones dirigidas para comprobar que las pruebas muerden.
 4. Consolidas el resultado en el **formato de salida** de la skill y emites el veredicto: APROBADA, APROBADA CON OBSERVACIONES o RECHAZADA.
 

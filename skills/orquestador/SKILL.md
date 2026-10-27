@@ -8,7 +8,7 @@ description: >
 license: MIT
 metadata:
   author: devskills
-  version: "1.1"
+  version: "1.2"
 ---
 
 ## When to Use
@@ -49,6 +49,13 @@ metadata:
 - Agentes independientes se lanzan **en paralelo** (por ejemplo, QA y Angel Fixer sobre el mismo punto de control en un elemento de la excepción). En el ciclo normal la revisión por historia es solo del Angel Fixer, y QA corre una vez por sprint, en su cierre.
 - **Ciclo híbrido** (reglas completas en `devskills:ciclo-historia`): el Angel Fixer revisa el código y QA el comportamiento, sin traslape; quien verifica una corrección es siempre un agente distinto del que la hizo.
 - El orquestador **sintetiza**: al usuario le llega el veredicto, las decisiones y las preguntas, no los volcados de archivos.
+
+### 2.1 Enrutamiento de modelo y esfuerzo (solo si el proyecto lo activó)
+- Al empezar la sesión lee `.devskills/enrutamiento.json` (local, ignorado por git; `devskills enrutamiento estado` lo resume). Si no existe, tiene `"activo": false` o no se puede leer: lanza a los agentes **sin** `model` ni `effort`, como siempre (cada uno usa su frontmatter).
+- Si está activo: al lanzar **cada** subagente con la herramienta Agent, pasa `model` y `effort` de la clave de `tabla` que corresponde a su rol y al tipo de ciclo (tabla de claves en `devskills:ciclo-historia`, sección 6), y escribe en el prompt "Enrutamiento: modelo X, esfuerzo Y" para que `dev-a`, `dev-b` y `qa` lancen a sus subagentes igual.
+- **Tú no te enrutas:** eres la sesión principal; no cambias tu modelo a media sesión (rompe la caché del contexto). Un hook no puede cambiar el modelo por mensaje; el enrutamiento es solo tu elección de `model`/`effort` en cada lanzamiento.
+- Verificación con código y **un solo reintento escalado** (primero esfuerzo, luego modelo) cuando un subagente enrutado falla; cada falla va a `.devskills/enrutamiento-fallos.md` y a la sección "Para engram". En la pasada documental y en el cierre del sprint revisas esos fallos y propones ajustar la tabla como **decisión del orquestador**. Reglas completas: `devskills:ciclo-historia`, sección 6.
+- Activarlo es decisión del Product Owner (afecta costo y calidad): antes, `devskills enrutamiento evaluar`; sin pruebas automatizadas no se recomienda.
 
 ### 3. Decidir lo técnico, preguntar lo de negocio
 - **Técnico** (cómo implementar dentro del SRS y el DISEÑO): lo decides, lo registras como **"decisión del orquestador"** (en el reporte y, si cambia el diseño, en el DISEÑO vía el analista) y lo informas; el Product Owner puede validarlo o revertirlo.
