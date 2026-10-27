@@ -138,7 +138,8 @@ def _texto(manejador) -> str:
 
 def _es_de_graphify(manejador) -> bool:
     texto = _texto(manejador).replace("\\", "/")
-    return any(re.search(rf"(^|/|\s){re.escape(n)}(\s|$)", texto) for n in SCRIPTS_HOOKS)
+    # La ruta puede ir entre comillas ("C:/.../hook_guard.py" search), como la pegan los instaladores en Windows.
+    return any(re.search(rf"(^|[/\s\"']){re.escape(n)}([\s\"']|$)", texto) for n in SCRIPTS_HOOKS)
 
 
 def _es_gestionado(manejador) -> bool:
