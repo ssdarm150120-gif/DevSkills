@@ -77,6 +77,13 @@ Uso:
                                      confirmación (--si sin terminal) y copia solo esos scripts. No toca codigo/, ni
                                      documentacion/*.md, ni los JSON de datos; si la plantilla HTML del proyecto
                                      difiere de la de DevSkills, la compara y avisa, pero no la copia
+  devskills enrutamiento [estado|activar|desactivar|evaluar] [ruta] [--forzar]
+                                     Enrutamiento de modelo y esfuerzo de los subagentes (archivo local
+                                     .devskills/enrutamiento.json, ignorado por git; ver docs/enrutamiento.md):
+                                     estado (por omisión) lo muestra; activar crea el archivo con la tabla por
+                                     omisión o reactiva el existente sin tocar su tabla (--forzar la reescribe);
+                                     desactivar lo apaga sin borrar la tabla; evaluar revisa si el proyecto encaja
+                                     (pruebas y su comando, CI, tipos y lint, Gherkin) y da un veredicto
   devskills help                     Muestra esta ayuda
 
 Dentro de Claude Code, el mismo arranque se hace con /devskills:nuevo-proyecto.
@@ -255,6 +262,9 @@ cmd_doctor() {
     revisar_opcional "Merge driver de Graphify en este proyecto" \
       "Sin él, dos ramas que regeneraron graph.json chocan en el merge. En este clon: git config merge.graphify.name 'graphify graph.json union merge' && git config merge.graphify.driver 'graphify merge-driver %O %A %B'" \
       hay_merge_driver_graphify || opcionales=$((opcionales + 1))
+  fi
+  if [[ -f documentacion/CONTEXTO.md ]]; then
+    estado_enrutamiento "."
   fi
   revisar_opcional "Plugin engram (memoria persistente)" \
     "Sin él no hay memoria entre sesiones (el ciclo funciona, pero no se guarda el avance). Instálalo como plugin de Claude Code (ver README, sección Requisitos)." hay_engram || opcionales=$((opcionales + 1))
@@ -472,6 +482,250 @@ cmd_sync_scripts() {
   echo "Revisa el resultado con 'git diff' y haz el commit tú o pídeselo al orquestador."
 }
 
+# ----------------------------------------------------------------------------
+# Enrutamiento de modelo y esfuerzo (docs/enrutamiento.md)
+# El archivo es LOCAL (.devskills/ está en el .gitignore del proyecto). Lo lee el orquestador al lanzar cada
+# subagente con la herramienta Agent; sin archivo o con "activo": false, cada agente usa su frontmatter.
+# ----------------------------------------------------------------------------
+
+archivo_enrutamiento() { echo "$1/.devskills/enrutamiento.json"; }
+
+fecha_iso() { date -u +%Y-%m-%dT%H:%M:%SZ; }
+
+# 0 si el archivo dice "activo": true (con cualquier espaciado o saltos de línea).
+enrutamiento_activo() {
+  tr -d '\r\n' <"$1" | grep -qE '"activo"[[:space:]]*:[[:space:]]*true'
+}
+
+# 0 si el archivo trae la clave "activo" con un booleano (si no, se trata como inactivo).
+enrutamiento_legible() {
+  tr -d '\r\n' <"$1" | grep -qE '"activo"[[:space:]]*:[[:space:]]*(true|false)'
+}
+
+escribir_enrutamiento_por_omision() {
+  local archivo="$1"
+  mkdir -p "$(dirname "$archivo")"
+  cat >"$archivo" <<EOF
+{
+  "activo": true,
+  "version": 1,
+  "tabla": {
+    "desarrollo": {"modelo": "sonnet", "esfuerzo": "medium"},
+    "desarrollo-excepcion": {"modelo": "sonnet", "esfuerzo": "high"},
+    "angel-fixer-revision": {"modelo": "sonnet", "esfuerzo": "medium"},
+    "angel-fixer-excepcion": {"modelo": "opus", "esfuerzo": "high"},
+    "qa-excepcion": {"modelo": "opus", "esfuerzo": "high"},
+    "qa-cierre-sprint": {"modelo": "opus", "esfuerzo": "high"},
+    "verificador-ligero": {"modelo": "sonnet", "esfuerzo": "medium"},
+    "verificador-final": {"modelo": "sonnet", "esfuerzo": "high"},
+    "analista-arquitecto": {"modelo": "opus", "esfuerzo": "medium"},
+    "pasada-documental": {"modelo": "haiku", "esfuerzo": "low"},
+    "registrar-avance": {"modelo": "haiku", "esfuerzo": "low"},
+    "mecanico": {"modelo": "haiku", "esfuerzo": "low"}
+  },
+  "escalamiento": {"max_reintentos": 1, "orden": ["esfuerzo", "modelo"]},
+  "actualizado": "$(fecha_iso)"
+}
+EOF
+}
+
+# Cambia "activo" y "actualizado" sin tocar la tabla (archivo temporal y mv: sed -i difiere entre GNU y BSD).
+cambiar_activo() {
+  local archivo="$1" valor="$2" tmp
+  tmp="$(mktemp)"
+  sed -E -e "s/(\"activo\"[[:space:]]*:[[:space:]]*)(true|false)/\1${valor}/" \
+    -e "s/(\"actualizado\"[[:space:]]*:[[:space:]]*)\"[^\"]*\"/\1\"$(fecha_iso)\"/" "$archivo" >"$tmp"
+  cat "$tmp" >"$archivo"
+  rm -f "$tmp"
+}
+
+# Avisa si .devskills/ no está ignorado por git (el archivo es local y nunca entra a un commit).
+revisar_ignorado() {
+  local ruta="$1"
+  if git -C "$ruta" rev-parse --git-dir >/dev/null 2>&1 \
+    && ! git -C "$ruta" check-ignore -q .devskills/enrutamiento.json 2>/dev/null; then
+    aviso "git no ignora .devskills/ en este proyecto: agrega la línea '.devskills/' a su .gitignore (el archivo es local)."
+  fi
+}
+
+estado_enrutamiento() {
+  local ruta="$1" archivo
+  archivo="$(archivo_enrutamiento "$ruta")"
+  if [[ ! -f "$archivo" ]]; then
+    ok "Enrutamiento de modelos: inactivo (no hay .devskills/enrutamiento.json); cada agente usa el modelo de su frontmatter. Para activarlo: 'devskills enrutamiento evaluar' y luego 'devskills enrutamiento activar'."
+    return 0
+  fi
+  if ! enrutamiento_legible "$archivo"; then
+    aviso "Enrutamiento de modelos: .devskills/enrutamiento.json no tiene \"activo\": true|false; se trata como inactivo. Reescríbelo con 'devskills enrutamiento activar --forzar'."
+    return 0
+  fi
+  if enrutamiento_activo "$archivo"; then
+    ok "Enrutamiento de modelos: activo (.devskills/enrutamiento.json). El orquestador pasa model y effort a cada subagente según esta tabla:"
+    sed -nE 's/^[[:space:]]*"([^"]+)"[[:space:]]*:[[:space:]]*\{[[:space:]]*"modelo"[[:space:]]*:[[:space:]]*"([^"]+)"[[:space:]]*,[[:space:]]*"esfuerzo"[[:space:]]*:[[:space:]]*"([^"]+)".*/    \1: \2 \/ \3/p' "$archivo"
+  else
+    ok "Enrutamiento de modelos: desactivado (.devskills/enrutamiento.json con \"activo\": false); cada agente usa el modelo de su frontmatter."
+  fi
+}
+
+# Primer archivo de prueba que encuentre (sin entrar a .git, entornos ni dependencias).
+primer_archivo_de_prueba() {
+  find "$1" \( -name .git -o -name node_modules -o -name .venv -o -name venv -o -name graphify-out \) -prune -o \
+    -type f \( -name 'test_*.py' -o -name '*_test.py' -o -name '*.feature' -o -name '*_spec.sh' \
+    -o -name '*.test.js' -o -name '*.test.ts' -o -name '*.spec.js' -o -name '*.spec.ts' -o -name '*_test.go' \) \
+    -print 2>/dev/null | head -n 1 || true
+}
+
+# Comando de pruebas deducido de la configuración (vacío si no se reconoce).
+comando_de_pruebas() {
+  local ruta="$1" dir
+  for dir in "codigo" "."; do
+    if [[ -f "$ruta/$dir/pytest.ini" ]] || grep -qs '^\[tool\.pytest' "$ruta/$dir/pyproject.toml" \
+      || grep -qs '^\[tool:pytest\]' "$ruta/$dir/setup.cfg"; then
+      if [[ "$dir" == "." ]]; then echo "pytest"; else echo "cd $dir && pytest"; fi
+      return 0
+    fi
+  done
+  if grep -qs '"test"[[:space:]]*:' "$ruta/package.json"; then echo "npm test"; return 0; fi
+  if [[ -f "$ruta/.shellspec" ]]; then echo "shellspec"; return 0; fi
+  if grep -qsE '^test:' "$ruta/Makefile"; then echo "make test"; return 0; fi
+  if [[ -f "$ruta/go.mod" ]]; then echo "go test ./..."; return 0; fi
+  return 1
+}
+
+# Verificaciones de tipos y lint que el proyecto configura (lista separada por comas; vacío si ninguna).
+verificaciones_estaticas() {
+  local ruta="$1" dir lista=()
+  for dir in "codigo" "."; do
+    { grep -qs '^\[tool\.mypy' "$ruta/$dir/pyproject.toml" || [[ -f "$ruta/$dir/mypy.ini" ]]; } && lista+=("mypy ($dir)")
+    { grep -qs '^\[tool\.ruff' "$ruta/$dir/pyproject.toml" || [[ -f "$ruta/$dir/ruff.toml" || -f "$ruta/$dir/.ruff.toml" ]]; } && lista+=("ruff ($dir)")
+    [[ -f "$ruta/$dir/.importlinter" ]] && lista+=("import-linter ($dir)")
+  done
+  [[ -f "$ruta/tsconfig.json" ]] && lista+=("TypeScript")
+  compgen -G "$ruta/eslint.config.*" >/dev/null || compgen -G "$ruta/.eslintrc*" >/dev/null && lista+=("ESLint")
+  grep -qsl 'shellcheck' "$ruta"/.github/workflows/*.yml "$ruta"/.github/workflows/*.yaml && lista+=("ShellCheck (CI)")
+  local IFS=","
+  echo "${lista[*]+"${lista[*]}"}" # bash 3.2 (macOS) con set -u falla con un arreglo vacío sin el +
+}
+
+hay_ci() {
+  compgen -G "$1/.github/workflows/*.yml" >/dev/null || compgen -G "$1/.github/workflows/*.yaml" >/dev/null \
+    || [[ -f "$1/.gitlab-ci.yml" ]]
+}
+
+hay_gherkin() {
+  grep -qsE '^[[:space:]]*(Escenario|Scenario)( [Pp]rincipal| Outline| [Ee]squema)?:' "$1/documentacion/SRS.md"
+}
+
+evaluar_enrutamiento() {
+  local ruta="$1" prueba comando estaticas faltan=0
+  echo -e "${CIAN}${NEGRITA}¿Encaja el enrutamiento de modelos en este proyecto?${NC} ($ruta)"
+  echo "La cascada solo es segura si el código verifica el trabajo del modelo menor (Model Routing Playbook, regla 4)."
+  prueba="$(primer_archivo_de_prueba "$ruta")"
+  if [[ -z "$prueba" ]]; then
+    aviso "Pruebas automatizadas: no encontré archivos de prueba (test_*.py, *.feature, *_spec.sh, *.test.ts...)."
+    echo ""
+    echo "Veredicto: no recomendado"
+    echo "Motivo: sin pruebas no hay cascada segura; nada detecta que un modelo menor falló y no hay cuándo escalar."
+    return 0
+  fi
+  ok "Pruebas automatizadas (por ejemplo ${prueba#"$ruta"/})"
+  if comando="$(comando_de_pruebas "$ruta")"; then
+    ok "Comando de pruebas: $comando"
+  else
+    aviso "Comando de pruebas: no lo deduje de la configuración (pytest, package.json, .shellspec, Makefile, go.mod); escríbelo en CONTEXTO.md."
+    faltan=$((faltan + 1))
+  fi
+  if hay_ci "$ruta"; then
+    ok "CI configurado"
+  else
+    aviso "CI: no hay workflow; la verificación queda solo en local."
+    faltan=$((faltan + 1))
+  fi
+  estaticas="$(verificaciones_estaticas "$ruta")"
+  if [[ -n "$estaticas" ]]; then
+    ok "Tipos y lint: ${estaticas//,/, }"
+  else
+    aviso "Tipos y lint: no encontré configuración (mypy, ruff, import-linter, TypeScript, ESLint, ShellCheck)."
+    faltan=$((faltan + 1))
+  fi
+  if hay_gherkin "$ruta"; then
+    ok "SRS con escenarios Gherkin (criterios de aceptación verificables)"
+  else
+    aviso "SRS con Gherkin: documentacion/SRS.md no tiene escenarios; el criterio de \"falló\" depende solo de las pruebas."
+    faltan=$((faltan + 1))
+  fi
+  echo ""
+  if [[ $faltan -eq 0 ]]; then
+    echo "Veredicto: recomendado"
+    echo "Motivo: pruebas con su comando, CI, tipos y lint y Gherkin detectan el fallo de un modelo menor; escalar es seguro."
+  else
+    echo "Veredicto: parcial"
+    echo "Motivo: hay pruebas, pero faltan $faltan de las verificaciones de arriba; actívalo solo si aceptas que algunos fallos se detecten tarde (QA de cierre)."
+  fi
+}
+
+cmd_enrutamiento() {
+  local accion="" ruta="" forzar=false
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      estado|activar|desactivar|evaluar)
+        if [[ -z "$accion" ]]; then accion="$1"; shift; else error "Acción de más: $1"; return 2; fi ;;
+      --forzar) forzar=true; shift ;;
+      -h|--help) mostrar_ayuda; return 0 ;;
+      -*) error "Opción desconocida: $1"; return 2 ;;
+      *) if [[ -z "$ruta" ]]; then ruta="$1"; shift; else error "Argumento de más: $1"; return 2; fi ;;
+    esac
+  done
+  [[ -z "$accion" ]] && accion="estado"
+  [[ -z "$ruta" ]] && ruta="."
+  if [[ ! -d "$ruta" ]]; then
+    error "No existe la carpeta $ruta."
+    return 1
+  fi
+  if [[ "$forzar" == true && "$accion" != "activar" ]]; then
+    error "--forzar solo aplica a 'activar'."
+    return 2
+  fi
+  local archivo
+  archivo="$(archivo_enrutamiento "$ruta")"
+  case "$accion" in
+    estado) estado_enrutamiento "$ruta" ;;
+    evaluar) evaluar_enrutamiento "$ruta" ;;
+    activar)
+      if [[ ! -f "$ruta/documentacion/CONTEXTO.md" ]]; then
+        error "$ruta no es un proyecto DevSkills (falta documentacion/CONTEXTO.md). No cambié nada."
+        return 1
+      fi
+      if [[ -f "$archivo" && "$forzar" != true ]]; then
+        if enrutamiento_legible "$archivo"; then
+          cambiar_activo "$archivo" true
+          ok "Reactivé .devskills/enrutamiento.json sin tocar su tabla (para volver a la tabla por omisión: --forzar)."
+        else
+          error ".devskills/enrutamiento.json existe pero no tiene \"activo\": true|false. Revísalo o reescríbelo con --forzar. No cambié nada."
+          return 1
+        fi
+      else
+        escribir_enrutamiento_por_omision "$archivo"
+        ok "Creé .devskills/enrutamiento.json con la tabla por omisión."
+      fi
+      revisar_ignorado "$ruta"
+      estado_enrutamiento "$ruta"
+      ;;
+    desactivar)
+      if [[ ! -f "$archivo" ]]; then
+        ok "No hay .devskills/enrutamiento.json: el enrutamiento ya está inactivo. No cambié nada."
+        return 0
+      fi
+      if ! enrutamiento_legible "$archivo"; then
+        error ".devskills/enrutamiento.json no tiene \"activo\": true|false; ya se trata como inactivo. No cambié nada."
+        return 1
+      fi
+      cambiar_activo "$archivo" false
+      ok "Desactivé el enrutamiento; la tabla se conserva para cuando lo reactives."
+      ;;
+  esac
+}
+
 main() {
   local comando="${1:-help}"
   [[ $# -gt 0 ]] && shift
@@ -481,6 +735,7 @@ main() {
     version|--version|-v) echo "devskills $VERSION" ;;
     update) cmd_update "$@" ;;
     sync-scripts) cmd_sync_scripts "$@" ;;
+    enrutamiento) cmd_enrutamiento "$@" ;;
     help|--help|-h) mostrar_ayuda ;;
     *) error "Comando desconocido: $comando"; mostrar_ayuda; return 2 ;;
   esac
