@@ -1,5 +1,15 @@
 {
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ \"${GRAPHIFY_SESION:-1}\" = 0 ] && exit 0; [ -f \"${CLAUDE_PROJECT_DIR:-.}/graphify-out/GRAPH_REPORT.md\" ] || exit 0; if [ \"$OS\" = Windows_NT ]; then set -- python py; else set -- python3 python; fi; for p in \"$@\"; do command -v \"$p\" >/dev/null 2>&1 && exec \"$p\" \"${CLAUDE_PLUGIN_ROOT}/motor/graphify/sesion_inicio.py\"; done; exit 0"
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Bash",
@@ -7,6 +17,24 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/vetar_acciones_externas.sh\""
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|Grep",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ \"${GRAPHIFY_GUARDIA:-1}\" = 0 ] && exit 0; [ -f \"${CLAUDE_PROJECT_DIR:-.}/graphify-out/graph.json\" ] || exit 0; if [ \"$OS\" = Windows_NT ]; then set -- python py; else set -- python3 python; fi; for p in \"$@\"; do command -v \"$p\" >/dev/null 2>&1 && exec \"$p\" \"${CLAUDE_PLUGIN_ROOT}/motor/graphify/hook_guard.py\" search; done; exit 0"
+          }
+        ]
+      },
+      {
+        "matcher": "Read|Glob",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ \"${GRAPHIFY_GUARDIA:-1}\" = 0 ] && exit 0; [ -f \"${CLAUDE_PROJECT_DIR:-.}/graphify-out/graph.json\" ] || exit 0; if [ \"$OS\" = Windows_NT ]; then set -- python py; else set -- python3 python; fi; for p in \"$@\"; do command -v \"$p\" >/dev/null 2>&1 && exec \"$p\" \"${CLAUDE_PLUGIN_ROOT}/motor/graphify/hook_guard.py\" read; done; exit 0"
           }
         ]
       }
