@@ -174,6 +174,23 @@ class HooksViejos(Base):
                          [{"matcher": "Bash|Grep", "hooks": [{"type": "command", "command": "mi-otro-hook"}]}])
         self.assertEqual(len(self.respaldos()), 1)
 
+    def test_reconoce_rutas_entre_comillas(self):
+        entre_comillas = {
+            "SessionStart": [{"hooks": [{"type": "command", "command":
+                                         '"C:/tools/python.exe" -I "C:/viejo/servicios/graphify/sesion_inicio.py"'}]}],
+            "PreToolUse": [{"matcher": "Bash|Grep", "hooks": [{"type": "command", "command":
+                                                               "python '/viejo/graphify/hook_guard.py' search"}]}],
+        }
+        self.assertEqual(len(enganchar.hooks_encontrados({"hooks": entre_comillas})), 2)
+        self.escribir({"hooks": entre_comillas, "otra": 1})
+        self.correr("--si", "--quitar", "--limpiar-hooks")
+        self.assertEqual(self.leer(), {"otra": 1})
+
+    def test_no_confunde_scripts_con_nombre_parecido(self):
+        parecidos = {"PreToolUse": [{"hooks": [{"type": "command", "command": 'python "/x/mi_hook_guard.py"'},
+                                               {"type": "command", "command": "python /x/hook_guard.pyc"}]}]}
+        self.assertEqual(enganchar.hooks_encontrados({"hooks": parecidos}), [])
+
     def test_sin_el_plugin_solo_avisa(self):
         self.escribir({"hooks": self.VIEJOS})
         r = self.correr("--si")
