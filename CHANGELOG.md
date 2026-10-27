@@ -13,6 +13,10 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 - **CI:** nuevo job `Motor` en Ubuntu, macOS y Windows (pruebas de rutas, migración, lanzador, panel, Graphify y orquestador con pytest; las que requieren el SDK opcional se saltan solas) y pruebas ShellSpec de los subcomandos (`spec/integration/motor_spec.sh`). `.gitleaks.toml` permite solo los secretos falsos de las pruebas del orquestador.
 - Documentación nueva en `docs/motor.md` y `motor/README.md`.
 
+### Escalera del mínimo en `implementar-historia`
+- Inspirada en [Ponytail](https://github.com/DietrichGebert/ponytail) (MIT): con la prueba en rojo, el desarrollador recorre seis peldaños (¿hace falta?, ¿ya existe en el proyecto?, ¿biblioteca estándar?, ¿framework?, ¿dependencia instalada?, ¿cabe en una línea?) y se detiene en el primero que resuelva; solo entonces escribe el mínimo. No recorta validación, errores, permisos, seguridad, accesibilidad ni la arquitectura.
+- Renglón nuevo "Sin sobrediseño" en las lecciones aprendidas. Objetivo: menos código generado y menos rondas con el Angel Fixer, que es donde se va el gasto de caché en los ciclos multiagente.
+
 ### Enrutamiento de modelo y esfuerzo (opcional, local)
 - Basado en el *Model Routing Playbook*: esfuerzo antes que modelo, por omisión un escalón abajo del modelo más caro, reglas simples por rol y riesgo, verificación con código y un solo reintento escalado, y cada fallo vuelto regla.
 - **Archivo local por proyecto** `.devskills/enrutamiento.json` (`activo`, `version`, `tabla` rol → `modelo`/`esfuerzo`, `escalamiento` y `actualizado`); `.devskills/` ya está en el `.gitignore` de la plantilla. Sin el archivo o con `"activo": false`, nada cambia.
