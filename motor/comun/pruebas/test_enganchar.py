@@ -237,7 +237,30 @@ class HooksGestionados(Base):
         self.assertNotIn("args", restantes[0][1])
 
 
-@unittest.skipUnless(shutil.which("bash"), "hace falta bash para correr el comando de los hooks")
+def bash_de_los_hooks():
+    """El bash con que Claude Code corre los hooks: en Windows es Git Bash, nunca el de System32 (WSL).
+
+    `subprocess.run(["bash", ...])` en Windows busca primero en System32 y encuentra el bash de WSL, que sin
+    distribución instalada falla; por eso se resuelve la ruta con el PATH y se descarta la de System32.
+    """
+    ruta = shutil.which("bash")
+    if os.name != "nt":
+        return ruta
+    if ruta and "system32" not in ruta.lower():
+        return ruta
+    git = shutil.which("git")
+    if git:
+        for raiz in Path(git).resolve().parents:
+            candidato = raiz / "bin" / "bash.exe"
+            if candidato.is_file():
+                return str(candidato)
+    return None
+
+
+BASH = bash_de_los_hooks()
+
+
+@unittest.skipUnless(BASH, "hace falta bash (Git Bash en Windows) para correr el comando de los hooks")
 class HooksDelPlugin(unittest.TestCase):
     """Los comandos de hooks/hooks.json deben ser inocuos sin grafo, desactivables y no fallar sin Python."""
 
@@ -254,7 +277,7 @@ class HooksDelPlugin(unittest.TestCase):
     def correr(self, nombre, proyecto, **extra):
         comando = self.comandos[nombre].replace("${CLAUDE_PLUGIN_ROOT}", RAIZ.as_posix())
         env = {**os.environ, "CLAUDE_PROJECT_DIR": str(proyecto), **extra}
-        return subprocess.run(["bash", "-c", comando], input="{}", capture_output=True, text=True,
+        return subprocess.run([BASH, "-c", comando], input="{}", capture_output=True, text=True,
                               encoding="utf-8", env=env, timeout=60)
 
     @staticmethod
@@ -287,7 +310,7 @@ class HooksDelPlugin(unittest.TestCase):
             vacio.mkdir()
             for nombre, comando in self.comandos.items():
                 comando = comando.replace("${CLAUDE_PLUGIN_ROOT}", RAIZ.as_posix())
-                r = subprocess.run([shutil.which("bash"), "-c", comando], input="{}", capture_output=True,
+                r = subprocess.run([BASH, "-c", comando], input="{}", capture_output=True,
                                    text=True, env={"PATH": str(vacio), "CLAUDE_PROJECT_DIR": t}, timeout=60)
                 self.assertEqual(r.returncode, 0, nombre)
 
