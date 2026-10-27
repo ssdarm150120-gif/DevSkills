@@ -7,7 +7,7 @@ description: >
 license: MIT
 metadata:
   author: devskills
-  version: "1.1"
+  version: "1.2"
 ---
 
 ## When to Use
@@ -39,9 +39,19 @@ Delegar en el subagente que corresponda; si la historia cruza capas, empezar por
 ### Paso 2. TDD (rojo → verde → refactor)
 - **Pruebas de aceptación primero:** copiar los escenarios de la historia (Anexo B) **tal cual** a su `.feature` (por defecto `codigo/<modulo>/pruebas/<id>_<titulo>.feature`; respeta la convención existente) e implementar sus pasos con pytest-bdd, con datos ficticios, adaptadores falsos y el reloj controlado. Empiezan en rojo. **Cada escenario del SRS debe tener su prueba:** es un punto de la lista mínima que revisa el Angel Fixer en la revisión por historia. QA las revisa (copia literal, comportamiento de punta a punta) y las refuerza en el cierre del sprint o, en la excepción, en su validación por historia; no se reescriben ni se suavizan para que pasen.
 - Escribir después las **pruebas unitarias del dominio** derivadas de los escenarios Gherkin.
-- Implementar lo mínimo para ponerlas en verde; refactorizar sin cambiar el comportamiento.
+- Implementar lo mínimo para ponerlas en verde, con la **escalera del mínimo** (abajo); refactorizar sin cambiar el comportamiento.
 - Los adaptadores se prueban contra **puertos falsos** y con su prueba de contrato.
 - Las pruebas deben **morder**: comprueba en una copia del scratchpad que una mutación del código las hace fallar.
+
+**Escalera del mínimo (inspirada en [Ponytail](https://github.com/DietrichGebert/ponytail), MIT).** Con la prueba en rojo y el código afectado ya leído, sube peldaño por peldaño y **detente en el primero que resuelva**:
+1. ¿Hace falta? (¿lo pide un escenario, un RF o un RNF?)
+2. ¿Ya existe en el proyecto? (`api_publica.py`, `nucleo`, otro caso de uso; el grafo lo ubica)
+3. ¿Lo resuelve la biblioteca estándar?
+4. ¿Lo hace el framework? (Django, el ORM, HTMX)
+5. ¿Lo hace una dependencia ya instalada? (no agregues una nueva sin el DISEÑO)
+6. ¿Cabe en una línea?
+
+Solo después escribe el mínimo que pone la prueba en verde. La escalera recorta código, **no** controles: validación, manejo de errores, permisos, seguridad, accesibilidad y lo que exijan el SRS y el DISEÑO no se recortan, y la arquitectura del Paso 1 tampoco (el mínimo vive en su capa). Menos código es menos que revisar y menos rondas con el Angel Fixer.
 
 ### Paso 3. Reglas que siempre se revisan antes de entregar
 - [ ] `dominio/` no importa Django, ORM ni librerías de red; nada fuera de la lista blanca.
@@ -70,6 +80,7 @@ Delegar en el subagente que corresponda; si la historia cruza capas, empezar por
 - [ ] **Archivos generados:** escribir con `newline="\n"` (en Windows se cuelan CRLF); `.gitattributes` con LF.
 - [ ] **Pruebas en paralelo:** recursos con nombre único por sesión de pytest (bases, carpetas temporales) y sin procesos huérfanos.
 - [ ] **Sin duplicados:** una sola fuente para cada permiso o regla (la matriz central), sin bloques duplicados en vistas.
+- [ ] **Sin sobrediseño:** cada pieza nueva pasó la escalera del mínimo (Paso 2); nada de abstracciones, opciones o capas "por si acaso" que ningún escenario pide. La lógica con ramas, bucles, parsers, dinero o seguridad conserva su prueba pequeña.
 - [ ] **Marca de "visto" por ID, con doble comprobación:** para no procesar dos veces un mensaje, un webhook o un evento, guarda una marca por su identificador único y comprueba **dos veces**: una consulta previa (barata, evita trabajo) y una restricción `UNIQUE` al insertar la marca, dentro de la misma transacción que el efecto. La consulta sola pierde la carrera entre dos entregas simultáneas; la restricción sola convierte el duplicado en un error en lugar de un "ya visto". Prueba la concurrencia.
 - [ ] **Enmascara solo valores largos:** al ocultar un secreto o un dato en logs, transcripciones o salidas, sustituye solo valores de 8 caracteres o más. Un valor de 4 o menos coincide por accidente con cualquier texto (o, si "enseñas los últimos 4", lo revelas entero). Un valor corto no es un secreto: no lo trates como tal; si lo es, su lugar es una variable de entorno y nunca el texto.
 - [ ] **Falsos positivos de gitleaks:** se suprimen con `gitleaks:allow` **en la misma línea** y el motivo; nunca se excluye una carpeta o un archivo del escaneo (una exclusión esconde el siguiente secreto real). Con semgrep: se corrige, o `# nosemgrep: <regla>` en la línea con motivo; nunca `--exclude` nuevo.
