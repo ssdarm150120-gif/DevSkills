@@ -28,27 +28,15 @@ python <DEVSKILLS>/motor/graphify/revisar_grafo.py graphify-out
 la documentación). Si encuentra algo real, corrige la fuente (o amplía el `.graphifyignore`) y regenera; no edites el
 grafo a mano.
 
-## Hooks de sesión (opcional)
+## Hooks de sesión
 
-Agrega a `.claude/settings.json` del proyecto (o a `~/.claude/settings.json`):
+Con el plugin `devskills` ya vienen activos (`hooks/hooks.json`): `SessionStart` → `sesion_inicio.py`, `PreToolUse` `Bash|Grep` → `hook_guard.py search` y `Read|Glob` → `hook_guard.py read`. No pegues nada en `settings.json`. En un proyecto sin `graphify-out/` no hacen nada (salen antes de lanzar Python) y nunca bloquean.
 
-```json
-{
-  "hooks": {
-    "SessionStart": [
-      { "hooks": [ { "type": "command", "command": "python <DEVSKILLS>/motor/graphify/sesion_inicio.py" } ] }
-    ],
-    "PreToolUse": [
-      { "matcher": "Bash|Grep", "hooks": [ { "type": "command", "command": "python <DEVSKILLS>/motor/graphify/hook_guard.py search" } ] },
-      { "matcher": "Read|Glob", "hooks": [ { "type": "command", "command": "python <DEVSKILLS>/motor/graphify/hook_guard.py read" } ] }
-    ]
-  }
-}
-```
+Si ya tenías estos hooks pegados a mano con una ruta absoluta, quedarían duplicados: `devskills motor enganchar` los detecta por el nombre del script y los quita (con confirmación y respaldo del `settings.json`).
 
-**El hook del `PreToolUse` debe ser Python, no bash (en Windows).** Un hook de bash lanza un `bash.exe` extra en CADA
-llamada a herramienta de cada sesión y subagente; con agentes en paralelo la capa MSYS de Git Bash falla con
-`add_item ... failed, errno 1` y las herramientas de Bash dejan de responder. Por eso se entrega `hook_guard.py`.
+**Sin el plugin** (solo `install.sh`): `devskills motor enganchar --hooks` escribe los tres hooks con el Python y la ruta de ese equipo, en forma sin shell (`command` + `args`). No hay ruta que copiar a mano.
+
+**Python, no bash, en Windows.** Un hook que es un script de bash lanza un `bash.exe` extra en CADA llamada a herramienta de cada sesión y subagente; con agentes en paralelo la capa MSYS de Git Bash falla con `add_item ... failed, errno 1`. Por eso la lógica es `hook_guard.py` (solo biblioteca estándar) y el `command` del plugin se limita a elegir el intérprete (`python3`/`python`, o `python`/`py` en Windows) con comandos internos del shell y a hacer `exec`. Detalle de la decisión en `docs/motor.md`, sección "Hooks de Graphify".
 
 Variables: `GRAPHIFY_SESION=0` desactiva el resumen; `GRAPHIFY_SESION_AUTOUPDATE=1` lanza `graphify update .` en segundo
 plano cuando el grafo está desactualizado (modifica `graphify-out/`, que suele estar versionado); `GRAPHIFY_SESION_MAX`

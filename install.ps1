@@ -185,5 +185,6 @@ if (($env:PATH -split ';') -notcontains $BinDir) {
 Write-Host "Para empezar:"
 Write-Host "  devskills doctor"
 Write-Host "  devskills init C:\proyectos\mi-sistema --nombre `"Mi sistema`""
+Write-Host "  Motor grafico (opcional): devskills motor iniciar ; devskills motor enganchar ; devskills panel"
 Write-Host "  En Claude Code, los agentes y skills se llaman devskills-<nombre> (por ejemplo, /devskills-ciclo HU-01)."
 Write-Host ""

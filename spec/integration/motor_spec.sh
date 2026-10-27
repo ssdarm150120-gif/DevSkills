@@ -177,6 +177,51 @@ Describe 'CLI devskills: motor gráfico'
       The stderr should include '--forzar'
     End
 
+    Describe 'enganchar'
+      # CLAUDE_CONFIG_DIR apunta a una carpeta temporal: nunca se toca el settings.json real.
+      enganchar() { CLAUDE_CONFIG_DIR="$DATOS/claude" devskills motor enganchar "$@"; }
+      It 'rechaza las opciones de enganchar en otras acciones'
+        When call devskills motor iniciar --quitar
+        The status should eq 2
+        The stderr should include 'solo aplican a'
+      End
+
+      It 'sin terminal exige --si y no cambia nada'
+        preparar() { mkdir -p "$DATOS/claude"; printf '%s' '{"theme":"dark"}' >"$DATOS/claude/settings.json"; }
+        BeforeCall 'preparar'
+        When call enganchar
+        The status should eq 1
+        The stdout should include 'statusLine'
+        The stderr should include '--si'
+        The contents of file "$DATOS/claude/settings.json" should eq '{"theme":"dark"}'
+      End
+
+      It 'con --si escribe la status line con la ruta de este equipo, respalda y es idempotente'
+        flujo() {
+          mkdir -p "$DATOS/claude"
+          printf '%s' '{"theme":"dark"}' >"$DATOS/claude/settings.json"
+          enganchar --si >/dev/null || return 1
+          grep -q 'statusline_limites.py' "$DATOS/claude/settings.json" || return 1
+          grep -q '"theme": "dark"' "$DATOS/claude/settings.json" || return 1
+          [[ "$(find "$DATOS/claude" -name 'settings.json.bak-*' | wc -l | tr -d ' ')" == "1" ]] || return 1
+          enganchar --si
+        }
+        When call flujo
+        The status should be success
+        The output should include 'Sin cambios'
+      End
+
+      It '--quitar deshace lo que puso'
+        quitar() {
+          enganchar --si >/dev/null || return 1
+          enganchar --si --quitar >/dev/null || return 1
+          ! grep -q 'statusLine' "$DATOS/claude/settings.json"
+        }
+        When call quitar
+        The status should be success
+      End
+    End
+
     Describe 'migrar'
       crear_previa() {
         mkdir -p "$PREVIA/panel/estado" "$PREVIA/orquestador/historial"

@@ -57,6 +57,16 @@ class Registro(unittest.TestCase):
         with self.assertRaises(panel.ErrorRegistro):
             panel.validar_registro(datos)
 
+    def test_raices_por_omision_se_pueden_desactivar_desde_el_registro(self):
+        self.assertTrue(panel.validar_registro({"proyectos": []})["usar_raices_defecto"])
+        self.assertTrue(panel.validar_registro({"proyectos": [], "usar_raices_defecto": True})["usar_raices_defecto"])
+        self.assertFalse(panel.validar_registro({"proyectos": [], "usar_raices_defecto": False})["usar_raices_defecto"])
+        self.assertTrue(json.loads(PLANTILLA.read_text(encoding="utf-8"))["usar_raices_defecto"])
+
+    def test_carpeta_de_transcripts_respeta_claude_config_dir(self):
+        with tempfile.TemporaryDirectory() as t, mock.patch.dict(os.environ, {"CLAUDE_CONFIG_DIR": t}):
+            self.assertEqual(panel.rutas.claude_dir() / "projects", Path(t).resolve() / "projects")
+
     def test_raices_de_deteccion(self):
         self.assertEqual(panel.validar_raices(["/srv/x"]), ["/srv/x"])
         with self.assertRaises(panel.ErrorRegistro):

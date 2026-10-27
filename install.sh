@@ -281,6 +281,7 @@ fi
 echo -e "${NEGRITA}Para empezar:${NC}"
 echo "  devskills doctor                       # revisa los requisitos"
 echo "  devskills init ~/proyectos/mi-sistema --nombre \"Mi sistema\""
+echo "  Motor gráfico (opcional): devskills motor iniciar · devskills motor enganchar · devskills panel"
 echo "  En Claude Code, los agentes y skills se llaman devskills-<nombre> (por ejemplo, /devskills-ciclo HU-01)."
 echo "  Si prefieres el plugin (devskills:<nombre>), usa /plugin marketplace add en lugar de este instalador."
 echo ""

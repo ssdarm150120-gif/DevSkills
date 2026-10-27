@@ -11,19 +11,10 @@ usan solo estos campos:
 y se escriben en <datos>/panel/estado/limites.json (escritura atómica; <datos> es DEVSKILLS_DATOS o ~/.devskills). No lee credenciales, no llama a ningún endpoint y no
 guarda contenido de mensajes. Imprime una línea corta, p. ej. "5 h: 23 % (14:20) · semana: 41 %".
 
-Activarlo (no se activa solo; `devskills panel estado` imprime la ruta exacta): agrega a ~/.claude/settings.json
-
-  "statusLine": {
-    "type": "command",
-    "command": "python <ruta-de-DevSkills>/motor/panel/statusline_limites.py",
-    "refreshInterval": 60
-  }
-
-Si ya tienes otra status line, envuélvela para conservar lo que muestra:
-
-    "command": "python <ruta-de-DevSkills>/motor/panel/statusline_limites.py --envolver \"<tu comando de status line>\""
-
-(el comando envuelto recibe el mismo JSON por stdin y su salida se imprime antes que los límites).
+Activarlo (no se activa solo): `devskills motor enganchar` escribe la `statusLine` en el settings.json de usuario de
+Claude Code con la ruta y el Python de ESTE equipo (muestra el diff, pide confirmación y respalda). Si ya tienes otra
+status line: `devskills motor enganchar --envolver "<tu comando>"`; el comando envuelto recibe el mismo JSON por stdin
+y su salida se imprime antes que los límites. Quitarla: `devskills motor enganchar --quitar`.
 """
 import json
 import os

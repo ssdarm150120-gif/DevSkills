@@ -87,9 +87,23 @@ Al copiar, el instalador adapta el contenido: `devskills:<nombre>` pasa a `devsk
 - Solo quita o borra entradas del manifiesto con aspecto de DevSkills (`devskills-*` o el CLI): un manifiesto alterado no puede hacer borrar archivos ajenos.
 - **Rutas con caracteres especiales:** `&`, `#`, `\` y la comilla simple (por ejemplo, una carpeta de usuario `O'Brien`) se instalan literales. Se **rechaza** (código 2, sin instalar nada) una ruta con saltos de línea o caracteres de control, `$`, comillas dobles o acento grave, porque las skills instaladas las incrustan en comandos de shell.
 
-**Qué no trae el instalador:** el hook de vetos para subagentes (`hooks/vetar_acciones_externas.sh`) pertenece al sistema de plugins de Claude Code y solo funciona instalado como plugin. Con el instalador, los vetos dependen de las reglas escritas en cada agente y de `--disallowedTools` en las corridas sin humano.
+**Qué no trae el instalador:** los hooks (`hooks/hooks.json`: el veto de acciones externas para subagentes y los de Graphify) pertenecen al sistema de plugins de Claude Code y solo funcionan instalado como plugin. Con el instalador, los vetos dependen de las reglas escritas en cada agente y de `--disallowedTools` en las corridas sin humano; los hooks de Graphify los escribe `devskills motor enganchar --hooks` con el Python y las rutas de ese equipo.
 
 Opciones: `--si` (`-Si`) no pregunta al reinstalar. Variables: `CLAUDE_CONFIG_DIR`, `DEVSKILLS_BIN_DIR`, `DEVSKILLS_SHARE_DIR`.
+
+## Motor gráfico: puesta en marcha en un equipo nuevo
+
+El panel y el orquestador opcional viajan con DevSkills (`motor/`) y no llevan rutas ni nombres de nadie: lo que depende del equipo se calcula ahí. La secuencia, en cualquier sistema:
+
+```bash
+# 1. Instala el plugin (recomendado) y/o el CLI (bash install.sh · install.ps1 en Windows)
+devskills motor iniciar        # 2. crea ~/.devskills/proyectos.json desde la plantilla
+devskills motor enganchar      # 3. status line de límites en el settings.json de Claude Code (diff + confirmación + respaldo)
+devskills panel                # 4. abre el panel; "Detectar" propone tus proyectos
+devskills orquestador instalar # 5. opcional; después: devskills orquestador iniciar
+```
+
+Los hooks de Graphify los trae el plugin (nada que pegar en `settings.json`); si venías de pegarlos a mano, `devskills motor enganchar` los detecta y los quita. Todo el detalle (qué escribe, `--envolver`, `--quitar`, `--hooks` sin plugin, migrar la configuración vieja, carpetas de detección configurables) está en [motor](motor.md).
 
 ## Actualizar
 
