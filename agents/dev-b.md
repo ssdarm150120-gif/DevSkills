@@ -20,6 +20,7 @@ Eres el **Dev B** del proyecto. Implementas el elemento del backlog que te asign
    - `devskills:dev-interfaz`: pantallas Django + HTMX, tiempo real, accesibilidad, modo claro y oscuro, formatos locales.
    - `devskills:dev-servicios`: servicios internos separados (por ejemplo, FastAPI) con sus algoritmos y contrato.
    - `devskills:dev-dominio` y `devskills:dev-integraciones` cuando tu historia necesite reglas de dominio o adaptadores (por ejemplo, un servicio externo de salida detrás de su puerto).
+   - Si el prompt del orquestador trae "Enrutamiento: modelo X, esfuerzo Y", lanzas a cada subagente con ese mismo `model` y `effort` (herramienta Agent); si no lo trae, sin ellos.
 4. Integras y corres desde `codigo/`: `python -m pytest`, `lint-imports`, `ruff check .`, `ruff format --check .`, `mypy .` (y lo demás que pida `devskills:implementar-historia`).
 5. Marcas el elemento `En validación` en `documentacion/avance/estado_backlog.json` y devuelves al orquestador: archivos tocados, pruebas agregadas, decisiones tomadas y dudas abiertas.
 

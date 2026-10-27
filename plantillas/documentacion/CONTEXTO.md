@@ -92,6 +92,30 @@ Dos grafos del proyecto con [Graphify](https://github.com/Graphify-Labs/graphify
 - **Consultar antes de leer:** `graphify query "<pregunta>" --graph codigo/graphify-out/graph.json --budget 1500`, `graphify explain "<Nombre>" --graph ...`, `graphify path "<A>" "<B>" --graph ...`, `graphify affected "<Nombre>" --graph ...` y `codigo/graphify-out/GRAPH_REPORT.md`; después, solo los archivos y líneas que citan. El grafo refleja `main` al último merge: lo que cambió en la rama del elemento se lee con `git diff`.
 - **Deriva (cierre del sprint):** `python documentacion/analisis/deriva_grafos.py --salida documentacion/avance/S{NN}/DERIVA-S{NN}.md`.
 
+## Enrutamiento de modelos
+
+**Opcional y local.** El orquestador (la sesión principal) puede elegir el modelo y el esfuerzo de cada subagente según su rol, en lugar de que todos usen el de su frontmatter: un escalón abajo del modelo más caro por omisión, el caro para lo de más riesgo y un solo reintento escalado cuando la verificación con código detecta una falla. Reglas completas en `devskills:ciclo-historia`, sección 6.
+
+- **Archivo:** `.devskills/enrutamiento.json`, **local** (`.devskills/` está en el `.gitignore`; nunca entra a un commit). Si no existe o tiene `"activo": false`, todo funciona como siempre. El orquestador nunca cambia su propio modelo (rompe la caché).
+- **Comandos:** `devskills enrutamiento evaluar` (¿encaja? recomendado / parcial / no recomendado; sin pruebas no hay cascada segura), `devskills enrutamiento activar` (crea la tabla por omisión; `--forzar` la reescribe), `devskills enrutamiento desactivar`, `devskills enrutamiento estado` (también en `devskills doctor`).
+- **Fallos:** cada falla de un subagente enrutado y su reintento se anotan en `.devskills/enrutamiento-fallos.md` (local) y en engram; en la pasada documental y en el cierre del sprint el orquestador propone ajustar la tabla como decisión suya.
+
+| Rol (clave de `tabla`) | Modelo | Esfuerzo por omisión |
+|------------------------|--------|----------------------|
+| `desarrollo` (dev-a, dev-b y sus subagentes, ciclo normal) | sonnet | medium |
+| `desarrollo-excepcion` (los mismos, en la excepción) | sonnet | high |
+| `angel-fixer-revision` (revisión por historia) | sonnet | medium |
+| `angel-fixer-excepcion` y `qa-excepcion` (seguridad, plataforma, crítico) | opus | high |
+| `qa-cierre-sprint` | opus | high |
+| `verificador-ligero` / `verificador-final` | sonnet | medium / high |
+| `analista-arquitecto` (SRS, DISEÑO, PLAN) | opus | medium |
+| `pasada-documental`, `registrar-avance`, `mecanico` | haiku | low |
+| Orquestador | no se enruta | — |
+
+| Decisión | Valor en este proyecto |
+|----------|------------------------|
+| Enrutamiento de modelos | <!-- "inactivo" (por omisión) / "activo desde <fecha>"; quién decidió y veredicto de `devskills enrutamiento evaluar` --> |
+
 ## Entorno local
 
 - El proyecto **nunca** apunta por defecto a un puerto reservado del host ({{PUERTOS_RESERVADOS}}).
