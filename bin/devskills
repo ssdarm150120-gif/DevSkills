@@ -97,6 +97,14 @@ Uso:
                                      panel y los servicios funcionan igual
   devskills motor iniciar            Crea el registro de proyectos desde la plantilla si no existe y apunta a la
                                      detección automática del panel
+  devskills motor enganchar [--quitar] [--si] [--envolver "<cmd>"] [--hooks] [--limpiar-hooks]
+                                     Engancha el motor a Claude Code en ESTE equipo: escribe la status line de límites en
+                                     el settings.json de usuario (CLAUDE_CONFIG_DIR o ~/.claude) con la ruta y el
+                                     Python de esta máquina. Muestra el diff, pide confirmación (--si sin terminal) y
+                                     respalda antes de escribir. No pisa una status line ajena (--envolver la conserva).
+                                     Avisa de hooks viejos de Graphify pegados a mano; con el plugin se quitan
+                                     (--limpiar-hooks fuerza). Sin plugin, --hooks escribe los hooks de Graphify.
+                                     --quitar deshace solo lo que puso este comando
   devskills motor migrar --desde <carpeta> [--forzar]
                                      Copia los DATOS de una instalación previa (proyectos.json, preferencias, estado
                                      del panel, historial y propuestas del orquestador) al directorio de datos, sin
@@ -827,7 +835,7 @@ cmd_panel() {
   "$PY" "$(ruta_nativa "$MOTOR/panel/panel.py")" "${args[@]}"
   if [[ "$accion" == "estado" ]]; then
     echo "Datos: $DEVSKILLS_DATOS"
-    echo "Status line de límites (opcional): python $(ruta_nativa "$MOTOR/panel/statusline_limites.py") (ver docs/motor.md)"
+    echo "Status line de límites (opcional): devskills motor enganchar (ver docs/motor.md)"
   fi
 }
 
@@ -905,15 +913,21 @@ cmd_orquestador() {
 }
 
 cmd_motor() {
-  local accion="" desde="" forzar=false
+  local accion="" desde="" forzar=false enganche=()
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      migrar|iniciar)
+      migrar|iniciar|enganchar)
         if [[ -z "$accion" ]]; then accion="$1"; shift; else error "Acción de más: $1"; return 2; fi ;;
       --desde)
         desde="${2:-}"
         if [[ -z "$desde" ]]; then error "--desde necesita una carpeta."; return 2; fi
         shift 2 ;;
+      --envolver)
+        if [[ -z "${2:-}" ]]; then error "--envolver necesita el comando de tu status line."; return 2; fi
+        enganche+=(--envolver "$2"); shift 2 ;;
+      --quitar|--si|-y|--hooks|--limpiar-hooks)
+        [[ "$1" == "-y" ]] && enganche+=(--si) || enganche+=("$1")
+        shift ;;
       --forzar) forzar=true; shift ;;
       -h|--help) mostrar_ayuda; return 0 ;;
       -*) error "Opción desconocida: $1"; return 2 ;;
@@ -921,11 +935,15 @@ cmd_motor() {
     esac
   done
   if [[ -z "$accion" ]]; then
-    error "Falta la acción. Uso: devskills motor <iniciar|migrar --desde <carpeta> [--forzar]>"
+    error "Falta la acción. Uso: devskills motor <iniciar|enganchar|migrar --desde <carpeta> [--forzar]>"
     return 2
   fi
   if [[ "$forzar" == true && "$accion" != "migrar" ]]; then error "--forzar solo aplica a 'migrar'."; return 2; fi
   if [[ -n "$desde" && "$accion" != "migrar" ]]; then error "--desde solo aplica a 'migrar'."; return 2; fi
+  if [[ ${#enganche[@]} -gt 0 && "$accion" != "enganchar" ]]; then
+    error "--quitar, --si, --envolver, --hooks y --limpiar-hooks solo aplican a 'enganchar'."
+    return 2
+  fi
   preparar_motor || return 1
   case "$accion" in
     migrar)
@@ -933,6 +951,11 @@ cmd_motor() {
       local args=(--desde "$(ruta_nativa "$desde")" --destino "$DEVSKILLS_DATOS")
       [[ "$forzar" == true ]] && args+=(--forzar)
       "$PY" "$(ruta_nativa "$MOTOR/comun/migrar.py")" "${args[@]}"
+      ;;
+    enganchar)
+      # La ruta de la copia instalada y el intérprete se calculan DENTRO de enganchar.py, en este equipo.
+      # ${enganche[@]+...}: con set -u, bash 3.2 (macOS) falla al expandir un arreglo vacío.
+      "$PY" "$(ruta_nativa "$MOTOR/comun/enganchar.py")" ${enganche[@]+"${enganche[@]}"}
       ;;
     iniciar)
       mkdir -p "$DEVSKILLS_DATOS"
@@ -942,7 +965,8 @@ cmd_motor() {
         cp "$MOTOR/plantillas/proyectos.ejemplo.json" "$DEVSKILLS_DATOS/proyectos.json"
         ok "Creé $DEVSKILLS_DATOS/proyectos.json desde la plantilla (un proyecto de ejemplo)."
       fi
-      echo "Siguiente paso: la detección automática de tus proyectos está en el panel (vista Registro, 'Detectar')."
+      echo "Siguientes pasos: 'devskills motor enganchar' (status line de límites en Claude Code) y 'devskills panel'"
+      echo "(vista Registro, 'Detectar': detección automática de tus proyectos; las carpetas que mira se configuran en el registro)."
       if [[ -t 0 ]]; then
         local respuesta
         read -r -p "¿Abrir el panel ahora? (s/N): " respuesta
