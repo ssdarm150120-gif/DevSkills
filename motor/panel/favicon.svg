@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Panel de control: disco de vidrio con el color de acento. index.html recolorea #b8f53d, #e3f7c4 y #8fdc1e. -->
+  <defs>
+    <linearGradient id="vidrio" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#16201a"/>
+      <stop offset="1" stop-color="#040604"/>
+    </linearGradient>
+    <radialGradient id="brillo" cx="32" cy="30" r="31" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#b8f53d" stop-opacity=".55"/>
+      <stop offset="1" stop-color="#b8f53d" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="disco" cx="26" cy="24" r="30" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#e3f7c4"/>
+      <stop offset=".5" stop-color="#b8f53d"/>
+      <stop offset="1" stop-color="#8fdc1e"/>
+    </radialGradient>
+    <linearGradient id="reflejo" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".14"/>
+      <stop offset=".5" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="url(#vidrio)"/>
+  <rect width="64" height="64" rx="15" fill="url(#brillo)"/>
+  <circle cx="32" cy="32" r="22" fill="url(#disco)"/>
+  <path d="M32 32 L13.8 21.5 A21 21 0 0 1 23.1 13 Z M32 32 L50.2 42.5 A21 21 0 0 1 40.9 51 Z" fill="#ffffff" fill-opacity=".5"/>
+  <circle cx="32" cy="32" r="15" fill="none" stroke="#040604" stroke-opacity=".18" stroke-width="1"/>
+  <circle cx="32" cy="32" r="22" fill="none" stroke="#ffffff" stroke-opacity=".55" stroke-width="1.2"/>
+  <circle cx="32" cy="32" r="8.5" fill="#ffffff" fill-opacity=".35"/>
+  <circle cx="32" cy="32" r="4.6" fill="#040604"/>
+  <rect width="64" height="64" rx="15" fill="url(#reflejo)"/>
+  <rect x=".75" y=".75" width="62.5" height="62.5" rx="14.3" fill="none" stroke="#b8f53d" stroke-opacity=".45" stroke-width="1.5"/>
+</svg>
