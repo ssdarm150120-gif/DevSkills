@@ -189,6 +189,7 @@ El `<id de sesión>` sale del campo `session_id` de los eventos del `stream-json
 En la prueba real, una historia **pequeña** costó **unos 17 USD** con el modelo más potente en los subagentes (el ciclo lanza desarrollador, QA, Angel Fixer y verificador, cada uno con su propio contexto). Para abaratarlo:
 
 - Pon un modelo más ligero en los subagentes: `export CLAUDE_CODE_SUBAGENT_MODEL=sonnet` (o el modelo que prefieras) antes de lanzar, o cambia `model:` en el encabezado de los agentes. Deja el modelo potente solo para el hilo del orquestador y el analista-arquitecto.
+- Mejor aún, por rol y riesgo: activa el [enrutamiento de modelo y esfuerzo](enrutamiento.md) (`devskills enrutamiento evaluar` y luego `activar`); el orquestador pasa `model` y `effort` a cada subagente y escala solo cuando la verificación falla. No lo combines con `CLAUDE_CODE_SUBAGENT_MODEL_FORCE` ni con `CLAUDE_CODE_EFFORT_LEVEL`, que lo anulan.
 - Fija siempre `--max-budget-usd` y `--max-turns`.
 - Parte los elementos grandes (más de 13 puntos) antes de correrlos.
 

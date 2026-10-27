@@ -205,6 +205,7 @@ cd ~/proyectos/mi-sistema && claude                # abre Claude Code en el proy
 | `devskills doctor` | Revisa los requisitos y explica cómo instalar lo que falte (dentro de un proyecto, también el merge driver de Graphify) |
 | `devskills update [--si]` | Muestra los cambios del clon de origen, pide confirmación y reinstala |
 | `devskills sync-scripts [ruta] [--si]` | Actualiza los `.py` de `documentacion/analisis/` de un proyecto ya creado con los de la plantilla: lista, `diff --stat`, confirmación; no toca `codigo/`, los `.md` ni los JSON, y solo compara la plantilla HTML |
+| `devskills enrutamiento [estado\|activar\|desactivar\|evaluar] [ruta] [--forzar]` | Enrutamiento de modelo y esfuerzo de los subagentes con el archivo local `.devskills/enrutamiento.json`: `evaluar` dice si el proyecto encaja (recomendado, parcial o no recomendado), `activar` crea la tabla por omisión (sin sobrescribir una existente salvo `--forzar`), `desactivar` la apaga y `estado` la muestra |
 | `devskills version` | Muestra la versión |
 | `devskills help` | Muestra la ayuda |
 
@@ -242,6 +243,7 @@ Opciones de `init`: `--nombre`, `--slug`, `--puerto-base`, `--puertos-reservados
 - **Puntos de control:** rama por elemento (y `cierre-sNN` por sprint), commit `wip` antes de cada revisión, y squash a `main` al cerrar. Nadie reconstruye un archivo de memoria.
 - **Quién decide:** el Product Owner lo de negocio; el orquestador lo técnico. Todo queda registrado con quién lo decidió.
 - **Grafo de conocimiento (Graphify, opcional):** dos grafos versionados por proyecto, **lo que es** (`codigo/`, sin LLM) y **el deber ser** (`documentacion/`: encabezados sin LLM; la pasada semántica con LLM solo si el Product Owner la autoriza, con Ollama local, claude-cli o API key). El del código se actualiza tras cada merge, el del deber ser en cada pasada documental, y el cierre del sprint mide la **deriva** entre los dos como hallazgos del QA de cierre. Los agentes consultan el grafo (`graphify query`, `explain`, `path`) antes de leer archivos en masa, para gastar menos tokens. Ver [docs/graphify.md](docs/graphify.md).
+- **Enrutamiento de modelo y esfuerzo (opcional, local):** con `.devskills/enrutamiento.json` activo, el orquestador lanza cada subagente con el modelo y el esfuerzo de su rol (por omisión un escalón abajo del más caro; Opus para la excepción y el QA de cierre; Haiku para lo mecánico), verifica con código y, ante una falla, reintenta una sola vez escalando (primero esfuerzo, luego modelo); cada fallo se registra y ajusta la tabla. El orquestador no cambia de modelo. Ver [docs/enrutamiento.md](docs/enrutamiento.md).
 
 > 📖 Ver [docs/metodologia.md](docs/metodologia.md) · [docs/stack.md](docs/stack.md) · [docs/telegram.md](docs/telegram.md)
 
@@ -289,6 +291,7 @@ Corre `devskills doctor` para revisarlos. Para correr sin humano (`claude -p`, `
 | [Instalación](docs/instalacion.md) | Plugin, instalador, actualización y requisitos |
 | [Telegram](docs/telegram.md) | Trabajar desde el celular |
 | [Graphify](docs/graphify.md) | Grafos del deber ser y de lo que es, deriva, consultas para ahorrar tokens, versionado y merge driver |
+| [Enrutamiento](docs/enrutamiento.md) | Modelo y esfuerzo por rol, archivo local, reintento escalado, registro de fallos y `devskills enrutamiento` |
 | [Cambios](CHANGELOG.md) | Historial de versiones |
 
 ---
