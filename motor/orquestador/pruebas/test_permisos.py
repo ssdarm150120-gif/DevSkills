@@ -73,6 +73,28 @@ def test_guardian_niega_rutas_fuera_o_sensibles(entrada, tmp_path):
     assert not p.decidir("Read", entrada, "lectura", tmp_path)[0]
 
 
+VARIANTES_INSEGURAS = [r"..\x", "../x", r"a/..\b", r"a\..\b", "a/../b", "C:/x", r"C:\x", "c:x",
+                       r"\\server\share", "//server/share"]
+
+
+@pytest.mark.parametrize("windows", [False, True], ids=["posix", "windows"])
+@pytest.mark.parametrize("herr,param", [("Read", "file_path"), ("Write", "file_path"), ("Grep", "path"), ("Glob", "path")])
+@pytest.mark.parametrize("valor", VARIANTES_INSEGURAS)
+def test_guardian_niega_variantes_de_ruta_en_cualquier_so(valor, herr, param, windows, tmp_path, monkeypatch):
+    """Simula POSIX y Windows sin depender del SO del host: la barra invertida separa y `..` siempre se niega."""
+    monkeypatch.setattr(p, "_ES_WINDOWS", windows)
+    modo = "cambios" if herr == "Write" else "lectura"
+    if windows and ".." not in valor:
+        pytest.skip("en Windows unidad/UNC se resuelven por contención real (cubierto en el host Windows)")
+    assert not p.decidir(herr, {param: valor}, modo, tmp_path)[0]
+
+
+def test_guardian_sigue_permitiendo_rutas_legitimas(tmp_path):
+    (tmp_path / "docs").mkdir()
+    assert p.decidir("Read", {"file_path": "docs/nota.md"}, "lectura", tmp_path)[0]
+    assert p.decidir("Read", {"file_path": str(tmp_path / "docs" / "nota.md")}, "lectura", tmp_path)[0]
+
+
 @pytest.mark.parametrize("herr,entrada", [
     ("Glob", {"pattern": "../**/*"}),
     ("Glob", {"pattern": "C:/Users/**"}),
