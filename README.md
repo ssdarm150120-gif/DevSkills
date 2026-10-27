@@ -206,6 +206,10 @@ cd ~/proyectos/mi-sistema && claude                # abre Claude Code en el proy
 | `devskills update [--si]` | Muestra los cambios del clon de origen, pide confirmación y reinstala |
 | `devskills sync-scripts [ruta] [--si]` | Actualiza los `.py` de `documentacion/analisis/` de un proyecto ya creado con los de la plantilla: lista, `diff --stat`, confirmación; no toca `codigo/`, los `.md` ni los JSON, y solo compara la plantilla HTML |
 | `devskills enrutamiento [estado\|activar\|desactivar\|evaluar] [ruta] [--forzar]` | Enrutamiento de modelo y esfuerzo de los subagentes con el archivo local `.devskills/enrutamiento.json`: `evaluar` dice si el proyecto encaja (recomendado, parcial o no recomendado), `activar` crea la tabla por omisión (sin sobrescribir una existente salvo `--forzar`), `desactivar` la apaga y `estado` la muestra |
+| `devskills panel [iniciar\|apagar\|estado] [--puerto N] [--no-abrir]` | Panel de control local (motor gráfico) en `127.0.0.1:18950`: proyectos, servicios y agentes de Claude Code; solo biblioteca estándar de Python |
+| `devskills servicios <levantar\|apagar\|listar> [objetivo] [--simular]` | Lanzador multiplataforma de los servicios del registro de proyectos, con lista blanca de tipos de arranque |
+| `devskills orquestador [instalar\|iniciar\|apagar\|estado]` | Orquestador local **opcional** (venv propio con `claude-agent-sdk`) |
+| `devskills motor iniciar` / `devskills motor migrar --desde <carpeta> [--forzar]` | Crea el registro de proyectos desde la plantilla, o copia los datos de una instalación previa a `~/.devskills` sin sobrescribir ni tocar el origen |
 | `devskills version` | Muestra la versión |
 | `devskills help` | Muestra la ayuda |
 
@@ -292,6 +296,7 @@ Corre `devskills doctor` para revisarlos. Para correr sin humano (`claude -p`, `
 | [Telegram](docs/telegram.md) | Trabajar desde el celular |
 | [Graphify](docs/graphify.md) | Grafos del deber ser y de lo que es, deriva, consultas para ahorrar tokens, versionado y merge driver |
 | [Enrutamiento](docs/enrutamiento.md) | Modelo y esfuerzo por rol, archivo local, reintento escalado, registro de fallos y `devskills enrutamiento` |
+| [Motor gráfico](docs/motor.md) | Panel local, lanzador de servicios, orquestador opcional, estado en `~/.devskills`, status line de límites, migración y seguridad |
 | [Cambios](CHANGELOG.md) | Historial de versiones |
 
 ---

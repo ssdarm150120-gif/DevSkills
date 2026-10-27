@@ -183,7 +183,7 @@ fi
 # Carga útil: se reemplaza completa (es nuestra, lo garantiza la marca).
 rm -rf "$SHARE_DIR"
 mkdir -p "$SHARE_DIR"
-for elemento in .claude-plugin agents skills plantillas scripts bin LICENSE README.md CHANGELOG.md; do
+for elemento in .claude-plugin agents skills plantillas scripts bin motor LICENSE README.md CHANGELOG.md; do
   if [[ -e "$ORIGEN/$elemento" ]]; then
     cp -R "$ORIGEN/$elemento" "$SHARE_DIR/"
   fi
