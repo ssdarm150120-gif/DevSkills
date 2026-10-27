@@ -68,8 +68,11 @@ JSON
     The output should not include 'Math.round(listos / total * 100)'
   End
 
+  # Éxito (0) = no hay node: `Skip if` ejecuta su condición como comando, así que `!` no sirve ahí.
+  sin_node() { ! command -v node >/dev/null 2>&1; }
+
   It 'la función del tablero devuelve lo mismo que porcentaje.py'
-    Skip if 'no hay node' ! command -v node >/dev/null 2>&1
+    Skip if 'no hay node' sin_node
     comparar_js() {
       PLAN_HTML="$PROJECT_ROOT/plantillas/analisis/plan_sprints_plantilla.html" node -e '
         const fs = require("fs");
