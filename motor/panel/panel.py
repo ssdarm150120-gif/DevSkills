@@ -11,7 +11,7 @@ de datos del motor (variable DEVSKILLS_DATOS, o ~/.devskills; ver comun/rutas.py
 
 --simular: Levantar/Apagar no ejecutan nada; corren servicios.py --simular y devuelven el comando. Tampoco se ejecutan
            `gh auth switch` ni `git config` (se devuelve el comando que correría); las lecturas sí se hacen. Tampoco
-           `git fetch`, gitleaks, `git add`, `git commit` ni `git push` de Pendientes de git.
+           `git fetch`, gitleaks, `git add`, `git commit` ni `git push` de Pendientes de git, ni los pasos de Aplicar cambios.
 --laboratorio DIR: carpeta base del Laboratorio (por omisión <datos>/laboratorio).
 --registro ARCHIVO: otro proyectos.json (pruebas: así el cambio de cuenta no toca el registro real).
 --estado DIR: carpeta del estado persistente (avisos.json, acciones.json). Por omisión <datos>/panel/estado (puerto 18950)
@@ -525,6 +525,13 @@ def validar_registro(d):
             servicios.append({"id": s["id"], "nombre": str(s.get("nombre") or s["id"]), "puertos": puertos,
                               "url": url, "tipo": arranque["tipo"], "salud": salud, "puerto_salud": puerto_salud,
                               "url_abrir": f"{u.scheme}://{u.netloc}{abrir}" if abrir else url})
+        # Receta de «Aplicar cambios»: una receta dañada no tumba todo el registro; se avisa y no se ejecuta.
+        aplicar, aplicar_error = None, None
+        if p.get("aplicar") is not None:
+            try:
+                aplicar = validar_aplicar(p["aplicar"], [s["id"] for s in servicios])
+            except ErrorRegistro as e:
+                aplicar_error = str(e)
         transcripts = [carpeta] + [t for t in (p.get("transcripts") or []) if isinstance(t, str)]
         conflictos = []
         for c in p.get("conflictos") or []:
@@ -537,7 +544,8 @@ def validar_registro(d):
                           "repositorio": validar_repositorio(p.get("repositorio"), p["id"], ids_cuenta),
                           "nota": str(p.get("nota") or ""), "servicios": servicios, "conflictos": conflictos,
                           "transcripts": transcripts,
-                          "enrutamiento": validar_enrutamiento(p.get("enrutamiento"), p["id"])})
+                          "enrutamiento": validar_enrutamiento(p.get("enrutamiento"), p["id"]),
+                          "aplicar": aplicar, "aplicar_error": aplicar_error})
     detectar_conflictos(proyectos, reservados, puerto_panel)
     # Prefijos para asignar carpetas de transcripts a proyectos; el más específico (más largo) gana.
     prefijos = []
@@ -3516,6 +3524,905 @@ def actualizar_desde_deteccion(pid):
     return {"ok": True, "cambio": bool(aplicados), "aplicados": aplicados}
 
 
+# ---------------------------------------------------------------- aplicar cambios (receta por proyecto)
+# Después de que una sesión de Claude Code edita un proyecto, un clic recompila el front, instala lo que cambió y
+# reinicia los servicios, sin abrir terminales. La RECETA vive en proyectos.json (clave `aplicar`), la propone el panel
+# a partir de lo que ve y la aprueba el usuario. Cada paso es de una lista blanca TIPADA (nunca un comando libre ni
+# shell); las carpetas son relativas al proyecto (ruta_segura del lanzador) y el reinicio usa el lanzador de servicios
+# (apagar + levantar). «Solo lo necesario»: se guarda en el estado del panel (fuera del repo) una huella por paso de
+# la última aplicación correcta y un paso se omite si sus entradas no cambiaron.
+
+TIPOS_PASO = ("npm-install", "npm-script", "pip-requisitos", "reiniciar-servicio")
+CLAVES_PASO = {"npm-install": {"id", "tipo", "carpeta", "timeout"},
+               "npm-script": {"id", "tipo", "carpeta", "script", "timeout"},
+               "pip-requisitos": {"id", "tipo", "venv", "requisitos", "timeout"},
+               "reiniciar-servicio": {"id", "tipo", "servicio", "timeout"}}
+TIMEOUT_PASO = {"npm-install": 900, "npm-script": 900, "pip-requisitos": 900, "reiniciar-servicio": 120}
+MAX_PASOS = 12
+MAX_SALIDA_PASO = 1500
+MAX_CLAVES_RECETA = {"version", "aprobada", "pasos"}
+PLAN_CACHE_SEG = 5.0              # el aviso de cambios sin aplicar se calcula como máximo cada 5 s por proyecto
+PROPUESTA_CACHE_SEG = 30.0
+SALUD_ESPERA_SEG = 45             # tras reiniciar: cuánto se espera a que el servicio responda
+LIBERAR_PUERTO_SEG = 15           # entre apagar y levantar: cuánto se espera a que se libere el puerto
+MAX_ARCHIVOS_HUELLA = 50000
+MAX_INTENCION = 300
+_EXCLUIR_HUELLA = {"node_modules", ".git", ".venv", "venv", "env", "__pycache__", "dist", "build", ".next", ".cache",
+                   "coverage", "bin", "obj", "graphify-out", ".pytest_cache", ".mypy_cache"}
+_PODAR_RECETA = {"node_modules", ".venv", "venv", "env", "__pycache__", "dist", "build", "bin", "obj", "graphify-out",
+                 "site-packages", "coverage", "vendor"}
+_SCRIPTS_DE_DESARROLLO = {"dev", "watch", "serve", "start:dev", "develop"}
+LIMITACIONES_APLICAR = ("El panel no puede reiniciar la terminal de Claude Code (hereda el PATH al arrancar); sí "
+                        "recompila el proyecto y reinicia sus servicios.")
+_ESTADOS_PASO = ("pendiente", "en-curso", "ok", "fallo", "omitido", "simulado")
+_RE_ANSI = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07]*\x07")
+_RE_CONTROL_SALIDA = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+_aplicaciones = {}                # pid -> estado de la ejecución en curso o la última de esta sesión
+_aplicaciones_lock = threading.Lock()
+_aplicar_estado_lock = threading.Lock()
+_plan_cache = {}                  # pid -> (instante, plan)
+_propuesta_cache = {}             # pid -> (instante, propuesta)
+_dormir = time.sleep              # las pruebas lo sustituyen
+
+
+def _lanzador_mod():
+    """El lanzador de servicios (misma lista blanca y mismas validaciones que Levantar/Apagar)."""
+    from servicios import servicios as lanzador
+    return lanzador
+
+
+def archivo_aplicar():
+    return Path(ESTADO["estado_dir"]) / "aplicar.json"
+
+
+def _rel_posix(v):
+    return str(v).replace("\\", "/").strip("/") or "."
+
+
+# ----- validación de la receta (lista blanca estricta)
+
+def _carpeta_paso(v, donde, base=None, archivo=False):
+    """Carpeta (o archivo) relativa al proyecto: patrón estricto, sin `..` ni rutas absolutas (ruta_segura del
+    lanzador). Con `base` también debe existir, ser del tipo esperado y quedar dentro del proyecto (sin symlinks que
+    escapen). Devuelve el texto normalizado con «/»."""
+    if not isinstance(v, str) or not _RE_CARPETA_REL.fullmatch(v):
+        raise ErrorRegistro(f"Ruta inválida en {donde}.")
+    lanzador = _lanzador_mod()
+    try:
+        destino = lanzador.ruta_segura(base if base is not None else Path("x"), v)
+    except lanzador.ErrorServicios:
+        raise ErrorRegistro(f"Ruta relativa no permitida en {donde}: no se aceptan «..» ni rutas absolutas.")
+    if base is not None:
+        existe = destino.is_file() if archivo else destino.is_dir()
+        try:
+            dentro = (os.path.commonpath([_norm_carpeta(os.path.realpath(destino)), _norm_carpeta(os.path.realpath(base))])
+                      == _norm_carpeta(os.path.realpath(base)))
+        except ValueError:
+            dentro = False
+        if not existe or not dentro:
+            raise ErrorRegistro(f"{'El archivo' if archivo else 'La carpeta'} {_rel_posix(v)} no existe dentro del "
+                                f"proyecto ({donde}).")
+    return _rel_posix(v)
+
+
+def _scripts_npm(carpeta):
+    datos = _json_seguro(Path(carpeta) / "package.json")
+    scripts = (datos or {}).get("scripts")
+    return {k for k, v in scripts.items() if isinstance(v, str)} if isinstance(scripts, dict) else set()
+
+
+def validar_paso(paso, ids_servicios, base=None):
+    """Un paso de la receta. Solo claves y tipos de la lista blanca; con `base` también se comprueba el disco (la
+    carpeta existe, el script existe en package.json, el archivo de requisitos existe). ErrorRegistro si algo no sirve."""
+    if not isinstance(paso, dict) or paso.get("tipo") not in TIPOS_PASO:
+        raise ErrorRegistro("Tipo de paso no permitido (npm-install, npm-script, pip-requisitos o reiniciar-servicio).")
+    tipo = paso["tipo"]
+    if set(paso) - CLAVES_PASO[tipo] or not {"id", "tipo"} <= set(paso):
+        raise ErrorRegistro(f"Claves no permitidas en un paso {tipo}; se aceptan: {', '.join(sorted(CLAVES_PASO[tipo]))}.")
+    if not isinstance(paso["id"], str) or not _ID.fullmatch(paso["id"]):
+        raise ErrorRegistro("Id de paso inválido (minúsculas, dígitos y guiones; máximo 41).")
+    donde = f"el paso {paso['id']}"
+    salida = {"id": paso["id"], "tipo": tipo}
+    if tipo in ("npm-install", "npm-script"):
+        if "carpeta" not in paso:
+            raise ErrorRegistro(f"Falta la carpeta en {donde}.")
+        salida["carpeta"] = _carpeta_paso(paso["carpeta"], donde, base)
+        if base is not None and not (Path(base).joinpath(*salida["carpeta"].split("/")) / "package.json").is_file():
+            raise ErrorRegistro(f"No hay package.json en {salida['carpeta']} ({donde}).")
+    if tipo == "npm-script":
+        lanzador = _lanzador_mod()
+        script = paso.get("script")
+        if not isinstance(script, str) or not _RE_SCRIPT_NPM.fullmatch(script):
+            raise ErrorRegistro(f"Nombre de script inválido en {donde}.")
+        if base is not None and script not in _scripts_npm(Path(base).joinpath(*salida["carpeta"].split("/"))):
+            raise ErrorRegistro(f"El script «{script}» no existe en el package.json de {salida['carpeta']} ({donde}).")
+        salida["script"] = lanzador.validar(script, lanzador.RE_SCRIPT_NPM, "script de npm")
+    if tipo == "pip-requisitos":
+        salida["venv"] = _carpeta_paso(paso.get("venv"), donde, base)
+        salida["requisitos"] = _carpeta_paso(paso.get("requisitos"), donde, base, archivo=True)
+        if not salida["requisitos"].lower().endswith(".txt"):
+            raise ErrorRegistro(f"El archivo de requisitos de {donde} debe ser un .txt.")
+    if tipo == "reiniciar-servicio":
+        if not isinstance(paso.get("servicio"), str) or paso["servicio"] not in ids_servicios:
+            raise ErrorRegistro(f"El servicio de {donde} no es de este proyecto.")
+        salida["servicio"] = paso["servicio"]
+    if "timeout" in paso:
+        t = paso["timeout"]
+        if isinstance(t, bool) or not isinstance(t, int) or not 10 <= t <= 3600:
+            raise ErrorRegistro(f"timeout inválido en {donde} (segundos, de 10 a 3600).")
+        salida["timeout"] = t
+    return salida
+
+
+def validar_aplicar(a, ids_servicios, base=None):
+    """La receta completa (`aplicar` del proyecto). None si no hay. Ids de paso únicos, máximo MAX_PASOS."""
+    if a is None:
+        return None
+    if not isinstance(a, dict) or set(a) - MAX_CLAVES_RECETA or a.get("version", 1) != 1:
+        raise ErrorRegistro("La receta «aplicar» solo acepta version, aprobada y pasos (version 1).")
+    pasos = a.get("pasos")
+    if not isinstance(pasos, list) or not 1 <= len(pasos) <= MAX_PASOS:
+        raise ErrorRegistro(f"La receta debe tener de 1 a {MAX_PASOS} pasos.")
+    vistos, validos = set(), []
+    for p in pasos:
+        v = validar_paso(p, ids_servicios, base)
+        if v["id"] in vistos:
+            raise ErrorRegistro(f"Id de paso repetido: {v['id']}.")
+        vistos.add(v["id"])
+        validos.append(v)
+    aprobada = a.get("aprobada")
+    if aprobada is not None and (not isinstance(aprobada, str) or len(aprobada) > 40):
+        raise ErrorRegistro("aprobada debe ser una fecha en texto.")
+    return {"version": 1, "aprobada": aprobada, "pasos": validos}
+
+
+# ----- huellas: «solo lo necesario»
+
+def _hash_archivo(ruta):
+    try:
+        return hashlib.sha256(Path(ruta).read_bytes()).hexdigest()
+    except OSError:
+        return "faltante"
+
+
+def _archivos_fuente(carpeta):
+    """Archivos relevantes de una carpeta (rutas relativas con «/»). Dentro de un repo git: lo rastreado más lo no
+    rastreado que no esté ignorado (`git ls-files -co --exclude-standard`), de modo que node_modules, .venv, bundles
+    ignorados, etc. nunca cuentan. Sin git: un recorrido que poda las carpetas de dependencias y de salida."""
+    carpeta = str(carpeta)
+    codigo, salida, _ = _git_ejecutar(["ls-files", "-z", "--cached", "--others", "--exclude-standard"], carpeta,
+                                      timeout=GIT_TIMEOUT)
+    if codigo == 0:
+        rels = [r for r in salida.decode("utf-8", errors="replace").split("\0") if r]
+    else:
+        rels = []
+        for raiz, dirs, archivos in os.walk(carpeta):
+            dirs[:] = [d for d in dirs if d not in _EXCLUIR_HUELLA]
+            rels.extend(os.path.relpath(os.path.join(raiz, a), carpeta).replace("\\", "/") for a in archivos)
+            if len(rels) > MAX_ARCHIVOS_HUELLA:
+                break
+    return sorted(r for r in rels if not _EXCLUIR_HUELLA.intersection(r.split("/")[:-1]))[:MAX_ARCHIVOS_HUELLA]
+
+
+def huella_arbol(carpeta):
+    """Huella barata del árbol de fuentes: sha256 de (ruta, tamaño, mtime en ns) de cada archivo relevante, sin leer
+    su contenido. Robusta frente a ediciones, altas y bajas; un `touch` o un checkout sin cambios solo provoca, como
+    mucho, una recompilación de más (nunca una de menos)."""
+    h = hashlib.sha256()
+    for rel in _archivos_fuente(carpeta):
+        try:
+            st = os.stat(os.path.join(carpeta, *rel.split("/")))
+            h.update(f"{rel}\0{st.st_size}\0{st.st_mtime_ns}\n".encode("utf-8", "replace"))
+        except OSError:
+            h.update(f"{rel}\0borrado\n".encode("utf-8", "replace"))
+    return h.hexdigest()
+
+
+def _carpeta_de_servicio(pid, sid, base):
+    """Carpeta de arranque del servicio (relativa al proyecto, validada con ruta_segura)."""
+    crudo = leer_registro_crudo()
+    pc = next((x for x in crudo.get("proyectos") or [] if x.get("id") == pid), {})
+    sc = next((x for x in pc.get("servicios") or [] if x.get("id") == sid), {})
+    lanzador = _lanzador_mod()
+    try:
+        return lanzador.ruta_segura(base, (sc.get("arranque") or {}).get("carpeta"))
+    except lanzador.ErrorServicios as e:
+        raise ErrorRegistro(str(e))
+
+
+def huella_paso(pid, paso, base):
+    """Huella de las ENTRADAS de un paso (más su definición: si la receta cambia, el paso vuelve a correr).
+    npm-install: package.json, package-lock.json y si existe node_modules. npm-script: el árbol de fuentes de la
+    carpeta. pip-requisitos: el archivo de requisitos y si existe el Python del venv. reiniciar-servicio: el árbol de
+    fuentes de la carpeta del servicio."""
+    lanzador = _lanzador_mod()
+    definicion = json.dumps({k: v for k, v in paso.items() if k != "timeout"}, sort_keys=True)
+    t = paso["tipo"]
+    if t == "npm-install":
+        c = lanzador.ruta_segura(base, paso["carpeta"])
+        datos = [_hash_archivo(c / "package.json"), _hash_archivo(c / "package-lock.json"), (c / "node_modules").is_dir()]
+    elif t == "npm-script":
+        datos = [huella_arbol(lanzador.ruta_segura(base, paso["carpeta"]))]
+    elif t == "pip-requisitos":
+        python = lanzador._python_de_venv(lanzador.ruta_segura(base, paso["venv"]), lanzador.sistema())
+        datos = [_hash_archivo(lanzador.ruta_segura(base, paso["requisitos"])), python.exists()]
+    else:
+        datos = [huella_arbol(_carpeta_de_servicio(pid, paso["servicio"], base))]
+    return hashlib.sha256((definicion + "\0" + repr(datos)).encode("utf-8")).hexdigest()
+
+
+def _estado_aplicar():
+    d = leer_json(archivo_aplicar(), {})
+    return d if isinstance(d, dict) else {}
+
+
+def _huellas_guardadas(pid):
+    with _aplicar_estado_lock:
+        e = _estado_aplicar().get(pid)
+        pasos = e.get("pasos") if isinstance(e, dict) else None
+        return {k: v for k, v in (pasos or {}).items() if isinstance(k, str) and isinstance(v, str)}
+
+
+def _guardar_estado_aplicar(pid, huellas=None, quitar=(), ultima=None, todo=False):
+    """Fusiona huellas (y/o el resumen de la última ejecución) en aplicar.json, de forma atómica."""
+    with _aplicar_estado_lock:
+        d = _estado_aplicar()
+        if todo:
+            d.pop(pid, None)
+        else:
+            e = d.setdefault(pid, {})
+            pasos = {k: v for k, v in (e.get("pasos") or {}).items() if isinstance(k, str) and k not in quitar}
+            pasos.update(huellas or {})
+            e["pasos"] = pasos
+            if ultima is not None:
+                e["ultima"] = ultima
+        try:
+            escribir_json_atomico(archivo_aplicar(), d)
+        except OSError as ex:
+            log(f"No se pudo guardar el estado de aplicar: {ex}")
+    _plan_cache.pop(pid, None)
+
+
+# ----- presentación de los pasos
+
+def _area_paso(pid, paso, nombres_servicio, base):
+    t = paso["tipo"]
+    if t in ("npm-install", "npm-script"):
+        rel = paso["carpeta"]
+    elif t == "pip-requisitos":
+        rel = os.path.dirname(paso["requisitos"]) or "."
+    else:
+        try:
+            rel = _rel_posix(os.path.relpath(_carpeta_de_servicio(pid, paso["servicio"], base), base))
+        except (ErrorRegistro, ValueError):
+            rel = "."
+        if rel == ".":
+            return nombres_servicio.get(paso["servicio"], paso["servicio"])
+    return "proyecto" if rel in (".", "") else rel.split("/")[-1]
+
+
+def _titulo_paso(paso, nombres_servicio):
+    t = paso["tipo"]
+    if t == "npm-install":
+        return f"Instalar dependencias de npm en {paso['carpeta']}"
+    if t == "npm-script":
+        return f"Ejecutar «npm run {paso['script']}» en {paso['carpeta']}"
+    if t == "pip-requisitos":
+        return f"Instalar los requisitos de Python ({paso['requisitos']})"
+    return f"Reiniciar {nombres_servicio.get(paso['servicio'], paso['servicio'])}"
+
+
+def _buscar_npm():
+    return shutil.which("npm")
+
+
+def _argv_paso(paso, base):
+    """(argv, cwd) de un paso que no es de reinicio. Argumentos fijos más valores ya validados; nunca shell."""
+    lanzador = _lanzador_mod()
+    t = paso["tipo"]
+    if t in ("npm-install", "npm-script"):
+        npm = _buscar_npm()
+        if not npm:
+            raise ErrorRegistro("npm no está en el PATH del panel. Instala Node.js y reinicia el panel (el PATH se "
+                                "hereda al arrancar; no basta con abrir otra terminal).")
+        cwd = lanzador.ruta_segura(base, paso["carpeta"])
+        if not (cwd / "package.json").is_file():
+            raise ErrorRegistro(f"No hay package.json en {paso['carpeta']}.")
+        if t == "npm-script":
+            if paso["script"] not in _scripts_npm(cwd):
+                raise ErrorRegistro(f"El script «{paso['script']}» ya no existe en el package.json de {paso['carpeta']}.")
+            return [npm, "run", paso["script"]], str(cwd)
+        modo = "ci" if (cwd / "package-lock.json").is_file() else "install"
+        return [npm, modo, "--no-audit", "--no-fund"], str(cwd)
+    if t == "pip-requisitos":
+        python = lanzador._python_de_venv(lanzador.ruta_segura(base, paso["venv"]), lanzador.sistema())
+        if not python.exists():
+            raise ErrorRegistro(f"No existe el Python del venv ({paso['venv']}); créalo antes de aplicar.")
+        req = lanzador.ruta_segura(base, paso["requisitos"])
+        if not req.is_file():
+            raise ErrorRegistro(f"No existe el archivo de requisitos {paso['requisitos']}.")
+        return [str(python), "-m", "pip", "install", "-r", str(req), "--disable-pip-version-check", "--no-input"], str(base)
+    raise ErrorRegistro("Tipo de paso sin comando directo.")
+
+
+def _comando_paso(paso, base):
+    """Texto del comando para mostrar (npm y Python con su nombre corto; nunca rutas absolutas del equipo)."""
+    t = paso["tipo"]
+    if t == "reiniciar-servicio":
+        return f"servicios.py apagar {paso['servicio']}  +  servicios.py levantar {paso['servicio']}"
+    if t == "npm-install":
+        modo = "ci" if (Path(base).joinpath(*paso["carpeta"].split("/")) / "package-lock.json").is_file() else "install"
+        return f"({paso['carpeta']}) npm {modo} --no-audit --no-fund"
+    if t == "npm-script":
+        return f"({paso['carpeta']}) npm run {paso['script']}"
+    return f"{paso['venv']}/python -m pip install -r {paso['requisitos']}"
+
+
+def limpiar_salida_paso(datos, n=MAX_SALIDA_PASO):
+    """Salida de un paso lista para mostrar: sin colores ni barras de progreso (`\\r`), sin caracteres de control, con
+    secretos enmascarados y recortada por el principio (lo útil de un fallo está al final)."""
+    texto = datos.decode("utf-8", errors="replace") if isinstance(datos, bytes) else str(datos)
+    texto = _RE_ANSI.sub("", texto).replace("\r\n", "\n")
+    lineas = [ln.split("\r")[-1].rstrip() for ln in texto.split("\n")]
+    texto = _RE_CONTROL_SALIDA.sub("", "\n".join(lineas))
+    texto = re.sub(r"\n{3,}", "\n\n", texto).strip()
+    texto = enmascarar(texto)
+    return texto if len(texto) <= n else "…" + texto[-n:]
+
+
+# ----- plan: qué se ejecuta y qué se omite
+
+def _servicios_de(p):
+    return {s["id"]: s["nombre"] for s in p["servicios"]}
+
+
+def planear(pid, forzar=False):
+    """Para cada paso de la receta: ejecutar u omitir y por qué. Reglas de «solo lo necesario»:
+    - npm-install corre si cambió package.json/package-lock.json (o falta node_modules); pip-requisitos, si cambió el
+      archivo de requisitos (o falta el Python del venv);
+    - npm-script (el build) corre si cambió algo dentro de su carpeta;
+    - reiniciar-servicio corre si cambió el código del servicio o si se ejecutó cualquier paso anterior (build o
+      dependencias nuevas);
+    - `forzar` ejecuta todo. Un paso sin huella guardada (nunca aplicado, o receta editada) cuenta como cambiado."""
+    reg = registro()
+    p = reg["por_id"].get(pid)
+    if not p:
+        raise KeyError(pid)
+    receta = p.get("aplicar")
+    if not receta:
+        return []
+    base = Path(p["carpeta"])
+    nombres = _servicios_de(p)
+    guardadas = _huellas_guardadas(pid)
+    plan, ejecuto_antes = [], False
+    for paso in receta["pasos"]:
+        try:
+            actual = huella_paso(pid, paso, base)
+            error = None
+        except (ErrorRegistro, OSError, ValueError) as e:
+            actual, error = None, str(e)
+        propio = actual is None or guardadas.get(paso["id"]) != actual
+        t = paso["tipo"]
+        if error:
+            accion, razon = "ejecutar", "No se pudo calcular su huella: " + error
+        elif forzar:
+            accion, razon = "ejecutar", "Forzado"
+        elif t == "reiniciar-servicio" and ejecuto_antes:
+            accion = "ejecutar"
+            razon = ("Cambió el código del servicio y se ejecutó un paso anterior" if propio
+                     else "Se ejecutó un paso anterior (build o dependencias)")
+        elif propio:
+            if guardadas.get(paso["id"]) is None:
+                razon = "Todavía no se ha aplicado"
+            elif t == "npm-install":
+                razon = "Cambió package.json o package-lock.json (o falta node_modules)"
+            elif t == "npm-script":
+                razon = f"Cambió algo dentro de {paso['carpeta']}"
+            elif t == "pip-requisitos":
+                razon = "Cambiaron los requisitos (o falta el venv)"
+            else:
+                razon = "Cambió el código del servicio"
+            accion = "ejecutar"
+        else:
+            accion, razon = "omitir", "Sin cambios desde la última aplicación"
+        ejecuto_antes = ejecuto_antes or accion == "ejecutar"
+        plan.append({"id": paso["id"], "tipo": t, "titulo": _titulo_paso(paso, nombres),
+                     "area": _area_paso(pid, paso, nombres, base), "accion": accion, "razon": razon,
+                     "propio": bool(propio), "comando": _comando_paso(paso, base)})
+    return plan
+
+
+def pendientes_de(plan):
+    """Aviso de cambios sin aplicar: las áreas de los pasos que cambiaron por sí mismos."""
+    areas = []
+    for x in plan:
+        if x["propio"] and x["area"] not in areas:
+            areas.append(x["area"])
+    return {"hay": bool(areas), "areas": areas,
+            "texto": ("Hay cambios sin aplicar: " + ", ".join(areas)) if areas else None}
+
+
+def _plan_en_cache(pid):
+    c = _plan_cache.get(pid)
+    if c and time.monotonic() - c[0] < PLAN_CACHE_SEG:
+        return c[1]
+    plan = planear(pid)
+    _plan_cache[pid] = (time.monotonic(), plan)
+    return plan
+
+
+# ----- propuesta de receta (solo lectura)
+
+def _id_paso(prefijo, texto):
+    s = unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode().lower()
+    s = re.sub(r"[^a-z0-9]+", "-", s).strip("-") or "raiz"
+    return (prefijo + "-" + s)[:41].strip("-")
+
+
+def proponer_receta(pid):
+    """Receta que el panel propone a partir de lo que ve: cada subcarpeta (hasta 2 niveles) con package.json y script
+    «build» → npm-install + npm-script build; cada servicio python-modulo con venv y un requirements.txt (en su carpeta
+    o en la raíz del proyecto) → pip-requisitos; y al final el reinicio de los servicios dotnet, django-devskills,
+    python-modulo y los npm que no sean de desarrollo (dev, watch…). Los docker-compose no se reinician solos.
+    -> {"pasos": [...], "notas": [...]}"""
+    reg = registro()
+    p = reg["por_id"].get(pid)
+    if not p:
+        raise KeyError(pid)
+    base = Path(p["carpeta"])
+    crudo = leer_registro_crudo()
+    pc = next((x for x in crudo.get("proyectos") or [] if x.get("id") == pid), {})
+    ids = [s["id"] for s in p["servicios"]]
+    pasos, notas, usados = [], [], set()
+
+    def agregar(paso):
+        if paso["id"] in usados:
+            paso["id"] = (paso["id"][:38] + "-" + str(len(usados)))[:41]
+        try:
+            pasos.append(validar_paso(paso, ids, base))
+            usados.add(paso["id"])
+        except ErrorRegistro as e:
+            notas.append(f"Se descartó un paso propuesto: {e}")
+    frentes = []
+    for d, archivos in recorrer(base, prof=2, podar=_PODAR_RECETA):
+        if "package.json" not in archivos:
+            continue
+        try:
+            rel = _rel_posix(os.path.relpath(d, base))
+        except ValueError:
+            continue
+        if rel.startswith(".."):
+            continue
+        if "build" in _scripts_npm(d):
+            frentes.append(rel)
+    for rel in sorted(frentes):
+        agregar({"id": _id_paso("npm-install", rel), "tipo": "npm-install", "carpeta": rel})
+        agregar({"id": _id_paso("npm-build", rel), "tipo": "npm-script", "carpeta": rel, "script": "build"})
+    if not frentes:
+        notas.append("No se encontró ninguna carpeta con package.json y script «build».")
+    vistos = set()
+    for sc in pc.get("servicios") or []:
+        a = sc.get("arranque") or {}
+        if a.get("tipo") != "python-modulo" or not a.get("venv"):
+            continue
+        try:
+            venv = _carpeta_paso(a["venv"], f"el servicio {sc.get('id')}", base)
+        except ErrorRegistro:
+            continue
+        carpeta = _rel_posix(a.get("carpeta") or ".")
+        candidatos = [f"{carpeta}/requirements.txt" if carpeta != "." else "requirements.txt", "requirements.txt"]
+        req = next((c for c in candidatos if base.joinpath(*c.split("/")).is_file()), None)
+        if req is None:
+            notas.append(f"{sc.get('id')}: no se encontró requirements.txt junto al servicio ni en la raíz.")
+        elif (venv, req) not in vistos:
+            vistos.add((venv, req))
+            agregar({"id": _id_paso("pip", req.rsplit("/", 1)[0] if "/" in req else "raiz"), "tipo": "pip-requisitos",
+                     "venv": venv, "requisitos": req})
+    for sc in pc.get("servicios") or []:
+        a = sc.get("arranque") or {}
+        tipo = a.get("tipo")
+        if sc.get("id") not in ids or tipo == "docker-compose":
+            continue
+        if tipo == "npm" and a.get("script") in _SCRIPTS_DE_DESARROLLO:
+            continue
+        agregar({"id": _id_paso("reiniciar", sc["id"]), "tipo": "reiniciar-servicio", "servicio": sc["id"]})
+    nombres = _servicios_de(p)
+    return {"pasos": [{**x, "titulo": _titulo_paso(x, nombres), "area": _area_paso(pid, x, nombres, base)} for x in pasos],
+            "notas": notas}
+
+
+def _propuesta_en_cache(pid):
+    c = _propuesta_cache.get(pid)
+    if c and time.monotonic() - c[0] < PROPUESTA_CACHE_SEG:
+        return c[1]
+    r = proponer_receta(pid)
+    _propuesta_cache[pid] = (time.monotonic(), r)
+    return r
+
+
+# ----- guardar la receta aprobada en proyectos.json
+
+def guardar_receta(pid, pasos):
+    """Valida (con comprobación de disco) y guarda la receta del proyecto en proyectos.json, con el mismo cuidado que el
+    resto de escrituras del registro (validación completa, escritura atómica y formato con sangría de 2). Una lista
+    vacía quita la receta. -> (código HTTP, respuesta)."""
+    reg = registro()
+    p = reg["por_id"].get(pid)
+    if not p:
+        raise KeyError(pid)
+    if not isinstance(pasos, list) or len(pasos) > MAX_PASOS:
+        raise ValueError(f"pasos debe ser una lista de hasta {MAX_PASOS} pasos.")
+    c = candado("aplicar-" + pid)
+    if c.locked():
+        return 409, {"ok": False, "error": "Hay una aplicación en curso: espera a que termine para cambiar la receta."}
+    receta = None
+    if pasos:
+        try:
+            receta = validar_aplicar({"version": 1, "aprobada": ahora_iso(), "pasos": pasos},
+                                     [s["id"] for s in p["servicios"]], base=Path(p["carpeta"]))
+        except ErrorRegistro as e:
+            raise ValueError(str(e))
+    with _registro_escritura:
+        crudo = leer_registro_crudo()
+        pc = next((x for x in crudo.get("proyectos") or [] if x.get("id") == pid), None)
+        if pc is None:
+            raise KeyError(pid)
+        if receta:
+            pc["aplicar"] = receta
+        else:
+            pc.pop("aplicar", None)
+        escribir_registro(crudo)
+    if receta:
+        _guardar_estado_aplicar(pid, quitar={k for k in _huellas_guardadas(pid) if k not in {x["id"] for x in receta["pasos"]}})
+    else:
+        _guardar_estado_aplicar(pid, todo=True)
+    _plan_cache.pop(pid, None)
+    log(f"Receta de aplicar de {pid}: " + (f"{len(receta['pasos'])} pasos aprobados" if receta else "quitada"))
+    return 200, {"ok": True, "receta": receta, "estado": estado_aplicar(pid)}
+
+
+# ----- ejecución de pasos
+
+def _matar_arbol(proc):
+    if os.name == "nt":
+        try:
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True, timeout=15,
+                           creationflags=_sin_ventana())
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+    try:
+        proc.kill()
+    except OSError:
+        pass
+
+
+def _correr_proceso(argv, cwd, timeout):
+    """Corre un argv (sin shell, sin entrada) con tiempo límite y devuelve (código | None, salida limpia). En Windows
+    un tiempo agotado mata también a los procesos hijos (npm.cmd → cmd → node)."""
+    entorno = dict(os.environ)
+    entorno.update(NO_COLOR="1", npm_config_update_notifier="false", npm_config_fund="false", PYTHONIOENCODING="utf-8",
+                   PIP_DISABLE_PIP_VERSION_CHECK="1", PIP_NO_INPUT="1")
+    try:
+        proc = subprocess.Popen(argv, cwd=cwd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                env=entorno, creationflags=_sin_ventana())
+    except OSError as e:
+        return None, f"No se pudo ejecutar el comando ({type(e).__name__})."
+    try:
+        salida, _ = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        _matar_arbol(proc)
+        try:
+            salida, _ = proc.communicate(timeout=10)
+        except (subprocess.TimeoutExpired, OSError):
+            salida = b""
+        return None, f"Tiempo agotado ({timeout} s).\n" + limpiar_salida_paso(salida, 600)
+    return proc.returncode, limpiar_salida_paso(salida)
+
+
+def _lanzador_cli(accion, objetivo):
+    """`servicios.py apagar|levantar <servicio> --registro …`: el mismo lanzador de Levantar/Apagar."""
+    cmd = [sys.executable, str(SERVICIOS_PY), accion, objetivo, "--registro", str(REGISTRO)]
+    try:
+        r = subprocess.run(cmd, capture_output=True, timeout=120, env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+                           creationflags=_sin_ventana())
+    except subprocess.TimeoutExpired:
+        return None, f"{accion} tardó más de 2 minutos."
+    except OSError as e:
+        return None, f"No se pudo ejecutar servicios.py ({type(e).__name__})."
+    return r.returncode, limpiar_salida_paso(r.stdout + b"\n" + r.stderr)
+
+
+def _esperar_puertos_libres(puertos):
+    limite = time.monotonic() + LIBERAR_PUERTO_SEG
+    while time.monotonic() < limite:
+        if not any(puerto_escucha(x) for x in puertos):
+            return True
+        _dormir(0.5)
+    return not any(puerto_escucha(x) for x in puertos)
+
+
+def _esperar_salud(s):
+    """Espera hasta SALUD_ESPERA_SEG a que el servicio responda: su ruta de salud (200-399, 401 o 403) o, sin ruta de
+    salud, que su puerto escuche. -> (ok, detalle)."""
+    limite = time.monotonic() + SALUD_ESPERA_SEG
+    codigo = None
+    while True:
+        if s["salud"]:
+            with _salud_lock:
+                _salud_cache.pop(s["id"], None)
+            codigo = sondear_salud(s)
+            if codigo is not None and (200 <= codigo < 400 or codigo in (401, 403)):
+                return True, f"{s['salud']} responde HTTP {codigo}"
+        elif puerto_escucha(s["puertos"][0]):
+            return True, f"El puerto :{s['puertos'][0]} está escuchando"
+        if time.monotonic() >= limite:
+            break
+        _dormir(1.0)
+    if s["salud"]:
+        return False, (f"{s['salud']} no respondió en {SALUD_ESPERA_SEG} s"
+                       + (f" (último HTTP {codigo})" if codigo is not None else "") + f". Revisa los logs en {rutas.servicios_logs()}.")
+    return False, f"El puerto :{s['puertos'][0]} no escuchó en {SALUD_ESPERA_SEG} s."
+
+
+def _reiniciar_servicio(p, sid):
+    """Apaga y vuelve a levantar con el lanzador y comprueba la salud. -> (ok, salida)."""
+    s = next((x for x in p["servicios"] if x["id"] == sid), None)
+    if not s:
+        return False, "El servicio ya no está en el registro."
+    codigo, t1 = _lanzador_cli("apagar", sid)
+    if codigo != 0:
+        return False, f"No se pudo apagar {sid}.\n{t1}"
+    if not _esperar_puertos_libres(s["puertos"]):
+        return False, f"Los puertos de {sid} siguen ocupados después de apagarlo.\n{t1}"
+    codigo, t2 = _lanzador_cli("levantar", sid)
+    if codigo != 0:
+        return False, f"No se pudo levantar {sid}.\n{t2}"
+    ok, detalle = _esperar_salud(s)
+    return ok, (t2 + "\n" if t2 else "") + detalle
+
+
+def _ejecutar_paso(p, paso, base):
+    """-> (ok, salida limpia)."""
+    if paso["tipo"] == "reiniciar-servicio":
+        return _reiniciar_servicio(p, paso["servicio"])
+    argv, cwd = _argv_paso(paso, base)
+    codigo, salida = _correr_proceso(argv, cwd, paso.get("timeout") or TIMEOUT_PASO[paso["tipo"]])
+    return codigo == 0, (salida or ("Listo." if codigo == 0 else f"Terminó con código {codigo}."))
+
+
+def _abrir_de(p, receta):
+    """Servicio que se ofrece en «Abrir»: el primero que reinicia la receta o, si no, el primero del proyecto."""
+    ids = [x["servicio"] for x in receta["pasos"] if x["tipo"] == "reiniciar-servicio"]
+    s = next((x for x in p["servicios"] if x["id"] in ids), None) or (p["servicios"][0] if p["servicios"] else None)
+    return {"servicio": s["id"], "nombre": s["nombre"], "url": s["url_abrir"]} if s else None
+
+
+def _instantanea(est):
+    with _aplicaciones_lock:
+        return copy.deepcopy(est)
+
+
+def _correr_aplicacion(pid, p, receta, plan, forzar, simular, llaves):
+    """Hilo de la aplicación: un paso tras otro; se detiene en el primer fallo. Libera los candados al terminar."""
+    est = _aplicaciones[pid]
+    base = Path(p["carpeta"])
+    pasos = {x["id"]: x for x in receta["pasos"]}
+    try:
+        fallo = None
+        for i, previsto in enumerate(plan):
+            with _aplicaciones_lock:
+                st = est["pasos"][i]
+                if fallo:
+                    st.update(estado="omitido", razon=f"No se ejecutó: falló «{fallo}»")
+                    continue
+                if previsto["accion"] == "omitir":
+                    st.update(estado="omitido", razon=previsto["razon"])
+                    continue
+                st.update(estado="en-curso", razon=previsto["razon"], inicio=time.time())
+            paso = pasos[previsto["id"]]
+            if simular:
+                with _aplicaciones_lock:
+                    st.update(estado="simulado", fin=time.time(), salida="Simulación: no se ejecutó nada.")
+                continue
+            try:
+                ok, salida = _ejecutar_paso(p, paso, base)
+            except ErrorRegistro as e:
+                ok, salida = False, str(e)
+            except Exception as e:  # noqa: BLE001 - un fallo inesperado nunca deja la ejecución «en curso» para siempre
+                ok, salida = False, f"Error inesperado ({type(e).__name__})."
+                log(f"aplicar {pid} {paso['id']}: error inesperado {type(e).__name__}: {e}")
+            with _aplicaciones_lock:
+                st.update(estado="ok" if ok else "fallo", fin=time.time(), salida=salida)
+            if ok:
+                try:
+                    reinicios = [x["id"] for x in receta["pasos"] if x["tipo"] == "reiniciar-servicio"
+                                 and x["id"] != paso["id"]]
+                    # Un paso ejecutado invalida las huellas de los reinicios: si el reinicio falla, la próxima vez
+                    # vuelve a intentarse aunque el código del servicio no haya cambiado.
+                    _guardar_estado_aplicar(pid, {paso["id"]: huella_paso(pid, paso, base)},
+                                            quitar=set() if paso["tipo"] == "reiniciar-servicio" else set(reinicios))
+                except (ErrorRegistro, OSError) as e:
+                    log(f"aplicar {pid} {paso['id']}: no se pudo guardar la huella ({e})")
+            else:
+                fallo = paso["id"]
+                log(f"aplicar {pid}: falló {paso['id']}")
+        with _aplicaciones_lock:
+            est["estado"] = "fallo" if fallo else ("simulado" if simular else "ok")
+            est["fin"] = time.time()
+            est["abrir"] = _abrir_de(p, receta) if not fallo else None
+            est["resumen"] = _resumen_ejecucion(est)
+        if not simular:
+            _guardar_estado_aplicar(pid, ultima={"fin": est["fin"], "estado": est["estado"], "resumen": est["resumen"],
+                                                 "forzar": forzar})
+        log(f"aplicar {pid} -> {est['estado']}" + (" (simulación)" if simular else ""))
+    except Exception as e:  # noqa: BLE001
+        with _aplicaciones_lock:
+            est["estado"] = "fallo"
+            est["fin"] = time.time()
+            est["resumen"] = f"Error inesperado ({type(e).__name__})."
+            for st in est["pasos"]:
+                if st["estado"] in ("pendiente", "en-curso"):
+                    st["estado"] = "omitido"
+        log(f"aplicar {pid}: error inesperado {type(e).__name__}: {e}")
+    finally:
+        _plan_cache.pop(pid, None)
+        for c in llaves:
+            c.release()
+
+
+def _resumen_ejecucion(est):
+    n = {k: sum(1 for s in est["pasos"] if s["estado"] == k) for k in _ESTADOS_PASO}
+    if est["estado"] == "fallo":
+        malo = next((s for s in est["pasos"] if s["estado"] == "fallo"), None)
+        return f"Falló «{malo['titulo']}»." if malo else "Falló."
+    if est["estado"] == "simulado":
+        return f"Simulación: {n['simulado']} paso(s) se ejecutarían y {n['omitido']} se omitirían."
+    return f"Listo: {n['ok']} paso(s) ejecutados y {n['omitido']} omitidos."
+
+
+def iniciar_aplicacion(pid, forzar=False):
+    """Arranca la aplicación en segundo plano (no bloquea el servidor HTTP). Un candado por proyecto: no dos a la vez
+    ni junto con Levantar/Apagar. -> (código HTTP, respuesta)."""
+    reg = registro()
+    p = reg["por_id"].get(pid)
+    if not p:
+        raise KeyError(pid)
+    if p.get("aplicar_error"):
+        return 409, {"ok": False, "error": "La receta guardada no es válida: " + p["aplicar_error"]}
+    receta = p.get("aplicar")
+    if not receta:
+        return 409, {"ok": False, "sin_receta": True,
+                     "error": "Este proyecto no tiene una receta aprobada: apruébala primero."}
+    llaves = []
+    for c in (candado("aplicar-" + pid), candado(pid)):
+        if not c.acquire(blocking=False):
+            for t in llaves:
+                t.release()
+            return 409, {"ok": False, "error": f"Ya hay una acción en curso para {pid}."}
+        llaves.append(c)
+    try:
+        plan = planear(pid, forzar=forzar)
+        simular = bool(ESTADO["simular"])
+        est = {"id": secrets.token_hex(6), "estado": "en-curso", "forzar": bool(forzar), "simulacion": simular,
+               "inicio": time.time(), "fin": None, "abrir": None, "resumen": None,
+               "pasos": [{"id": x["id"], "tipo": x["tipo"], "titulo": x["titulo"], "estado": "pendiente",
+                          "razon": x["razon"], "comando": x["comando"],
+                          "accion": x["accion"], "salida": "", "inicio": None, "fin": None} for x in plan]}
+        with _aplicaciones_lock:
+            _aplicaciones[pid] = est
+        hilo = threading.Thread(target=_correr_aplicacion, args=(pid, p, receta, plan, forzar, simular, llaves),
+                                daemon=True, name=f"aplicar-{pid}")
+        hilo.start()
+    except BaseException:
+        for t in llaves:
+            t.release()
+        raise
+    log(f"aplicar {pid} iniciado" + (" (forzado)" if forzar else "") + (" (simulación)" if simular else ""))
+    return 202, {"ok": True, "ejecucion": _instantanea(est)}
+
+
+def estado_aplicar(pid, con_propuesta=False):
+    """Todo lo que la UI necesita del apartado «Aplicar cambios». KeyError si el proyecto no existe."""
+    reg = registro()
+    p = reg["por_id"].get(pid)
+    if not p:
+        raise KeyError(pid)
+    receta = p.get("aplicar")
+    nombres = _servicios_de(p)
+    base = Path(p["carpeta"])
+    with _aplicaciones_lock:
+        ejecucion = copy.deepcopy(_aplicaciones.get(pid))
+    en_curso = bool(ejecucion) and ejecucion["estado"] == "en-curso"
+    salida = {"ok": True, "proyecto": pid, "nombre": p["nombre"], "simulacion": ESTADO["simular"],
+              "limitaciones": LIMITACIONES_APLICAR, "receta": None, "receta_error": p.get("aplicar_error"),
+              "plan": None, "pendientes": {"hay": False, "areas": [], "texto": None}, "ejecucion": ejecucion,
+              "ultima": None, "propuesta": None, "abrir": None, "en_curso": en_curso}
+    if receta:
+        salida["receta"] = {"aprobada": receta["aprobada"],
+                            "pasos": [{**x, "titulo": _titulo_paso(x, nombres), "area": _area_paso(pid, x, nombres, base)}
+                                      for x in receta["pasos"]]}
+        salida["abrir"] = _abrir_de(p, receta)
+        if not en_curso:
+            try:
+                plan = _plan_en_cache(pid)
+                salida["plan"] = plan
+                salida["pendientes"] = pendientes_de(plan)
+            except (ErrorRegistro, OSError) as e:
+                salida["plan_error"] = str(e)
+        else:
+            c = _plan_cache.get(pid)
+            salida["plan"] = c[1] if c else None
+        if not ejecucion:
+            with _aplicar_estado_lock:
+                u = (_estado_aplicar().get(pid) or {}).get("ultima")
+            salida["ultima"] = u if isinstance(u, dict) else None
+    if con_propuesta or not receta:
+        try:
+            salida["propuesta"] = _propuesta_en_cache(pid)
+        except OSError as e:
+            salida["propuesta"] = {"pasos": [], "notas": [f"No se pudo leer el proyecto: {type(e).__name__}."]}
+    return salida
+
+
+# ----- intención del chat: «aplica los cambios del <proyecto>» (la resuelve el panel, no el orquestador)
+
+_RE_PREFIJO = r"^(?:(?:por favor|porfa|oye|hola|ey|quiero que|necesito que|puedes|podrias)\s+)*"
+_RE_INTENCIONES = (
+    re.compile(_RE_PREFIJO + r"aplica(?:r|me|le)?\s+(?:todos\s+)?(?:los\s+)?cambios?\s+(?:de|del|en|al|a|para)\s+(.+)$"),
+    re.compile(_RE_PREFIJO + r"(?:actualiza|actualizar|actualizame|recompila|recompilar|recompilame|reconstruye|reconstruir"
+                              r"|rebuild)\s+(.+)$"),
+)
+_PALABRAS_RELLENO = {"el", "la", "los", "las", "de", "del", "al", "a", "en", "mi", "proyecto", "por", "favor", "porfa",
+                     "ahora", "ya", "otra", "vez", "un", "una", "para", "que", "es"}
+
+
+def _normalizar_frase(t):
+    t = unicodedata.normalize("NFD", str(t).lower())
+    t = "".join(c for c in t if unicodedata.category(c) != "Mn")
+    return re.sub(r"[^a-z0-9ñ]+", " ", t).strip()
+
+
+def _nucleo(frase):
+    return [w for w in _normalizar_frase(frase).split() if w not in _PALABRAS_RELLENO]
+
+
+def _alias_proyectos():
+    """alias_proyectos de la configuración del orquestador (solo lectura; sin importar sus módulos)."""
+    d = leer_json(rutas.orquestador_config(), {})
+    a = d.get("alias_proyectos") if isinstance(d, dict) else None
+    if not isinstance(a, dict):
+        return {}
+    return {str(k): [str(x) for x in v if isinstance(x, str)][:20] for k, v in list(a.items())[:200] if isinstance(v, list)}
+
+
+def intencion_aplicar(texto, reg=None, alias=None):
+    """Reconoce «aplica (los) cambios (de/del/en) X», «actualiza el X» y «recompila X». Coincide solo si lo que sigue al
+    verbo ES un proyecto: su id, su nombre o un alias, sin palabras de relleno (igualdad exacta de palabras, sin acentos
+    ni mayúsculas). Sin coincidencia clara (otro tema, proyecto desconocido o ambiguo) no coincide y la frase sigue su
+    camino normal al orquestador. -> {"coincide": bool, "proyecto"?, "nombre"?, "ambiguo"?, "candidatos"?}"""
+    if not isinstance(texto, str) or not texto.strip() or len(texto) > MAX_INTENCION:
+        return {"coincide": False}
+    frase = _normalizar_frase(texto)
+    resto = None
+    for patron in _RE_INTENCIONES:
+        m = patron.match(frase)
+        if m:
+            resto = _nucleo(m.group(1))
+            break
+    if not resto:
+        return {"coincide": False}
+    reg = reg or registro()
+    alias = _alias_proyectos() if alias is None else alias
+    candidatos = []
+    for pid, p in reg["por_id"].items():
+        nombres = [pid.replace("-", " "), p["nombre"], *alias.get(pid, [])]
+        if any(_nucleo(n) == resto for n in nombres if _nucleo(n)):
+            candidatos.append({"proyecto": pid, "nombre": p["nombre"]})
+    if len(candidatos) == 1:
+        return {"coincide": True, "intencion": "aplicar", **candidatos[0]}
+    return {"coincide": False, "ambiguo": len(candidatos) > 1, "candidatos": candidatos[:5]}
+
+
 # ---------------------------------------------------------------- enrutamiento de modelos por proyecto
 
 ARCHIVO_ENRUTAMIENTO = Path(".devskills") / "enrutamiento.json"
@@ -4396,6 +5303,13 @@ def chat_resolver(q):
                  "candidatos": cand}
 
 
+def chat_intencion(q):
+    """«Aplica los cambios del <proyecto>» y similares: la resuelve el panel, sin orquestador y sin gastar tokens. Solo
+    reconoce la intención; ejecutar sigue pidiendo un clic explícito en la tarjeta o en el apartado del proyecto."""
+    texto = _texto_chat((q.get("texto") or [""])[0], 1, MAX_INTENCION)
+    return 200, {"ok": True, **intencion_aplicar(texto)}
+
+
 def _vista_instruccion(d):
     ctx = d.get("contexto_usado") if isinstance(d.get("contexto_usado"), dict) else None
     errores = d.get("errores") if isinstance(d.get("errores"), list) else []
@@ -4559,6 +5473,8 @@ def chat_get(ruta, q):
             return chat_estado()
         if ruta == "/api/chat/resolver":
             return chat_resolver(q)
+        if ruta == "/api/chat/intencion":
+            return chat_intencion(q)
         if ruta == "/api/chat/instruccion":
             return chat_instruccion(q)
         if ruta == "/api/chat/propuestas/version":
@@ -4762,6 +5678,16 @@ class Manejador(BaseHTTPRequestHandler):
                     return self._enviar(200, estado_git((q.get("id") or [""])[0], actualizar="actualizar" in q))
                 except KeyError:
                     return self._enviar(404, {"ok": False, "error": "Proyecto no encontrado."})
+            if u.path == "/api/proyecto/aplicar":
+                if set(q) - {"id", "propuesta"} or q.get("propuesta", ["1"]) != ["1"]:
+                    return self._enviar(400, {"ok": False, "error": "Solo se aceptan ?id=<proyecto> y, opcional, &propuesta=1."})
+                pid = (q.get("id") or [""])[0]
+                if not _ID.match(pid):
+                    return self._enviar(400, {"ok": False, "error": "Proyecto inválido."})
+                try:
+                    return self._enviar(200, estado_aplicar(pid, con_propuesta="propuesta" in q))
+                except KeyError:
+                    return self._enviar(404, {"ok": False, "error": "Proyecto no encontrado."})
             if u.path == "/api/tokens":
                 if set(q) - {"forzar"} or q.get("forzar", ["1"]) != ["1"]:
                     return self._enviar(400, {"ok": False, "error": "Solo se acepta ?forzar=1."})
@@ -4861,6 +5787,30 @@ class Manejador(BaseHTTPRequestHandler):
                 return self._enviar(404, {"ok": False, "error": "Proyecto no encontrado."})
             except ValueError as e:
                 return self._enviar(400, {"ok": False, "error": str(e)})
+            return self._enviar(codigo, r)
+        if u.path in ("/api/proyecto/aplicar/ejecutar", "/api/proyecto/aplicar/receta"):
+            # Lista blanca estricta de claves; los pasos se validan uno a uno (tipos, rutas relativas, scripts, servicios).
+            es_ejecutar = u.path.endswith("/ejecutar")
+            claves = {"id", "forzar"} if es_ejecutar else {"id", "pasos"}
+            if (not isinstance(cuerpo.get("id"), str) or not _ID.match(cuerpo["id"])
+                    or not set(cuerpo) <= claves or not {"id"} <= set(cuerpo)
+                    or (es_ejecutar and "forzar" in cuerpo and not isinstance(cuerpo["forzar"], bool))
+                    or (not es_ejecutar and not isinstance(cuerpo.get("pasos"), list))):
+                return self._enviar(400, {"ok": False, "error": "Solo se acepta " + (
+                    '{"id": "proyecto", "forzar": false}' if es_ejecutar else '{"id": "proyecto", "pasos": [paso]}') + "."})
+            try:
+                if es_ejecutar:
+                    codigo, r = iniciar_aplicacion(cuerpo["id"], cuerpo.get("forzar", False))
+                else:
+                    codigo, r = guardar_receta(cuerpo["id"], cuerpo["pasos"])
+            except ErrorRegistro as e:
+                return self._enviar(500, {"ok": False, "error": str(e)})
+            except KeyError:
+                return self._enviar(404, {"ok": False, "error": "Proyecto no encontrado."})
+            except ValueError as e:
+                return self._enviar(400, {"ok": False, "error": str(e)})
+            except OSError as e:
+                return self._enviar(500, {"ok": False, "error": f"No se pudo guardar: {type(e).__name__}."})
             return self._enviar(codigo, r)
         if u.path in ("/api/deteccion/agregar", "/api/deteccion/actualizar", "/api/enrutamiento",
                       "/api/enrutamiento/tabla"):

@@ -7,7 +7,8 @@
   ... --registro ARCHIVO                                  Otro proyectos.json (por omisión <datos>/proyectos.json)
 
 Cada servicio corre en su PROPIA ventana (Windows: consola nueva) o proceso en segundo plano (macOS y Linux: con su
-log en <datos>/servicios/logs y su pid en <datos>/servicios/pids). Los comandos se arman con campos estructurados del
+log en <datos>/servicios/logs). En ambos casos el pid del envoltorio queda en <datos>/servicios/pids y `apagar` lo cierra
+con su árbol, tras verificar que sigue siendo un envoltorio `servicios.py _ejecutar` (no un pid reciclado). Los comandos se arman con campos estructurados del
 registro, sin shell y sin texto libre; solo se aceptan estos tipos de arranque (lista blanca):
 
   dotnet, npm, django-devskills, python-modulo, docker-compose
@@ -276,27 +277,79 @@ def _matar(pid: int, so: str) -> None:
         pass
 
 
+def _nombre_archivo(servicio_id: str) -> str:
+    return re.sub(r"[^A-Za-z0-9_.-]", "_", servicio_id)
+
+
 def _archivo_pid(servicio_id: str) -> Path:
-    return rutas.servicios_pids() / f"{re.sub(r'[^A-Za-z0-9_.-]', '_', servicio_id)}.pid"
+    return rutas.servicios_pids() / f"{_nombre_archivo(servicio_id)}.pid"
 
 
-def _matar_grupo_registrado(servicio_id: str, so: str) -> None:
-    """macOS/Linux: el servicio se lanzó con start_new_session, así que su pid es el de un grupo entero
-    (el ejecutor, npm, node...). Se apaga el grupo y se borra el pid."""
-    archivo = _archivo_pid(servicio_id)
-    try:
-        pid = int(archivo.read_text(encoding="utf-8").strip())
-    except (OSError, ValueError):
-        return
-    if so != "windows" and pid > 1 and pid != os.getpid():
-        try:
-            os.killpg(pid, signal.SIGTERM)
-        except OSError:
-            pass
+def _archivo_apagado(servicio_id: str) -> Path:
+    """Marcador de apagado intencional: lo crea `apagar` y lo consume el envoltorio al terminar el servicio."""
+    return rutas.servicios_pids() / f"{_nombre_archivo(servicio_id)}.apagado"
+
+
+def _borrar(archivo: Path) -> None:
     try:
         archivo.unlink()
     except OSError:
         pass
+
+
+def marcar_apagado(servicio_id: str) -> None:
+    try:
+        rutas.servicios_pids().mkdir(parents=True, exist_ok=True)
+        _archivo_apagado(servicio_id).write_text(str(time.time()), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def apagado_intencional(servicio_id: str) -> bool:
+    """True si `apagar` marcó este servicio; el marcador se consume (se borra) al consultarlo."""
+    archivo = _archivo_apagado(servicio_id)
+    existe = archivo.exists()
+    _borrar(archivo)
+    return existe
+
+
+def _linea_de_comandos(pid: int, so: str, ejecutar=_ejecutar_texto) -> str:
+    """Línea de comandos del proceso (vacía si no existe o no se pudo leer). Sin shell: PowerShell/CIM en
+    Windows (wmic ya no viene en Windows 11) y `ps` en macOS y Linux."""
+    if so == "windows":
+        return ejecutar(["powershell", "-NoProfile", "-NonInteractive", "-Command",
+                         f"(Get-CimInstance Win32_Process -Filter 'ProcessId={int(pid)}').CommandLine"]).strip()
+    return ejecutar(["ps", "-o", "args=", "-p", str(int(pid))]).strip()
+
+
+def es_envoltorio(pid: int, so: str, ejecutar=_ejecutar_texto) -> bool:
+    """True solo si el pid sigue siendo un envoltorio `servicios.py _ejecutar <plan>` del lanzador. Protege contra un
+    pid reciclado por otro programa: si no se puede comprobar, se considera ajeno y NO se mata."""
+    linea = _linea_de_comandos(pid, so, ejecutar).lower()
+    return "servicios.py" in linea and re.search(r"\b_ejecutar\b", linea) is not None
+
+
+def _cerrar_envoltorio_registrado(servicio_id: str, so: str, ejecutar=_ejecutar_texto, matar=None, matar_grupo=None) -> bool:
+    """Cierra el envoltorio de la ventana del arranque anterior junto con todo su árbol (el servicio incluido) y
+    borra el pid registrado. Windows: `taskkill /T /F`. macOS y Linux: el envoltorio se lanzó con start_new_session,
+    así que su pid es el de un grupo entero (envoltorio, npm, node...) y se apaga el grupo. True si lo cerró."""
+    archivo = _archivo_pid(servicio_id)
+    try:
+        pid = int(archivo.read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        _borrar(archivo)
+        return False
+    _borrar(archivo)
+    if pid <= 1 or pid == os.getpid() or not es_envoltorio(pid, so, ejecutar):
+        return False
+    if so == "windows":
+        (matar or _matar)(pid, so)
+        return True
+    try:
+        (matar_grupo or os.killpg)(pid, signal.SIGTERM)
+    except OSError:
+        return False
+    return True
 
 
 # ---------------------------------------------------------------- ejecución
@@ -367,36 +420,61 @@ def ejecutar_plan(archivo_plan: Path) -> int:
                 codigo = 127
         if codigo != 0:
             break
-    if os.name == "nt":  # la consola nueva se cierra sola al terminar: se deja leer el mensaje
+    sid = plan.get("servicio_id")
+    intencional = apagado_intencional(sid) if sid else False  # lo apagó `apagar`: no hay nada que leer
+    if sid:
+        _limpiar_pid_propio(sid)
+    if sistema() == "windows" and not intencional:  # se cayó solo: la consola se queda para leer el error
         try:
             input("\nEl servicio terminó. Presiona Enter para cerrar esta ventana...")
-        except EOFError:
+        except (EOFError, RuntimeError, OSError):  # sin consola (pythonw) o sin entrada: no hay a quién esperar
             pass
     return codigo
 
 
+def _limpiar_pid_propio(servicio_id: str) -> None:
+    """Al terminar por su cuenta, el envoltorio borra su pid registrado (si todavía es el suyo)."""
+    try:
+        pid = int(_archivo_pid(servicio_id).read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        return
+    if pid in (os.getpid(), os.getppid()):  # getppid: en Windows el lanzador del venv es el padre del intérprete real
+        _borrar(_archivo_pid(servicio_id))
+
+
+def _python_del_envoltorio(so: str) -> str:
+    """Intérprete del envoltorio. En Windows el panel corre con pythonw.exe (sin consola): el envoltorio necesita
+    python.exe para tener su ventana y poder esperar el Enter."""
+    exe = Path(sys.executable)
+    if so == "windows" and exe.name.lower() == "pythonw.exe" and exe.with_name("python.exe").exists():
+        return str(exe.with_name("python.exe"))
+    return str(exe)
+
+
 def lanzar(plan: dict, servicio_id: str, titulo: str, so: str | None = None) -> int:
-    """Abre el servicio en su propia ventana (Windows) o como proceso en segundo plano (macOS y Linux). Devuelve el pid."""
+    """Abre el servicio en su propia ventana (Windows) o como proceso en segundo plano (macOS y Linux). Devuelve el
+    pid del envoltorio, que queda registrado en la carpeta de pids para que `apagar` lo cierre con su árbol."""
     so = so or sistema()
     carpeta_planes = rutas.servicios_dir() / "planes"
     carpeta_planes.mkdir(parents=True, exist_ok=True)
+    rutas.servicios_pids().mkdir(parents=True, exist_ok=True)
+    _borrar(_archivo_apagado(servicio_id))  # un marcador viejo no debe silenciar la pausa de este arranque
     archivo = carpeta_planes / f"{uuid.uuid4().hex}.json"
-    archivo.write_text(json.dumps({**plan, "titulo": titulo}), encoding="utf-8")
+    archivo.write_text(json.dumps({**plan, "titulo": titulo, "servicio_id": servicio_id}), encoding="utf-8")
     rutas.restringir(archivo)
-    argv = [sys.executable, str(Path(__file__).resolve()), "_ejecutar", str(archivo)]
+    argv = [_python_del_envoltorio(so), str(Path(__file__).resolve()), "_ejecutar", str(archivo)]
     if so == "windows":
         proceso = subprocess.Popen(argv, cwd=plan["cwd"] if Path(plan["cwd"]).is_dir() else None,
                                    creationflags=subprocess.CREATE_NEW_CONSOLE, close_fds=True)  # type: ignore[attr-defined]
     else:
         rutas.servicios_logs().mkdir(parents=True, exist_ok=True)
-        rutas.servicios_pids().mkdir(parents=True, exist_ok=True)
-        log = open(rutas.servicios_logs() / f"{re.sub(r'[^A-Za-z0-9_.-]', '_', servicio_id)}.log", "ab")
+        log = open(rutas.servicios_logs() / f"{_nombre_archivo(servicio_id)}.log", "ab")
         try:
             proceso = subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
                                        start_new_session=True, close_fds=True)
         finally:
             log.close()
-        _archivo_pid(servicio_id).write_text(str(proceso.pid), encoding="utf-8")
+    _archivo_pid(servicio_id).write_text(str(proceso.pid), encoding="utf-8")
     return proceso.pid
 
 
@@ -475,7 +553,10 @@ def apagar(datos: dict, objetivo: str, simular: bool, so: str | None = None) -> 
         if tipo == "docker-compose":
             subprocess.run([_programa("docker"), "compose", "stop"], cwd=str(directorio))
         else:
-            _matar_grupo_registrado(sid, so)
+            marcar_apagado(sid)  # antes de matar: un envoltorio que sobreviva sabrá que el apagado fue intencional
+            if _cerrar_envoltorio_registrado(sid, so):
+                _borrar(_archivo_apagado(sid))  # el envoltorio ya no existe: nadie consumirá el marcador
+                print(f"Cerrada la ventana del arranque anterior de {sid}")
             for pt in puertos:
                 for pid in pids_en_puerto(pt, so):
                     _matar(pid, so)

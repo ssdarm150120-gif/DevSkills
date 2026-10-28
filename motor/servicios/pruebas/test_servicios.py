@@ -9,6 +9,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 MOTOR = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(MOTOR))
@@ -243,6 +244,182 @@ class Simulacion(unittest.TestCase):
         r = self.correr("listar")
         self.assertEqual(r.returncode, 1)
         self.assertIn("No encontré el registro", r.stderr)
+
+
+class Envoltorio(unittest.TestCase):
+    """Cierre de la ventana (envoltorio `_ejecutar`) del arranque anterior y señal de apagado intencional.
+    Todo con fakes: no se abre ninguna consola ni se mata ningún proceso real."""
+    LINEA_WIN = r'"C:\Python\python.exe" C:\DevSkills\motor\servicios\servicios.py _ejecutar C:\d\planes\ab12.json'
+    LINEA_POSIX = "/usr/bin/python3 /opt/devskills/motor/servicios/servicios.py _ejecutar /home/u/planes/ab12.json"
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        parche = mock.patch.dict(os.environ, {"DEVSKILLS_DATOS": self._tmp.name})
+        parche.start()
+        self.addCleanup(parche.stop)
+        sv.rutas.servicios_pids().mkdir(parents=True, exist_ok=True)
+        self.pid = sv._archivo_pid("demo-api")
+
+    def registrar(self, pid=4242):
+        self.pid.write_text(str(pid), encoding="utf-8")
+
+    def test_apagar_cierra_el_envoltorio_registrado_y_su_arbol_en_windows(self):
+        self.registrar()
+        muertos = []
+        cerrado = sv._cerrar_envoltorio_registrado("demo-api", "windows", lambda argv: self.LINEA_WIN,
+                                                   matar=lambda pid, so: muertos.append((pid, so)))
+        self.assertTrue(cerrado)
+        self.assertEqual(muertos, [(4242, "windows")])
+        self.assertFalse(self.pid.exists())  # el archivo de pid se limpia
+
+    def test_matar_en_windows_usa_taskkill_con_arbol(self):
+        with mock.patch.object(sv.subprocess, "run") as correr:
+            sv._matar(4242, "windows")
+        self.assertEqual(correr.call_args.args[0], ["taskkill", "/PID", "4242", "/F", "/T"])
+
+    def test_apagar_cierra_el_grupo_en_posix(self):
+        self.registrar(5151)
+        grupos = []
+        cerrado = sv._cerrar_envoltorio_registrado("demo-api", "linux", lambda argv: self.LINEA_POSIX,
+                                                   matar_grupo=lambda pid, senal: grupos.append((pid, senal)))
+        self.assertTrue(cerrado)
+        self.assertEqual(grupos, [(5151, sv.signal.SIGTERM)])
+        self.assertFalse(self.pid.exists())
+
+    def test_no_mata_un_pid_reciclado_ajeno(self):
+        for so in ("windows", "linux"):
+            self.registrar()
+            muertos = []
+            cerrado = sv._cerrar_envoltorio_registrado(
+                "demo-api", so, lambda argv: r"C:\Chrome\chrome.exe --type=renderer",
+                matar=lambda *a: muertos.append(a), matar_grupo=lambda *a: muertos.append(a))
+            self.assertFalse(cerrado)
+            self.assertEqual(muertos, [])
+            self.assertFalse(self.pid.exists())  # el pid viejo igual se limpia
+
+    def test_no_mata_si_no_puede_comprobar_la_linea_de_comandos(self):
+        self.registrar()
+        muertos = []
+        self.assertFalse(sv._cerrar_envoltorio_registrado("demo-api", "windows", lambda argv: "",
+                                                          matar=lambda *a: muertos.append(a)))
+        self.assertEqual(muertos, [])
+
+    def test_servicios_py_sin_ejecutar_no_es_envoltorio(self):
+        # por ejemplo `servicios.py apagar x` (la propia CLI) no es la ventana de un servicio
+        self.assertFalse(sv.es_envoltorio(1, "linux", lambda argv: "python3 servicios.py apagar demo-api"))
+        self.assertTrue(sv.es_envoltorio(1, "windows", lambda argv: self.LINEA_WIN))
+
+    def test_pid_corrupto_o_ausente_no_rompe(self):
+        self.assertFalse(sv._cerrar_envoltorio_registrado("demo-api", "windows", lambda argv: self.LINEA_WIN))
+        self.pid.write_text("no-es-un-pid", encoding="utf-8")
+        self.assertFalse(sv._cerrar_envoltorio_registrado("demo-api", "windows", lambda argv: self.LINEA_WIN))
+        self.assertFalse(self.pid.exists())
+
+    def datos(self, tipo="dotnet"):
+        return registro_de_prueba(Path(self._tmp.name), {"tipo": tipo, "carpeta": "."})
+
+    def test_apagar_cierra_la_ventana_y_deja_limpio_el_marcador(self):
+        self.registrar()
+        with mock.patch.object(sv, "es_envoltorio", return_value=True), \
+                mock.patch.object(sv, "_matar") as matar, mock.patch.object(sv, "pids_en_puerto", return_value=[]):
+            self.assertEqual(sv.apagar(self.datos(), "demo-api", False, "windows"), 0)
+        matar.assert_called_once_with(4242, "windows")
+        self.assertFalse(self.pid.exists())
+        self.assertFalse(sv._archivo_apagado("demo-api").exists())
+
+    def test_apagar_sin_envoltorio_deja_el_marcador_para_el_que_sobreviva(self):
+        self.registrar()
+        with mock.patch.object(sv, "es_envoltorio", return_value=False), \
+                mock.patch.object(sv, "_matar") as matar, mock.patch.object(sv, "pids_en_puerto", return_value=[]):
+            sv.apagar(self.datos(), "demo-api", False, "windows")
+        matar.assert_not_called()
+        self.assertTrue(sv._archivo_apagado("demo-api").exists())
+
+    def test_apagar_docker_compose_no_toca_pids_ni_envoltorios(self):
+        self.registrar()
+        with mock.patch.object(sv.subprocess, "run") as correr, \
+                mock.patch.object(sv, "_cerrar_envoltorio_registrado") as cerrar:
+            sv.apagar(self.datos("docker-compose"), "demo-api", False, "windows")
+        cerrar.assert_not_called()
+        self.assertEqual(correr.call_args.args[0][1:], ["compose", "stop"])
+        self.assertFalse(sv._archivo_apagado("demo-api").exists())
+
+    # --- señal de apagado intencional
+
+    def correr_envoltorio(self, codigo, intencional, servicio_id="demo-api"):
+        """Ejecuta ejecutar_plan con un servicio falso que termina con `codigo`; devuelve cuántas veces pidió el Enter."""
+        plan = Path(self._tmp.name) / "plan.json"
+        plan.write_text(json.dumps({"cwd": self._tmp.name, "env": {}, "titulo": "t", "servicio_id": servicio_id,
+                                    "pasos": [{"argv": ["servicio-falso"]}]}), encoding="utf-8")
+        if intencional:
+            sv.marcar_apagado(servicio_id)
+        with mock.patch.object(sv, "sistema", return_value="windows"), mock.patch.object(sv, "_titulo"), \
+                mock.patch.object(sv.subprocess, "run", return_value=mock.Mock(returncode=codigo)), \
+                mock.patch("builtins.input") as pedir:
+            self.assertEqual(sv.ejecutar_plan(plan), codigo)
+        self.assertFalse(plan.exists())
+        return pedir.call_count
+
+    def test_caida_no_intencional_conserva_la_pausa(self):
+        self.assertEqual(self.correr_envoltorio(1, intencional=False), 1)
+
+    def test_apagado_intencional_no_espera_enter(self):
+        self.assertEqual(self.correr_envoltorio(1, intencional=True), 0)
+        self.assertFalse(sv._archivo_apagado("demo-api").exists())  # el marcador se consume
+
+    def test_el_marcador_de_otro_servicio_no_cuenta(self):
+        sv.marcar_apagado("otro-servicio")
+        self.assertEqual(self.correr_envoltorio(1, intencional=False), 1)
+        self.assertTrue(sv._archivo_apagado("otro-servicio").exists())
+
+    def test_pausa_sin_consola_no_revienta(self):
+        plan = Path(self._tmp.name) / "plan.json"
+        plan.write_text(json.dumps({"cwd": self._tmp.name, "env": {}, "titulo": "t", "servicio_id": "demo-api",
+                                    "pasos": [{"argv": ["x"]}]}), encoding="utf-8")
+        with mock.patch.object(sv, "sistema", return_value="windows"), mock.patch.object(sv, "_titulo"), \
+                mock.patch.object(sv.subprocess, "run", return_value=mock.Mock(returncode=1)), \
+                mock.patch("builtins.input", side_effect=RuntimeError("lost sys.stdin")):
+            self.assertEqual(sv.ejecutar_plan(plan), 1)
+
+    def test_el_envoltorio_limpia_su_propio_pid_al_terminar(self):
+        self.registrar(os.getpid())
+        self.correr_envoltorio(0, intencional=False)
+        self.assertFalse(self.pid.exists())
+
+    def test_no_borra_el_pid_de_un_arranque_nuevo(self):
+        self.registrar(999999)
+        self.correr_envoltorio(0, intencional=False)
+        self.assertTrue(self.pid.exists())
+
+    # --- lanzar
+
+    def test_lanzar_en_windows_registra_el_pid_del_envoltorio_y_usa_python_con_consola(self):
+        carpeta = Path(self._tmp.name) / "py"
+        carpeta.mkdir()
+        (carpeta / "python.exe").write_text("")
+        (carpeta / "pythonw.exe").write_text("")
+        sv.marcar_apagado("demo-api")  # un marcador viejo no debe sobrevivir al nuevo arranque
+        plan = {"cwd": self._tmp.name, "env": {}, "pasos": [], "tipo": "dotnet", "aviso": None}
+        with mock.patch.object(sv.sys, "executable", str(carpeta / "pythonw.exe")), \
+                mock.patch.object(sv.subprocess, "CREATE_NEW_CONSOLE", 16, create=True), \
+                mock.patch.object(sv.subprocess, "Popen", return_value=mock.Mock(pid=777)) as popen:
+            self.assertEqual(sv.lanzar(plan, "demo-api", "Demo", "windows"), 777)
+        argv = popen.call_args.args[0]
+        self.assertEqual(argv[0], str(carpeta / "python.exe"))
+        self.assertEqual(argv[2], "_ejecutar")
+        self.assertEqual(popen.call_args.kwargs["creationflags"], 16)
+        self.assertEqual(self.pid.read_text(encoding="utf-8"), "777")
+        self.assertFalse(sv._archivo_apagado("demo-api").exists())
+        guardado = json.loads(Path(argv[3]).read_text(encoding="utf-8"))
+        self.assertEqual(guardado["servicio_id"], "demo-api")
+
+    def test_lanzar_en_posix_sigue_registrando_el_pid(self):
+        plan = {"cwd": self._tmp.name, "env": {}, "pasos": [], "tipo": "dotnet", "aviso": None}
+        with mock.patch.object(sv.subprocess, "Popen", return_value=mock.Mock(pid=888)) as popen:
+            self.assertEqual(sv.lanzar(plan, "demo-api", "Demo", "linux"), 888)
+        self.assertTrue(popen.call_args.kwargs["start_new_session"])
+        self.assertEqual(self.pid.read_text(encoding="utf-8"), "888")
 
 
 if __name__ == "__main__":

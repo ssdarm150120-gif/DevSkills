@@ -431,6 +431,37 @@ details.agente[open] > summary::after { transform: rotate(225deg); }
 .pend-git .pg-commits { margin: 6px 0 0; padding-left: 20px; font-size: 12.5px; }
 .pend-git .salida { max-height: 160px; }
 .pg-modal p { margin: 0 0 12px; }
+.aplicar { padding: 16px 18px; border: 1px solid var(--borde); border-radius: var(--radio-chico); background: rgba(0,0,0,.28); max-width: 860px; margin-bottom: 8px; }
+.aplicar .encabezado { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.aplicar .botones { margin-top: 12px; }
+.aplicar .aviso { margin: 12px 0 0; }
+.aplicar .limites { margin: 12px 0 0; font-size: 12.5px; color: var(--tenue); }
+/* Aplicar y git en una sola sección: resumen común arriba y los dos pasos lado a lado (apilados en marcos angostos). */
+.cambios { max-width: 1180px; margin-bottom: 8px; }
+.cambios .resumen-cambios { padding: 14px 18px; border: 1px solid var(--borde); border-radius: var(--radio-chico); background: rgba(0,0,0,.28); margin-bottom: 12px; }
+.cambios .resumen-cambios .estados { margin-bottom: 8px; }
+.cambios .resumen-cambios p { margin: 0; }
+.cambios .resumen-cambios .flujo { margin: 8px 0 0; font-size: 12.5px; color: var(--tenue); }
+.cambios .columnas { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; }
+.cambios .columnas > * { min-width: 0; }
+.cambios .aplicar, .cambios .pend-git { max-width: none; margin-bottom: 0; }
+@container (min-width: 1000px) { .cambios .columnas { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+.ap-pasos { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; }
+.ap-paso { border: 1px solid var(--borde); border-radius: 14px; padding: 8px 12px; background: rgba(255,255,255,.02); min-width: 0; }
+.ap-paso .ap-cab { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.ap-paso .ap-icono { min-width: 22px; text-align: center; font-size: 14px; }
+.ap-paso .ap-razon { margin-top: 2px; font-size: 12.5px; color: var(--tenue); overflow-wrap: anywhere; }
+.ap-paso .ap-comando { margin-top: 2px; font: 12px var(--mono); color: var(--muy-tenue); overflow-wrap: anywhere; }
+.ap-paso .ap-salida { margin: 6px 0 0; max-height: 150px; overflow: auto; font: 12px/1.45 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere;
+  background: rgba(0,0,0,.45); border: 1px solid var(--borde); border-radius: 10px; padding: 6px 8px; }
+.ap-paso.s-fallo { border-color: rgba(255,138,122,.4); }
+.ap-paso.s-fallo .ap-salida { color: #ffd2cb; }
+.ap-paso.s-omitido { opacity: .75; }
+.ap-chip-ok { color: var(--ok); background: rgba(var(--ok-rgb), .1); border-color: rgba(var(--ok-rgb), .25); }
+.ap-aprobar { display: grid; gap: 8px; margin: 12px 0; }
+.ap-aprobar label { display: flex; gap: 10px; align-items: flex-start; padding: 8px 12px; border: 1px solid var(--borde); border-radius: 14px; cursor: pointer; }
+.ap-aprobar label span { min-width: 0; overflow-wrap: anywhere; }
+.msg.chat .ap-pasos { margin-top: 8px; }
 .chip.gh-activa { color: var(--ok); background: rgba(var(--ok-rgb), .1); border-color: rgba(var(--ok-rgb), .25); }
 
 /* ---------- inicio: segundo marco con sesiones recientes ---------- */
@@ -991,6 +1022,54 @@ function hace(seg) {
 const urlSegura = (u) => { try { const x = new URL(u); return (x.protocol === "http:" || x.protocol === "https:") ? x.href : null; } catch (e) { return null; } };
 const leer = (k, d) => { try { return localStorage.getItem(k) ?? d; } catch (e) { return d; } };
 const guardar = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+
+/* Pestañas de los servicios: «Abrir» las abre con un nombre estable por proyecto y servicio y guarda la referencia, para
+   poder recargar solo esa pestaña al terminar «Aplicar cambios». El navegador no deja controlar pestañas que el panel no abrió. */
+const ventanasServicio = new Map();
+const claveVentana = (pid, sid) => "devskills-" + pid + "-" + sid;
+const esLoopback = (u) => { try { return ["localhost", "127.0.0.1", "[::1]"].includes(new URL(u).hostname); } catch (e) { return false; } };
+/* Abre (o reutiliza) la pestaña del servicio. Devuelve true si la abrió el panel; con false el enlace normal sigue su curso.
+   Solo se abre la URL registrada del servicio (http/https) o una de este equipo; nunca una URL arbitraria. */
+function abrirServicio(pid, sid, url, registrada) {
+  const u = urlSegura(url);
+  if (!u || !(esLoopback(u) || (registrada && urlSegura(registrada) === u))) return false;
+  const w = window.open(u, claveVentana(pid, sid));
+  if (!w) return false;
+  ventanasServicio.set(claveVentana(pid, sid), w);
+  return true;
+}
+const enlaceAbrir = (pid, sid, url, nombre, extra = {}) => el("a", { class: "boton", href: url, target: "_blank", rel: "noopener noreferrer",
+  onclick: (e) => { if (abrirServicio(pid, sid, url, url)) e.preventDefault(); }, ...extra }, nombre);
+const PREF_RECARGA = "panel.recargarAlAplicar";
+const recargarActivado = () => leer(PREF_RECARGA, "1") !== "0";
+const textoRecarga = new Map();  // pid → { inicio, texto } de la última aplicación vigilada
+/* Tras una aplicación correcta con al menos un paso ejecutado, recarga solo la pestaña que abrió el panel. */
+function recargarTrasAplicar(pid, d) {
+  const ej = d.ejecucion;
+  if (!recargarActivado() || !ej || ej.estado !== "ok" || ej.simulacion || !(ej.pasos || []).some((p) => p.estado === "ok") || !d.abrir) return;
+  const url = urlSegura(d.abrir.url);
+  const w = ventanasServicio.get(claveVentana(pid, d.abrir.servicio));
+  let texto;
+  if (url && w && !w.closed) {
+    try { w.location.href = url; texto = "Se recargó la pestaña de " + d.abrir.nombre + "."; } catch (e) { texto = null; }
+  }
+  textoRecarga.set(pid, { inicio: ej.inicio, texto: texto || "Ábrelo con «Abrir» para que se recargue solo la próxima vez." });
+}
+const avisoRecarga = (pid, ej) => { const r = textoRecarga.get(pid); return r && ej && r.inicio === ej.inicio ? r.texto : null; };
+/* Espera a que termine la ejecución recién lanzada (el paso de reinicio ya verifica la salud) y entonces recarga. */
+async function vigilarAplicacion(pid, inicio, alTerminar) {
+  for (let i = 0; i < 900; i++) {
+    await new Promise((r) => setTimeout(r, 1000));
+    let d;
+    try { d = await api("/api/proyecto/aplicar?id=" + encodeURIComponent(pid)); } catch (e) { continue; }
+    const ej = d && d.ejecucion;
+    if (!d || !d.ok || !ej || ej.inicio !== inicio) { if (d && d.ok && !d.en_curso) return; continue; }
+    if (d.en_curso || ej.fin == null) continue;
+    recargarTrasAplicar(pid, d);
+    if (alTerminar) alTerminar();
+    return;
+  }
+}
 
 /* Sección desplegable (<details>/<summary> nativos): recuerda abierta/cerrada por clave en localStorage y su cuerpo
    tiene scroll propio (salvo `grupo`, que solo agrupa otras secciones y no se desplaza). El contador del encabezado
@@ -1803,15 +1882,15 @@ function vistaProyecto(pid) {
   horasSel.value = leer("panel.horas", "6");
   horasSel.style.width = "auto";
   const enrutamiento = crearEnrutamiento(pid, () => id === rutaVigente);
-  const pendientesGit = crearPendientesGit(pid, () => id === rutaVigente);
+  const cambios = crearCambios(pid, () => id === rutaVigente);
   $("vista").replaceChildren(
     el("div", { class: "proyecto-superior" }, cabeza,
       el("section", { class: "columna-servicios", "aria-label": "Servicios" },
         el("div", { class: "fila-seccion" }, el("div", {}, el("span", { class: "etq" }, "Servicios"), el("h2", { class: "seccion" }, "Levantar y apagar")), acciones),
         salidaProyecto, servicios)),
-    el("div", { class: "fila-seccion" }, el("div", {}, el("span", { class: "etq" }, "Git"), el("h2", { class: "seccion" }, "Pendientes de git")),
-      el("span", { class: "extra" }, "Commit local con gitleaks y Push con confirmación; nunca en main ni forzado")),
-    pendientesGit.nodo,
+    el("div", { class: "fila-seccion" }, el("div", {}, el("span", { class: "etq" }, "Cambios"), el("h2", { class: "seccion" }, "Aplicar y subir cambios")),
+      el("span", { class: "extra" }, "Primero aplica para verlos funcionando; cuando estés conforme, commit y push (nunca en main ni forzado)")),
+    cambios.nodo,
     el("div", { class: "fila-seccion" }, el("div", {}, el("span", { class: "etq" }, "Modelos"), el("h2", { class: "seccion" }, "Enrutamiento de modelos")),
       el("span", { class: "extra" }, "Subagentes con modelo y esfuerzo por rol; se verifica con pruebas y se escala una vez")),
     enrutamiento.nodo,
@@ -1855,11 +1934,186 @@ function vistaProyecto(pid) {
   });
 }
 
+/* ---------- Aplicar cambios: receta por proyecto (instalar solo lo que cambió, recompilar el front y reiniciar servicios) ----------
+   El servidor decide todo (qué se ejecuta, qué se omite y por qué); aquí solo se muestra y se pide un clic explícito. La
+   receta son pasos TIPADOS de una lista blanca (nunca comandos libres). Nunca alert()/confirm() ni innerHTML. El apartado
+   del proyecto y la tarjeta del chat usan los mismos flujos de aprobación y de confirmación. */
+const ICONO_PASO = { pendiente: "○", "en-curso": "⏳", ok: "✅", fallo: "❌", omitido: "⏭", simulado: "▶" };
+const ETQ_PASO = { pendiente: "Pendiente", "en-curso": "En curso", ok: "Listo", fallo: "Falló", omitido: "Omitido", simulado: "Simulado" };
+const ETQ_PLAN = { ejecutar: "Se ejecutará", omitir: "Se omite" };
+const CLAVES_PASO_RECETA = ["id", "tipo", "carpeta", "script", "venv", "requisitos", "servicio", "timeout"];
+const ORDEN_TIPO_PASO = { "npm-install": 0, "npm-script": 1, "pip-requisitos": 2, "reiniciar-servicio": 3 };
+const soloClavesPaso = (p) => Object.fromEntries(CLAVES_PASO_RECETA.filter((k) => p[k] !== undefined).map((k) => [k, p[k]]));
+function detallePaso(p) {
+  if (p.tipo === "npm-install") return `npm ci o npm install (según haya package-lock.json) · carpeta ${p.carpeta}`;
+  if (p.tipo === "npm-script") return `npm run ${p.script} · carpeta ${p.carpeta}`;
+  if (p.tipo === "pip-requisitos") return `${p.venv}: pip install -r ${p.requisitos}`;
+  return `servicio ${p.servicio}: apagar y levantar con el lanzador, y esperar su salud`;
+}
+// `plan`: los pasos son del plan (se ejecutará / se omite) y no de una ejecución.
+function pintarPasosAplicar(pasos, plan = false) {
+  return el("ul", { class: "ap-pasos" }, pasos.map((p) => {
+    const estado = plan ? (p.accion === "omitir" ? "omitido" : "pendiente") : (p.estado || "pendiente");
+    const etiqueta = plan ? ETQ_PLAN[p.accion] || p.accion : ETQ_PASO[estado] || estado;
+    return el("li", { class: "ap-paso s-" + estado },
+      el("div", { class: "ap-cab" }, el("span", { class: "ap-icono", "aria-hidden": "true" }, ICONO_PASO[estado] || "○"),
+        el("strong", {}, p.titulo), el("span", { class: "chip sin-punto " + (estado === "ok" ? "ap-chip-ok" : estado === "fallo" ? "conflicto" : estado === "en-curso" ? "parcial" : "") }, etiqueta)),
+      p.razon ? el("div", { class: "ap-razon" }, p.razon) : null,
+      p.comando ? el("div", { class: "ap-comando" }, p.comando) : null,
+      p.salida ? el("pre", { class: "ap-salida", tabindex: "0", "aria-label": "Salida de " + p.titulo }, p.salida) : null);
+  }));
+}
+function dialogoAplicar(etq, titulo, ...hijos) {
+  $("dialogo-etq").textContent = etq;
+  $("dialogo-titulo").textContent = titulo;
+  $("dialogo-contenido").replaceChildren(el("div", { class: "pg-modal" }, ...hijos));
+  if (!$("dialogo").open) $("dialogo").showModal();
+}
+const cerrarDialogoAplicar = () => { if ($("dialogo").open) $("dialogo").close(); };
+
+// Aprobar o editar la receta: se muestran los pasos que el panel propone (y los de la receta actual) con casillas.
+async function flujoAprobarReceta(pid, alCambiar) {
+  let d;
+  try { d = await api("/api/proyecto/aplicar?id=" + encodeURIComponent(pid) + "&propuesta=1"); } catch (e) { d = { error: "No se pudo contactar al panel." }; }
+  if (d.error || !d.ok) { dialogoAplicar("Aplicar cambios", "Receta", el("div", { class: "aviso mal" }, d.error || "No se pudo leer el proyecto.")); return; }
+  const actual = (d.receta && d.receta.pasos) || [];
+  const ids = new Set(actual.map((p) => p.id));
+  const extra = ((d.propuesta && d.propuesta.pasos) || []).filter((p) => !ids.has(p.id));
+  const lista = [...actual.map((p) => ({ p, marcado: true })), ...extra.map((p) => ({ p, marcado: !actual.length }))]
+    .sort((a, b) => (ORDEN_TIPO_PASO[a.p.tipo] ?? 9) - (ORDEN_TIPO_PASO[b.p.tipo] ?? 9));
+  const cajas = lista.map((x) => el("input", { type: "checkbox", checked: x.marcado ? true : null, "aria-label": x.p.titulo }));
+  const msg = el("div", { class: "aviso mal", hidden: true, role: "alert" });
+  const guardarBtn = el("button", { type: "button", class: "boton primario" }, actual.length ? "Guardar la receta" : "Aprobar la receta");
+  const quitarBtn = actual.length ? el("button", { type: "button", class: "boton descartar" }, "Quitar la receta") : null;
+  const enviar = async (pasos) => {
+    guardarBtn.disabled = true; if (quitarBtn) quitarBtn.disabled = true; msg.hidden = true;
+    let r;
+    try { r = await api("/api/proyecto/aplicar/receta", { method: "POST", body: JSON.stringify({ id: pid, pasos }) }); } catch (e) { r = { error: "No se pudo contactar al panel." }; }
+    guardarBtn.disabled = false; if (quitarBtn) quitarBtn.disabled = false;
+    if (!r.ok) { msg.textContent = r.error || "No se pudo guardar la receta."; msg.hidden = false; return; }
+    cerrarDialogoAplicar();
+    if (alCambiar) alCambiar(r.estado);
+  };
+  guardarBtn.addEventListener("click", () => enviar(lista.filter((_, i) => cajas[i].checked).map((x) => soloClavesPaso(x.p))));
+  if (quitarBtn) quitarBtn.addEventListener("click", () => enviar([]));
+  const actualizarBoton = () => { guardarBtn.disabled = !cajas.some((c) => c.checked); };
+  cajas.forEach((c) => c.addEventListener("change", actualizarBoton));
+  actualizarBoton();
+  dialogoAplicar("Aplicar cambios", (actual.length ? "Editar la receta · " : "Aprobar la receta · ") + d.nombre,
+    el("p", {}, actual.length ? "Marca los pasos que forman la receta de este proyecto. Se guarda en proyectos.json."
+      : "El panel propone esta receta a partir de lo que ve en el proyecto. Revísala y apruébala una vez; queda guardada en proyectos.json y la puedes editar después."),
+    el("p", { class: "sub" }, "Solo se ejecutan pasos de esta lista: instalar dependencias de npm, ejecutar un script de package.json, instalar requisitos de Python en un venv y reiniciar un servicio del proyecto. Nunca comandos libres ni shell."),
+    lista.length ? el("div", { class: "ap-aprobar", role: "group", "aria-label": "Pasos de la receta" },
+      lista.map((x, i) => el("label", {}, cajas[i], el("span", {}, el("strong", {}, x.p.titulo), el("br"), el("span", { class: "sub" }, detallePaso(x.p)))))) : el("div", { class: "aviso" }, "El panel no encontró nada que proponer."),
+    ((d.propuesta && d.propuesta.notas) || []).length ? el("ul", { class: "sub" }, d.propuesta.notas.map((n) => el("li", {}, n))) : null,
+    d.simulacion ? el("div", { class: "aviso info" }, "Modo simulación: la receta sí se guarda (es solo configuración); nada se ejecuta.") : null,
+    msg,
+    el("div", { class: "botones" }, guardarBtn, quitarBtn, el("button", { type: "button", class: "boton", onclick: cerrarDialogoAplicar }, "Cancelar")));
+}
+
+// Confirmación antes de ejecutar: qué se ejecutará y qué se omite (y por qué). Nada corre sin este clic.
+async function flujoAplicar(pid, forzar, alCambiar) {
+  let d;
+  try { d = await api("/api/proyecto/aplicar?id=" + encodeURIComponent(pid)); } catch (e) { d = { error: "No se pudo contactar al panel." }; }
+  if (d.error || !d.ok) { dialogoAplicar("Aplicar cambios", "Confirmar", el("div", { class: "aviso mal" }, d.error || "No se pudo leer el proyecto.")); return; }
+  if (!d.receta) { flujoAprobarReceta(pid, alCambiar); return; }
+  if (d.en_curso) { dialogoAplicar("Aplicar cambios", d.nombre, el("div", { class: "aviso" }, "Ya hay una aplicación en curso para este proyecto.")); return; }
+  const plan = (d.plan || []).map((x) => (forzar ? { ...x, accion: "ejecutar", razon: "Forzado" } : x));
+  const n = plan.filter((x) => x.accion === "ejecutar").length;
+  const msg = el("div", { class: "aviso mal", hidden: true, role: "alert" });
+  const ir = el("button", { type: "button", class: "boton primario", disabled: n === 0 }, d.simulacion ? "Simular" : forzar ? "Sí, forzar todo" : "Sí, aplicar");
+  ir.addEventListener("click", async () => {
+    ir.disabled = true; msg.hidden = true;
+    let r;
+    try { r = await api("/api/proyecto/aplicar/ejecutar", { method: "POST", body: JSON.stringify({ id: pid, forzar: !!forzar }) }); } catch (e) { r = { error: "No se pudo contactar al panel." }; }
+    if (!r.ok) { ir.disabled = false; msg.textContent = r.error || "No se pudo iniciar."; msg.hidden = false; return; }
+    cerrarDialogoAplicar();
+    if (alCambiar) alCambiar({ ...d, ejecucion: r.ejecucion, en_curso: true });
+    if (r.ejecucion && !d.simulacion) vigilarAplicacion(pid, r.ejecucion.inicio, () => { if (alCambiar) alCambiar(); });
+  });
+  const recarga = el("input", { type: "checkbox", id: "ap-recargar" });
+  recarga.checked = recargarActivado();
+  recarga.addEventListener("change", () => guardar(PREF_RECARGA, recarga.checked ? "1" : "0"));
+  dialogoAplicar("Aplicar cambios", (forzar ? "Forzar todo · " : "") + d.nombre,
+    el("p", {}, n ? `Se ${n === 1 ? "ejecutará 1 paso" : `ejecutarán ${n} pasos`}, en este orden. Se detiene en el primer fallo.` : "No hay nada que aplicar: todo está al día."),
+    pintarPasosAplicar(plan, true),
+    n === 0 && !forzar ? el("p", { class: "sub" }, "Si quieres recompilar y reiniciar de todos modos, usa «Forzar todo».") : null,
+    d.simulacion ? el("div", { class: "aviso info" }, "Modo simulación: no se ejecutará nada; verás los comandos.") : null,
+    el("label", { class: "sub", for: "ap-recargar", title: "Solo recarga la pestaña que abriste con «Abrir» desde el panel" }, recarga, " Recargar la pestaña del proyecto al aplicar"),
+    el("p", { class: "sub" }, d.limitaciones),
+    msg,
+    el("div", { class: "botones" }, ir, el("button", { type: "button", class: "boton", onclick: cerrarDialogoAplicar }, "Cancelar")));
+}
+
+function crearAplicar(pid, vigente, enlaces = {}) {
+  const nodo = el("section", { class: "aplicar", "aria-label": "Aplicar cambios" }, el("span", { class: "sub" }, "Consultando el proyecto…"));
+  const est = { d: null, firma: "", tick: 0 };
+  async function pedir() {
+    try {
+      const d = await api("/api/proyecto/aplicar?id=" + encodeURIComponent(pid));
+      if (!vigente()) return;
+      if (d.error && !d.ok) { est.d = null; nodo.replaceChildren(el("span", { class: "sub" }, d.error)); return; }
+      const termino = !!(est.d && est.d.en_curso) && !d.en_curso;
+      est.d = d;
+      pintar();
+      if (enlaces.alActualizar) enlaces.alActualizar(d);
+      if (termino && enlaces.alTerminar) enlaces.alTerminar();  // lo aplicado pudo cambiar el árbol de git
+    } catch (e) {}
+  }
+  const alCambiar = (d) => { if (d) { est.d = d; pintar(true); if (enlaces.alActualizar) enlaces.alActualizar(d); } pedir(); };
+  function pintar(forzar) {
+    const d = est.d;
+    if (!d) return;
+    const firma = JSON.stringify([d, avisoRecarga(pid, d.ejecucion)]);
+    if (!forzar && firma === est.firma) return;
+    est.firma = firma;
+    const ej = d.ejecucion;
+    const enCurso = !!d.en_curso;
+    const chips = [
+      d.receta ? el("span", { class: "chip sin-punto", title: d.receta.aprobada || "" }, `Receta aprobada · ${d.receta.pasos.length} pasos`) : el("span", { class: "chip parcial" }, "Sin receta aprobada"),
+      enCurso ? el("span", { class: "chip trabajando" }, "Aplicando…") : null,
+      d.receta && !enCurso ? (d.pendientes.hay ? el("span", { class: "chip parcial" }, "Cambios sin aplicar") : el("span", { class: "chip corriendo" }, "Al día")) : null].filter(Boolean);
+    const aviso = d.receta_error ? el("div", { class: "aviso mal" }, "La receta guardada no es válida y no se ejecutará: " + d.receta_error + " Edítala o quítala.")
+      : d.receta && !enCurso && d.pendientes.hay ? el("div", { class: "aviso", role: "status" }, el("strong", {}, d.pendientes.texto))
+      : !d.receta ? el("div", { class: "aviso info" }, "Aprueba una vez la receta del proyecto (el panel propone los pasos) y después bastará un clic para dejarlo actualizado.") : null;
+    const bAplicar = el("button", { type: "button", class: "boton primario", disabled: enCurso || !!d.receta_error,
+      title: d.receta ? "Muestra qué se ejecutará y pide confirmación" : "Revisa y aprueba la receta propuesta",
+      onclick: () => flujoAplicar(pid, false, alCambiar) }, d.receta ? "Aplicar cambios" : "Revisar y aprobar la receta…");
+    const bForzar = d.receta ? el("button", { type: "button", class: "boton", disabled: enCurso || !!d.receta_error, title: "Ejecuta todos los pasos aunque no haya cambios",
+      onclick: () => flujoAplicar(pid, true, alCambiar) }, "Forzar todo") : null;
+    const bEditar = el("button", { type: "button", class: "boton mini", disabled: enCurso, onclick: () => flujoAprobarReceta(pid, alCambiar) }, d.receta || d.receta_error ? "Editar la receta" : "Ver la propuesta");
+    const url = ej && ej.estado === "ok" && d.abrir ? urlSegura(d.abrir.url) : null;
+    const bAbrir = url ? enlaceAbrir(pid, d.abrir.servicio, url, "Abrir " + d.abrir.nombre) : null;
+    const avRecarga = avisoRecarga(pid, ej);
+    let cuerpo = null;
+    if (ej) {
+      cuerpo = [pintarPasosAplicar(ej.pasos),
+        ej.resumen ? el("div", { class: "aviso " + (ej.estado === "fallo" ? "mal" : ej.estado === "ok" ? "info" : ""), role: "status" }, (ej.simulacion ? "Simulación · " : "") + ej.resumen + (avRecarga ? " " + avRecarga : "")) : null];
+    } else if (d.receta && d.plan && d.plan.length) {
+      const det = plegable("aplicar-plan-" + pid, "Qué haría ahora", { abierto: false });
+      det.contar(String(d.plan.filter((x) => x.accion === "ejecutar").length));
+      det.cuerpo.replaceChildren(pintarPasosAplicar(d.plan, true));
+      cuerpo = [det.nodo];
+    }
+    const ultima = !ej && d.ultima ? el("div", { class: "sub", style: "margin-top:10px" }, `Última aplicación: ${fechaLocal(d.ultima.fin * 1000)} · ${d.ultima.resumen || d.ultima.estado}`) : null;
+    nodo.replaceChildren(...[
+      el("div", { class: "encabezado" }, el("span", { class: "etq" }, "1 · Aplicar"), el("div", { class: "estados" }, chips)),
+      aviso,
+      el("div", { class: "botones" }, bAplicar, bForzar, bAbrir, bEditar),
+      ...(cuerpo || []), ultima,
+      d.plan_error ? el("div", { class: "aviso mal" }, "No se pudo calcular el aviso: " + d.plan_error) : null,
+      el("p", { class: "limites" }, d.limitaciones)].filter(Boolean));
+  }
+  // Cada 4 s en reposo y cada segundo mientras se aplica (el servidor cachea el aviso 5 s).
+  cada(1000, () => { if ((est.d && est.d.en_curso) || ++est.tick % 4 === 1) pedir(); });
+  return { nodo, recargar: pedir };
+}
+
 /* ---------- Pendientes de git: Commit (local, con gitleaks) y Push (con confirmación en un modal) ----------
    El servidor decide todo: aquí solo se muestran los pendientes y se manda la lista de archivos elegidos, el mensaje y
    la rama actual. Nunca se usa alert()/confirm() del navegador ni innerHTML. */
 const ESTADO_ARCHIVO = { M: "modificado", A: "agregado", D: "borrado", R: "renombrado", C: "copiado", T: "tipo", U: "conflicto", "??": "nuevo" };
-function crearPendientesGit(pid, vigente) {
+function crearPendientesGit(pid, vigente, enlaces = {}) {
   const nodo = el("section", { class: "pend-git", "aria-label": "Pendientes de git" }, el("span", { class: "sub" }, "Consultando git…"));
   const est = { d: null, sel: new Map(), mensaje: "", editado: false, ocupado: false, salida: "", salidaMal: false, hallazgos: [], accion: null, firma: "" };
   async function pedir(actualizar) {
@@ -1877,6 +2131,7 @@ function crearPendientesGit(pid, vigente) {
         est.salida = d.fetch.simulado ? "Simulación: no se hizo git fetch." : d.fetch.hecho ? "Se consultó el remoto." : "No se pudo consultar el remoto: " + (d.fetch.error || "");
       }
       pintar();
+      if (enlaces.alActualizar) enlaces.alActualizar(d);
     } catch (e) {}
   }
   const elegidos = () => (est.d.archivos || []).filter((a) => est.sel.get(a.ruta)).map((a) => a.ruta);
@@ -1887,7 +2142,7 @@ function crearPendientesGit(pid, vigente) {
     const firma = JSON.stringify([d, [...est.sel], est.mensaje, est.ocupado, est.salida, est.salidaMal, est.hallazgos, est.accion]);
     if (!forzar && (firma === est.firma || enEdicion)) return;
     est.firma = firma;
-    if (!d.es_repo) { nodo.replaceChildren(el("div", { class: "encabezado" }, el("span", { class: "etq" }, "Git")), el("span", { class: "sub" }, d.motivo || "La carpeta no es un repositorio git.")); return; }
+    if (!d.es_repo) { nodo.replaceChildren(el("div", { class: "encabezado" }, el("span", { class: "etq" }, "2 · Commit y push")), el("span", { class: "sub" }, d.motivo || "La carpeta no es un repositorio git.")); return; }
     const chips = [
       el("span", { class: "chip sin-punto" }, d.rama ? "Rama: " + d.rama : "HEAD desacoplado"),
       d.upstream ? el("span", { class: "chip sin-punto", title: "Rama remota que sigue" }, `${d.upstream} · ↑${d.adelante ?? "?"} ↓${d.atras ?? "?"}`) : el("span", { class: "chip sin-punto" }, "Sin upstream"),
@@ -1938,7 +2193,7 @@ function crearPendientesGit(pid, vigente) {
       : el("span", { class: "sub" }, d.rama_por_omision ? `Ninguna rama local tiene commits fuera de origin/${d.rama_por_omision}.` : "No se conoce la rama por omisión del remoto (haz «Actualizar remoto»)."));
 
     nodo.replaceChildren(...[
-      el("div", { class: "encabezado" }, el("span", { class: "etq" }, "Git"), el("div", { class: "estados" }, chips), consulta, actualizar),
+      el("div", { class: "encabezado" }, el("span", { class: "etq" }, "2 · Commit y push"), el("div", { class: "estados" }, chips), consulta, actualizar),
       d.aviso ? el("div", { class: "aviso", style: "margin:12px 0 0" }, d.aviso) : null,
       el("div", { class: "pg-barra" }, el("h4", {}, `Archivos sin commit (${d.archivos_total})`), alternar),
       lista, masArchivos,
@@ -1967,15 +2222,17 @@ function crearPendientesGit(pid, vigente) {
     est.accion = r.accion || null;
   }
   async function commit(archivos) {
+    let exito = false;
     est.ocupado = true; est.salida = "Escaneando con gitleaks y commiteando…"; est.salidaMal = false; est.hallazgos = []; pintar(true);
     try {
       const r = await api("/api/proyecto/git/commit", { method: "POST", body: JSON.stringify({ id: pid, archivos, mensaje: est.mensaje }) });
       mostrar(r);
-      if (r.ok && !r.simulado) est.editado = false;
+      if (r.ok && !r.simulado) { est.editado = false; exito = true; }
     } catch (e) { est.salidaMal = true; est.salida = "No se pudo contactar al panel."; }
     est.ocupado = false;
     await pedir(false);
     pintar(true);
+    if (exito && enlaces.alExito) enlaces.alExito();
   }
   function cerrarModal() { if ($("dialogo").open) $("dialogo").close(); }
   function confirmarPush() {
@@ -1993,12 +2250,14 @@ function crearPendientesGit(pid, vigente) {
       } }, "Aplicar la cuenta del proyecto") : null;
     const subir = el("button", { type: "button", class: "boton primario", disabled: bloqueada, onclick: async () => {
       cerrarModal();
+      let exito = false;
       est.ocupado = true; est.salida = "Subiendo " + d.rama + "…"; est.salidaMal = false; est.hallazgos = []; pintar(true);
-      try { mostrar(await api("/api/proyecto/git/push", { method: "POST", body: JSON.stringify({ id: pid, rama: d.rama }) })); }
+      try { const r = await api("/api/proyecto/git/push", { method: "POST", body: JSON.stringify({ id: pid, rama: d.rama }) }); mostrar(r); exito = !!(r.ok && !r.simulado); }
       catch (e) { est.salidaMal = true; est.salida = "No se pudo contactar al panel."; }
       est.ocupado = false;
       await pedir(false);
       pintar(true);
+      if (exito && enlaces.alExito) enlaces.alExito();
     } }, d.simulacion ? "Simular el push" : "Sí, subir " + d.rama);
     $("dialogo-etq").textContent = "Confirmar push";
     $("dialogo-titulo").textContent = d.rama;
@@ -2015,6 +2274,51 @@ function crearPendientesGit(pid, vigente) {
   }
   cada(15000, () => pedir(false));
   return { nodo, recargar: () => pedir(false) };
+}
+
+/* ---------- Cambios: Aplicar y Pendientes de git en una sola sección ----------
+   Un solo flujo: 1) aplicar para ver los cambios funcionando, 2) commit y push cuando estés conforme. Cada parte sigue
+   siendo su propio componente; aquí solo se unen en una fila, se resume el estado combinado y se refrescan entre sí:
+   tras un commit o un push exitoso se recarga Aplicar (cambió el árbol) y al terminar de aplicar se recarga git. */
+function crearCambios(pid, vigente) {
+  const est = { ap: null, git: null };
+  const estado = el("div", { class: "estados" });
+  const texto = el("p", { role: "status", "aria-live": "polite" });
+  const resumen = el("div", { class: "resumen-cambios", role: "group", "aria-label": "Resumen de cambios del proyecto" },
+    estado, texto,
+    el("p", { class: "flujo" }, "1) Aplica los cambios para verlos funcionando → 2) haz commit y push cuando estés conforme."));
+  function resumir() {
+    const ap = est.ap, g = est.git;
+    if (!ap && !g) return;
+    const partes = [];
+    let pendiente = false;
+    if (ap) {
+      if (ap.en_curso) { partes.push("Aplicando cambios…"); pendiente = true; }
+      else if (ap.receta_error) { partes.push("La receta de aplicar no es válida"); pendiente = true; }
+      else if (ap.receta && ap.pendientes && ap.pendientes.hay) { partes.push("Hay cambios sin aplicar: " + ap.pendientes.areas.join(", ")); pendiente = true; }
+      else if (ap.receta) partes.push("Todo aplicado");
+      else partes.push("Aún sin receta para aplicar");
+    }
+    if (g && g.es_repo) {
+      const n = g.archivos_total || 0, s = g.sin_subir || 0;
+      if (n) { partes.push(`${n} archivo${n === 1 ? "" : "s"} sin commit`); pendiente = true; }
+      if (s) { partes.push(`${s} commit${s === 1 ? "" : "s"} sin push`); pendiente = true; }
+      if (!n && !s) partes.push("sin pendientes de git");
+      partes.push(g.rama ? "rama " + g.rama : "HEAD desacoplado");
+    }
+    estado.replaceChildren(pendiente ? el("span", { class: "chip parcial" }, "Con pendientes") : el("span", { class: "chip corriendo" }, "Todo al día"));
+    texto.textContent = partes.join(" · ");
+  }
+  let aplicar, git;
+  aplicar = crearAplicar(pid, vigente, {
+    alActualizar: (d) => { est.ap = d; resumir(); },
+    alTerminar: () => git.recargar() });
+  git = crearPendientesGit(pid, vigente, {
+    alActualizar: (d) => { est.git = d; resumir(); },
+    alExito: () => aplicar.recargar() });
+  const nodo = el("section", { class: "cambios", "aria-label": "Aplicar y subir cambios" },
+    resumen, el("div", { class: "columnas" }, aplicar.nodo, git.nodo));
+  return { nodo, recargar: () => { aplicar.recargar(); git.recargar(); } };
 }
 
 /* ---------- enrutamiento de modelos: evaluación (solo lectura), interruptor y tabla rol → modelo/esfuerzo ----------
@@ -2336,7 +2640,7 @@ function pintarProyecto(p, cabeza, servicios, acciones, salidaProyecto, refresca
     // Los tres estados de "Abrir" ocupan la misma celda (ver .botones.servicio): el texto va en .txt con elipsis.
     let abrir;
     if (sal.estado === "listo" && url) {
-      abrir = el("a", { class: "boton", href: url, target: "_blank", rel: "noopener noreferrer", title: url }, el("span", { class: "txt" }, "Abrir ↗"));
+      abrir = el("a", { class: "boton", href: url, target: "_blank", rel: "noopener noreferrer", title: url, onclick: (e) => { if (abrirServicio(p.id, s.id, url, url)) e.preventDefault(); } }, el("span", { class: "txt" }, "Abrir ↗"));
     } else if (sal.estado === "arrancando" || trabajando[s.id] === "levantar") {
       abrir = el("button", { type: "button", class: "boton cargando", disabled: true, "aria-label": "Abrir: cargando, el servicio aún no está listo", title: sal.detalle || "Esperando a que el servicio responda" },
         el("span", { class: "giro", "aria-hidden": "true" }), el("span", { class: "txt" }, "Cargando…"));
@@ -3346,7 +3650,7 @@ const ID_PROYECTO = /^[a-z0-9][a-z0-9-]{0,40}$/;
   function guardarHilo() {
     const recorte = (s, n) => (typeof s === "string" && s.length > n ? s.slice(0, n) : s);
     est.mensajes = est.mensajes.slice(-MAX_MENSAJES);
-    const copia = est.mensajes.map((m) => ({ ...m, respuesta: recorte(m.respuesta, MAX_GUARDADO), borrador: recorte(m.borrador, MAX_GUARDADO), armado: undefined, trabajandoAccion: undefined }));
+    const copia = est.mensajes.map((m) => ({ ...m, respuesta: recorte(m.respuesta, MAX_GUARDADO), borrador: recorte(m.borrador, MAX_GUARDADO), armado: undefined, trabajandoAccion: undefined, consultando: undefined, d: undefined }));
     guardar(CLAVE, JSON.stringify(copia));
     guardar(CLAVE_VISTAS, JSON.stringify([...est.vistas].slice(-500)));
   }
@@ -3381,8 +3685,12 @@ const ID_PROYECTO = /^[a-z0-9][a-z0-9-]{0,40}$/;
     botonArrancar.textContent = est.arrancando ? "Arrancando…" : "Arrancar orquestador";
     actualizarEnvio();
   }
+  // «Aplica los cambios del <proyecto>», «actualiza el <proyecto>» y «recompila <proyecto>» las resuelve el panel y
+  // funcionan aunque el orquestador esté apagado; el servidor decide si la frase coincide de verdad.
+  const PARECE_APLICAR = /^\s*(?:(?:por favor|porfa|oye|hola|ey|quiero que|necesito que|puedes|podr[ií]as)\s+)*(?:aplic|actualiz|recompil|reconstru|rebuild)/i;
   function actualizarEnvio() {
-    const ok = est.activo === true && !est.bloqueado && !est.enviando && area.value.trim().length > 0;
+    const texto = area.value.trim();
+    const ok = !est.enviando && texto.length > 0 && ((est.activo === true && !est.bloqueado) || PARECE_APLICAR.test(texto));
     enviar.disabled = !ok;
     area.disabled = false;
   }
@@ -3441,6 +3749,19 @@ const ID_PROYECTO = /^[a-z0-9][a-z0-9-]{0,40}$/;
     if (texto.length > MAX_TEXTO) { mostrarSugerencia(`El texto supera ${MAX_TEXTO} caracteres.`, []); return; }
     ocultarSugerencia();
     est.enviando = true; actualizarEnvio();
+    let intencion = null;
+    try { intencion = await api("/api/chat/intencion?" + new URLSearchParams({ texto: texto.slice(0, 300) })); } catch (e) {}
+    if (intencion && intencion.ok && intencion.coincide === true && ID_PROYECTO.test(intencion.proyecto || "")) {
+      est.enviando = false;
+      responderAplicar(texto, intencion);
+      return;
+    }
+    if (est.activo !== true || est.bloqueado) {
+      // Sin orquestador (o en simulación) solo se pueden resolver en el panel las frases de «aplicar cambios».
+      est.enviando = false; actualizarEnvio();
+      mostrarSugerencia(est.bloqueado ? "Modo simulación: el chat no envía al orquestador real." : "El orquestador está apagado, y el panel solo resuelve frases como «aplica los cambios del <proyecto>» (con el nombre exacto de un proyecto).", []);
+      return;
+    }
     let otros = null;
     try {
       const r = await api("/api/chat/resolver?" + new URLSearchParams({ texto: texto.slice(0, 500) }));
@@ -3462,6 +3783,28 @@ const ID_PROYECTO = /^[a-z0-9][a-z0-9-]{0,40}$/;
     }
     enviarAhora(texto, proyecto);
   }
+  /* ----- «Aplica los cambios del <proyecto>»: lo resuelve el panel (sin orquestador y sin gastar tokens) ----- */
+  function responderAplicar(texto, i) {
+    agregar({ rol: "yo", tipo: "texto", texto, proyecto: i.proyecto, proyecto_nombre: i.nombre || nombreProyecto(i.proyecto), modo: "panel" }, true);
+    area.value = "";
+    const m = agregar({ rol: "sistema", tipo: "aplicar", proyecto: i.proyecto, proyecto_nombre: i.nombre || nombreProyecto(i.proyecto), d: null }, true);
+    actualizarEnvio();
+    refrescarAplicar(m);
+  }
+  async function refrescarAplicar(m) {
+    if (m.consultando) return;
+    m.consultando = true;
+    let d;
+    try { d = await api("/api/proyecto/aplicar?id=" + encodeURIComponent(m.proyecto)); } catch (e) { m.consultando = false; return; }
+    m.consultando = false;
+    if (!d.ok) { m.errorUi = d.error || "No se pudo leer el proyecto."; confirmar(false); return; }
+    const antes = JSON.stringify([m.d, m.tr]);
+    m.errorUi = null;
+    m.d = d;
+    m.tr = avisoRecarga(m.proyecto, d.ejecucion);
+    if (JSON.stringify([d, m.tr]) !== antes) confirmar(false);
+  }
+
   async function enviarAhora(texto, proyecto) {
     const modo = selModo.value === "cambios" ? "cambios" : "lectura";
     est.enviando = true; actualizarEnvio();
@@ -3511,6 +3854,7 @@ const ID_PROYECTO = /^[a-z0-9][a-z0-9-]{0,40}$/;
   function sondear() {
     est.tick++;
     for (const m of est.mensajes.slice()) {
+      if (m.tipo === "aplicar" && ID_PROYECTO.test(m.proyecto || "") && (m.d === null || m.d === undefined || m.d.en_curso)) refrescarAplicar(m);
       if (m.tipo !== "instruccion" || TERMINALES.has(m.estado) || !ID_INSTRUCCION.test(m.iid || "")) continue;
       if (m.estado === "pendiente_confirmacion" && est.tick % 5 !== 0) continue;
       consultarInstruccion(m.iid);
@@ -3600,7 +3944,7 @@ const ID_PROYECTO = /^[a-z0-9][a-z0-9-]{0,40}$/;
 
   function crearUsuario(m) {
     return el("article", { class: "msg chat yo", "data-id": m.id, "aria-label": "Tú, para " + (m.proyecto_nombre || m.proyecto) },
-      cabecera(m, el("span", { class: "chip proyecto", title: m.proyecto_nombre }, m.proyecto_nombre || m.proyecto), chip(m.modo === "cambios" ? "Cambios" : "Solo lectura")),
+      cabecera(m, el("span", { class: "chip proyecto", title: m.proyecto_nombre }, m.proyecto_nombre || m.proyecto), chip(m.modo === "cambios" ? "Cambios" : m.modo === "panel" ? "Lo resuelve el panel" : "Solo lectura")),
       el("p", { class: "msg-texto" }, m.texto));
   }
   function crearInstruccion(m) {
@@ -3659,11 +4003,45 @@ const ID_PROYECTO = /^[a-z0-9][a-z0-9-]{0,40}$/;
       m.archivo ? el("div", { class: "meta" }, m.archivo) : null,
       botones);
   }
+  // Tarjeta de «Aplicar cambios»: la receta (o la propuesta si aún no hay una aprobada), el progreso y el botón Ejecutar,
+  // con los mismos flujos de aprobación y de confirmación que el apartado del proyecto.
+  function crearAplicarTarjeta(m) {
+    const d = m.d;
+    const alCambiar = (nuevo) => { if (nuevo) { m.d = nuevo; confirmar(false); } refrescarAplicar(m); };
+    const cuerpo = [];
+    if (!d) {
+      cuerpo.push(m.errorUi ? el("div", { class: "error-chat" }, m.errorUi) : el("div", { class: "trabajando", role: "status" }, "consultando"));
+    } else if (!d.receta) {
+      const propuestos = (d.propuesta && d.propuesta.pasos) || [];
+      cuerpo.push(el("div", { class: "msg-titulo" }, "Este proyecto aún no tiene una receta aprobada"),
+        el("p", { class: "msg-texto" }, d.receta_error ? "La receta guardada no es válida: " + d.receta_error
+          : propuestos.length ? `El panel propone ${propuestos.length} paso${propuestos.length === 1 ? "" : "s"} a partir de lo que ve en el proyecto. Apruébala una vez y después bastará un clic.`
+          : "El panel no encontró nada que proponer."),
+        propuestos.length ? el("ul", { class: "sub" }, propuestos.map((p) => el("li", {}, p.titulo))) : null,
+        el("div", { class: "msg-acciones" }, el("button", { type: "button", class: "boton", onclick: () => flujoAprobarReceta(m.proyecto, alCambiar) }, "Revisar y aprobar la receta")));
+    } else {
+      const ej = d.ejecucion;
+      const url = ej && ej.estado === "ok" && d.abrir ? urlSegura(d.abrir.url) : null;
+      cuerpo.push(el("div", { class: "msg-titulo" }, "Aplicar los cambios de " + (m.proyecto_nombre || m.proyecto)),
+        el("div", { class: "msg-detalle" }, d.en_curso ? "Aplicando…" : d.pendientes.hay ? d.pendientes.texto : "No hay cambios sin aplicar (puedes forzar todo)."),
+        ej ? pintarPasosAplicar(ej.pasos) : pintarPasosAplicar(d.plan || [], true),
+        ej && ej.resumen ? el("div", { class: "meta" }, (ej.simulacion ? "Simulación · " : "") + ej.resumen + (avisoRecarga(m.proyecto, ej) ? " " + avisoRecarga(m.proyecto, ej) : "")) : null,
+        m.errorUi ? el("div", { class: "error-chat" }, m.errorUi) : null,
+        el("div", { class: "msg-acciones" },
+          el("button", { type: "button", class: "boton", disabled: !!d.en_curso || !!d.receta_error, title: "Muestra qué se ejecutará y pide confirmación", onclick: () => flujoAplicar(m.proyecto, false, alCambiar) }, "Ejecutar"),
+          el("button", { type: "button", class: "boton mini", disabled: !!d.en_curso || !!d.receta_error, onclick: () => flujoAplicar(m.proyecto, true, alCambiar) }, "Forzar todo"),
+          url ? enlaceAbrir(m.proyecto, d.abrir.servicio, url, "Abrir " + d.abrir.nombre) : null));
+    }
+    if (d && d.limitaciones) cuerpo.push(el("div", { class: "meta" }, d.limitaciones));
+    return el("article", { class: "msg chat sistema" + (m.leido === false ? " no-leido" : ""), "data-id": m.id, "aria-label": "Aplicar cambios de " + (m.proyecto_nombre || m.proyecto) },
+      cabecera(m, el("span", { class: "chip proyecto", title: m.proyecto_nombre }, m.proyecto_nombre || m.proyecto), chip("Aplicar cambios"), chip("Lo resuelve el panel")),
+      ...cuerpo);
+  }
   function crearTextoSistema(m) {
     return el("article", { class: "msg chat sistema" + (m.leido === false ? " no-leido" : ""), "data-id": m.id },
       cabecera(m, chip("Sistema")), el("p", { class: "msg-texto" }, m.texto || ""));
   }
-  chatBus.crear = (m) => (m.rol === "yo" ? crearUsuario(m) : m.tipo === "instruccion" ? crearInstruccion(m) : m.tipo === "propuesta" ? crearPropuesta(m) : crearTextoSistema(m));
+  chatBus.crear = (m) => (m.rol === "yo" ? crearUsuario(m) : m.tipo === "instruccion" ? crearInstruccion(m) : m.tipo === "propuesta" ? crearPropuesta(m) : m.tipo === "aplicar" ? crearAplicarTarjeta(m) : crearTextoSistema(m));
 
   /* ----- arranque ----- */
   cargar();
