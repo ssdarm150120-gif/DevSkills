@@ -111,6 +111,43 @@ Cada proyecto del registro (`carpeta` y `repositorio.cuenta` de `proyectos.json`
 
 **Endpoints** (token, `Host` y `Origin` como el resto): `GET /api/proyecto/git?id=<proyecto>[&actualizar=1]`, `POST /api/proyecto/git/commit` `{id, archivos[], mensaje}` y `POST /api/proyecto/git/push` `{id, rama}`. Con `--simular` las lecturas se hacen, pero no hay `git fetch`, gitleaks, `add`, `commit` ni `push`: se devuelven los comandos. Todos los subprocesos de git tienen tiempo límite y sin preguntas interactivas; el log del panel (`panel.log`) solo guarda proyecto, rama, código y hash, sin mensajes, tokens ni URLs con credenciales. Pruebas: `motor/panel/pruebas/test_panel_git.py` (repos temporales y un remoto bare local).
 
+## Aplicar cambios (recompilar y reiniciar con un clic)
+
+Después de que una sesión de Claude Code edita un proyecto, para ver los cambios hay que recompilar el front y reiniciar el back. El apartado **Aplicar cambios** de cada proyecto lo hace con un clic, sin abrir terminales. **Limitación:** el panel no puede reiniciar la terminal de Claude Code (el `PATH` se hereda al arrancar); sí recompila el proyecto y reinicia sus servicios.
+
+**Receta detectada y aprobada.** La primera vez, el botón lleva a aprobar la receta que el panel propone a partir de lo que ve: cada subcarpeta (hasta 2 niveles, sin `node_modules`) con `package.json` y script `build` → `npm-install` + `npm-script build`; cada servicio `python-modulo` con `venv` y un `requirements.txt` (en su carpeta o en la raíz) → `pip-requisitos`; y al final el reinicio de los servicios `dotnet`, `django-devskills`, `python-modulo` y los `npm` que no sean de desarrollo (`dev`, `watch`, `serve`…). Los `docker-compose` no se reinician solos. El usuario marca o desmarca pasos y aprueba una vez; queda guardada en `proyectos.json` (clave `aplicar`) y se edita o se quita después. La escritura reusa la del resto del registro: validación completa con las reglas de lectura, escritura atómica y formato con sangría de 2 (el panel no hace respaldo de `proyectos.json` en ninguna de sus escrituras).
+
+```json
+"aplicar": {
+  "version": 1,
+  "aprobada": "2026-10-28T10:15:00-06:00",
+  "pasos": [
+    { "id": "npm-install-frontend", "tipo": "npm-install", "carpeta": "frontend" },
+    { "id": "npm-build-frontend", "tipo": "npm-script", "carpeta": "frontend", "script": "build" },
+    { "id": "pip-backend", "tipo": "pip-requisitos", "venv": ".venv", "requisitos": "backend/requirements.txt" },
+    { "id": "reiniciar-dashboard-web", "tipo": "reiniciar-servicio", "servicio": "dashboard-web" }
+  ]
+}
+```
+
+**Pasos tipados de lista blanca, nunca comandos libres ni shell.** `npm-install` (`npm ci` si hay `package-lock.json`, si no `npm install`; siempre con `--no-audit --no-fund`), `npm-script` (`npm run <script>`; el nombre cumple `[A-Za-z0-9:._-]{1,60}` y debe existir en el `package.json`), `pip-requisitos` (`<venv>/python -m pip install -r <archivo .txt>`) y `reiniciar-servicio` (un servicio del MISMO proyecto, con el lanzador: `servicios.py apagar` y después `levantar`, y se espera a que su ruta de salud responda hasta 45 s; si no responde, el paso falla). Las carpetas son relativas al proyecto, validadas con `ruta_segura` del lanzador (sin `..`, rutas absolutas, unidades ni UNC) y con comprobación en disco al aprobar. `npm` se resuelve con `shutil.which` (en Windows, `npm.cmd`) y se ejecuta sin shell; si el `PATH` del panel no lo tiene, el paso falla explicando que hay que reiniciar el panel. Cada paso tiene su tiempo límite (900 s para npm y pip, 120 s para el reinicio; `timeout` opcional por paso, de 10 a 3600) y, en Windows, un tiempo agotado mata también a los procesos hijos. Una receta dañada a mano no tumba el registro: se avisa y no se ejecuta.
+
+**Solo lo necesario (huellas).** Se guarda en `<estado>/aplicar.json` (por omisión `~/.devskills/panel/estado/`, nunca en el repo) la huella de cada paso de la última aplicación correcta. La huella es un sha256 de la definición del paso (si editas la receta, el paso vuelve a correr) y de sus entradas:
+- `npm-install`: contenido de `package.json` y `package-lock.json` y si existe `node_modules`. Corre solo si cambió alguno.
+- `npm-script` (el build): una firma barata del árbol de la carpeta, sin leer contenido: sha256 de (ruta, tamaño, mtime en ns) de cada archivo relevante. Dentro de un repo se listan con `git ls-files -co --exclude-standard` (rastreados más no rastreados no ignorados, así `node_modules`, `dist` y lo que ignore el `.gitignore` nunca cuentan); sin git, un recorrido que poda `node_modules`, `.venv`, `__pycache__`, `dist`, `build`, etc. Es barata y robusta: ediciones, altas y bajas cambian la firma; un `touch` o un checkout sin cambios solo puede causar una recompilación de más, nunca una de menos.
+- `pip-requisitos`: contenido del archivo de requisitos y si existe el Python del venv.
+- `reiniciar-servicio`: la misma firma del árbol de la carpeta de arranque del servicio. Además se reinicia siempre que haya corrido cualquier paso anterior (build o dependencias nuevas). Cuando un paso corre bien se invalidan las huellas de los reinicios: si el reinicio falla, la próxima vez se reintenta aunque el código del servicio no haya cambiado.
+
+Las huellas se calculan DESPUÉS de cada paso correcto (un build que escribe dentro de la carpeta vigilada no se vuelve a disparar solo). Si la carpeta de un servicio es `.`, la firma abarca todo el proyecto (un cambio del front también marcaría cambios del back). **Forzar todo** ejecuta todos los pasos.
+
+**Aviso de cambios sin aplicar.** El apartado muestra «Hay cambios sin aplicar: frontend, backend» con las áreas de los pasos que cambiaron por sí mismos (carpeta del front, del archivo de requisitos o del servicio). Se calcula en el servidor con caché de 5 s por proyecto y se refresca cada 4 s; cuando una sesión termina de editar, es el disparador para dar clic.
+
+**Ejecución en segundo plano.** **Aplicar cambios** abre un modal de la página (nunca `confirm()`) con lo que se ejecutará, lo que se omite y por qué; el clic en «Sí, aplicar» lanza un hilo (no bloquea el servidor HTTP) y el apartado muestra el progreso paso a paso: pendiente, en curso, ✅, ❌, omitido (con su razón) o simulado, con la salida de cada paso limpia (sin colores ni barras de progreso, secretos enmascarados, recortada a sus últimos 1500 caracteres). Se detiene en el primer fallo y marca el resto como omitido. Al terminar bien aparece **Abrir** con la `url` y el `abrir` del servicio reiniciado. Un candado por proyecto: no dos aplicaciones a la vez ni junto con Levantar/Apagar del mismo proyecto (409). Con `--simular` se muestran los comandos y no se ejecuta ni se guarda nada (la receta sí se puede aprobar: es solo configuración).
+
+**Chat del panel.** Frases como «aplica (los) cambios (de/del/en) <proyecto>», «actualiza el <proyecto>» y «recompila <proyecto>» las intercepta el panel ANTES de mandarlas al orquestador (sin gastar tokens y aunque esté apagado): coincide solo si lo que sigue al verbo es exactamente el id, el nombre o un alias (`alias_proyectos` de la configuración del orquestador) de UN proyecto, sin acentos ni mayúsculas y sin palabras de relleno («el», «proyecto», «por favor»…). Es un resolvedor mínimo propio en `panel.py` (no se importa nada del orquestador): igualdad exacta de palabras, sin puntajes difusos. Si el proyecto no se reconoce o es ambiguo, la frase sigue su camino normal al orquestador. La respuesta es una tarjeta con la receta (o la propuesta, si todavía no hay una aprobada) y el botón **Ejecutar**, que abre la misma confirmación que el botón del apartado; ejecutar siempre requiere un clic explícito.
+
+**Endpoints** (token, `Host` y `Origin` como el resto; claves exactas, sin texto libre): `GET /api/proyecto/aplicar?id=<proyecto>[&propuesta=1]` (receta, plan, aviso, ejecución, última aplicación y propuesta), `POST /api/proyecto/aplicar/receta` `{id, pasos[]}` (aprueba o edita; `pasos: []` quita la receta), `POST /api/proyecto/aplicar/ejecutar` `{id, forzar?}` (202; el progreso se consulta con el GET) y `GET /api/chat/intencion?texto=…`. El log del panel solo guarda proyecto, paso y resultado. Pruebas: `motor/panel/pruebas/test_panel_aplicar.py` (proyecto temporal con front y back, fakes para npm, pip y el lanzador; no se instala ni se compila nada).
+
 ## Seguridad
 
 - Todo escucha solo en `127.0.0.1`; el panel valida `Host` y `Origin` y exige un token por sesión (en un archivo con permisos restringidos, nunca enviado al navegador en el caso del orquestador).
