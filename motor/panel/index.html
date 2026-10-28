@@ -1023,6 +1023,54 @@ const urlSegura = (u) => { try { const x = new URL(u); return (x.protocol === "h
 const leer = (k, d) => { try { return localStorage.getItem(k) ?? d; } catch (e) { return d; } };
 const guardar = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
 
+/* Pestañas de los servicios: «Abrir» las abre con un nombre estable por proyecto y servicio y guarda la referencia, para
+   poder recargar solo esa pestaña al terminar «Aplicar cambios». El navegador no deja controlar pestañas que el panel no abrió. */
+const ventanasServicio = new Map();
+const claveVentana = (pid, sid) => "devskills-" + pid + "-" + sid;
+const esLoopback = (u) => { try { return ["localhost", "127.0.0.1", "[::1]"].includes(new URL(u).hostname); } catch (e) { return false; } };
+/* Abre (o reutiliza) la pestaña del servicio. Devuelve true si la abrió el panel; con false el enlace normal sigue su curso.
+   Solo se abre la URL registrada del servicio (http/https) o una de este equipo; nunca una URL arbitraria. */
+function abrirServicio(pid, sid, url, registrada) {
+  const u = urlSegura(url);
+  if (!u || !(esLoopback(u) || (registrada && urlSegura(registrada) === u))) return false;
+  const w = window.open(u, claveVentana(pid, sid));
+  if (!w) return false;
+  ventanasServicio.set(claveVentana(pid, sid), w);
+  return true;
+}
+const enlaceAbrir = (pid, sid, url, nombre, extra = {}) => el("a", { class: "boton", href: url, target: "_blank", rel: "noopener noreferrer",
+  onclick: (e) => { if (abrirServicio(pid, sid, url, url)) e.preventDefault(); }, ...extra }, nombre);
+const PREF_RECARGA = "panel.recargarAlAplicar";
+const recargarActivado = () => leer(PREF_RECARGA, "1") !== "0";
+const textoRecarga = new Map();  // pid → { inicio, texto } de la última aplicación vigilada
+/* Tras una aplicación correcta con al menos un paso ejecutado, recarga solo la pestaña que abrió el panel. */
+function recargarTrasAplicar(pid, d) {
+  const ej = d.ejecucion;
+  if (!recargarActivado() || !ej || ej.estado !== "ok" || ej.simulacion || !(ej.pasos || []).some((p) => p.estado === "ok") || !d.abrir) return;
+  const url = urlSegura(d.abrir.url);
+  const w = ventanasServicio.get(claveVentana(pid, d.abrir.servicio));
+  let texto;
+  if (url && w && !w.closed) {
+    try { w.location.href = url; texto = "Se recargó la pestaña de " + d.abrir.nombre + "."; } catch (e) { texto = null; }
+  }
+  textoRecarga.set(pid, { inicio: ej.inicio, texto: texto || "Ábrelo con «Abrir» para que se recargue solo la próxima vez." });
+}
+const avisoRecarga = (pid, ej) => { const r = textoRecarga.get(pid); return r && ej && r.inicio === ej.inicio ? r.texto : null; };
+/* Espera a que termine la ejecución recién lanzada (el paso de reinicio ya verifica la salud) y entonces recarga. */
+async function vigilarAplicacion(pid, inicio, alTerminar) {
+  for (let i = 0; i < 900; i++) {
+    await new Promise((r) => setTimeout(r, 1000));
+    let d;
+    try { d = await api("/api/proyecto/aplicar?id=" + encodeURIComponent(pid)); } catch (e) { continue; }
+    const ej = d && d.ejecucion;
+    if (!d || !d.ok || !ej || ej.inicio !== inicio) { if (d && d.ok && !d.en_curso) return; continue; }
+    if (d.en_curso || ej.fin == null) continue;
+    recargarTrasAplicar(pid, d);
+    if (alTerminar) alTerminar();
+    return;
+  }
+}
+
 /* Sección desplegable (<details>/<summary> nativos): recuerda abierta/cerrada por clave en localStorage y su cuerpo
    tiene scroll propio (salvo `grupo`, que solo agrupa otras secciones y no se desplaza). El contador del encabezado
    se cambia con .contar(texto). Nunca se usa innerHTML: todo entra como nodos o texto. */
@@ -1981,12 +2029,17 @@ async function flujoAplicar(pid, forzar, alCambiar) {
     if (!r.ok) { ir.disabled = false; msg.textContent = r.error || "No se pudo iniciar."; msg.hidden = false; return; }
     cerrarDialogoAplicar();
     if (alCambiar) alCambiar({ ...d, ejecucion: r.ejecucion, en_curso: true });
+    if (r.ejecucion && !d.simulacion) vigilarAplicacion(pid, r.ejecucion.inicio, () => { if (alCambiar) alCambiar(); });
   });
+  const recarga = el("input", { type: "checkbox", id: "ap-recargar" });
+  recarga.checked = recargarActivado();
+  recarga.addEventListener("change", () => guardar(PREF_RECARGA, recarga.checked ? "1" : "0"));
   dialogoAplicar("Aplicar cambios", (forzar ? "Forzar todo · " : "") + d.nombre,
     el("p", {}, n ? `Se ${n === 1 ? "ejecutará 1 paso" : `ejecutarán ${n} pasos`}, en este orden. Se detiene en el primer fallo.` : "No hay nada que aplicar: todo está al día."),
     pintarPasosAplicar(plan, true),
     n === 0 && !forzar ? el("p", { class: "sub" }, "Si quieres recompilar y reiniciar de todos modos, usa «Forzar todo».") : null,
     d.simulacion ? el("div", { class: "aviso info" }, "Modo simulación: no se ejecutará nada; verás los comandos.") : null,
+    el("label", { class: "sub", for: "ap-recargar", title: "Solo recarga la pestaña que abriste con «Abrir» desde el panel" }, recarga, " Recargar la pestaña del proyecto al aplicar"),
     el("p", { class: "sub" }, d.limitaciones),
     msg,
     el("div", { class: "botones" }, ir, el("button", { type: "button", class: "boton", onclick: cerrarDialogoAplicar }, "Cancelar")));
@@ -2011,7 +2064,7 @@ function crearAplicar(pid, vigente, enlaces = {}) {
   function pintar(forzar) {
     const d = est.d;
     if (!d) return;
-    const firma = JSON.stringify(d);
+    const firma = JSON.stringify([d, avisoRecarga(pid, d.ejecucion)]);
     if (!forzar && firma === est.firma) return;
     est.firma = firma;
     const ej = d.ejecucion;
@@ -2030,11 +2083,12 @@ function crearAplicar(pid, vigente, enlaces = {}) {
       onclick: () => flujoAplicar(pid, true, alCambiar) }, "Forzar todo") : null;
     const bEditar = el("button", { type: "button", class: "boton mini", disabled: enCurso, onclick: () => flujoAprobarReceta(pid, alCambiar) }, d.receta || d.receta_error ? "Editar la receta" : "Ver la propuesta");
     const url = ej && ej.estado === "ok" && d.abrir ? urlSegura(d.abrir.url) : null;
-    const bAbrir = url ? el("a", { class: "boton", href: url, target: "_blank", rel: "noopener noreferrer" }, "Abrir " + d.abrir.nombre) : null;
+    const bAbrir = url ? enlaceAbrir(pid, d.abrir.servicio, url, "Abrir " + d.abrir.nombre) : null;
+    const avRecarga = avisoRecarga(pid, ej);
     let cuerpo = null;
     if (ej) {
       cuerpo = [pintarPasosAplicar(ej.pasos),
-        ej.resumen ? el("div", { class: "aviso " + (ej.estado === "fallo" ? "mal" : ej.estado === "ok" ? "info" : ""), role: "status" }, (ej.simulacion ? "Simulación · " : "") + ej.resumen) : null];
+        ej.resumen ? el("div", { class: "aviso " + (ej.estado === "fallo" ? "mal" : ej.estado === "ok" ? "info" : ""), role: "status" }, (ej.simulacion ? "Simulación · " : "") + ej.resumen + (avRecarga ? " " + avRecarga : "")) : null];
     } else if (d.receta && d.plan && d.plan.length) {
       const det = plegable("aplicar-plan-" + pid, "Qué haría ahora", { abierto: false });
       det.contar(String(d.plan.filter((x) => x.accion === "ejecutar").length));
@@ -2586,7 +2640,7 @@ function pintarProyecto(p, cabeza, servicios, acciones, salidaProyecto, refresca
     // Los tres estados de "Abrir" ocupan la misma celda (ver .botones.servicio): el texto va en .txt con elipsis.
     let abrir;
     if (sal.estado === "listo" && url) {
-      abrir = el("a", { class: "boton", href: url, target: "_blank", rel: "noopener noreferrer", title: url }, el("span", { class: "txt" }, "Abrir ↗"));
+      abrir = el("a", { class: "boton", href: url, target: "_blank", rel: "noopener noreferrer", title: url, onclick: (e) => { if (abrirServicio(p.id, s.id, url, url)) e.preventDefault(); } }, el("span", { class: "txt" }, "Abrir ↗"));
     } else if (sal.estado === "arrancando" || trabajando[s.id] === "levantar") {
       abrir = el("button", { type: "button", class: "boton cargando", disabled: true, "aria-label": "Abrir: cargando, el servicio aún no está listo", title: sal.detalle || "Esperando a que el servicio responda" },
         el("span", { class: "giro", "aria-hidden": "true" }), el("span", { class: "txt" }, "Cargando…"));
@@ -3744,10 +3798,11 @@ const ID_PROYECTO = /^[a-z0-9][a-z0-9-]{0,40}$/;
     try { d = await api("/api/proyecto/aplicar?id=" + encodeURIComponent(m.proyecto)); } catch (e) { m.consultando = false; return; }
     m.consultando = false;
     if (!d.ok) { m.errorUi = d.error || "No se pudo leer el proyecto."; confirmar(false); return; }
-    const antes = JSON.stringify(m.d);
+    const antes = JSON.stringify([m.d, m.tr]);
     m.errorUi = null;
     m.d = d;
-    if (JSON.stringify(d) !== antes) confirmar(false);
+    m.tr = avisoRecarga(m.proyecto, d.ejecucion);
+    if (JSON.stringify([d, m.tr]) !== antes) confirmar(false);
   }
 
   async function enviarAhora(texto, proyecto) {
@@ -3970,12 +4025,12 @@ const ID_PROYECTO = /^[a-z0-9][a-z0-9-]{0,40}$/;
       cuerpo.push(el("div", { class: "msg-titulo" }, "Aplicar los cambios de " + (m.proyecto_nombre || m.proyecto)),
         el("div", { class: "msg-detalle" }, d.en_curso ? "Aplicando…" : d.pendientes.hay ? d.pendientes.texto : "No hay cambios sin aplicar (puedes forzar todo)."),
         ej ? pintarPasosAplicar(ej.pasos) : pintarPasosAplicar(d.plan || [], true),
-        ej && ej.resumen ? el("div", { class: "meta" }, (ej.simulacion ? "Simulación · " : "") + ej.resumen) : null,
+        ej && ej.resumen ? el("div", { class: "meta" }, (ej.simulacion ? "Simulación · " : "") + ej.resumen + (avisoRecarga(m.proyecto, ej) ? " " + avisoRecarga(m.proyecto, ej) : "")) : null,
         m.errorUi ? el("div", { class: "error-chat" }, m.errorUi) : null,
         el("div", { class: "msg-acciones" },
           el("button", { type: "button", class: "boton", disabled: !!d.en_curso || !!d.receta_error, title: "Muestra qué se ejecutará y pide confirmación", onclick: () => flujoAplicar(m.proyecto, false, alCambiar) }, "Ejecutar"),
           el("button", { type: "button", class: "boton mini", disabled: !!d.en_curso || !!d.receta_error, onclick: () => flujoAplicar(m.proyecto, true, alCambiar) }, "Forzar todo"),
-          url ? el("a", { class: "boton", href: url, target: "_blank", rel: "noopener noreferrer" }, "Abrir " + d.abrir.nombre) : null));
+          url ? enlaceAbrir(m.proyecto, d.abrir.servicio, url, "Abrir " + d.abrir.nombre) : null));
     }
     if (d && d.limitaciones) cuerpo.push(el("div", { class: "meta" }, d.limitaciones));
     return el("article", { class: "msg chat sistema" + (m.leido === false ? " no-leido" : ""), "data-id": m.id, "aria-label": "Aplicar cambios de " + (m.proyecto_nombre || m.proyecto) },
