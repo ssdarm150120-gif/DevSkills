@@ -1461,7 +1461,7 @@ def _git_fetch(pid, raiz):
         codigo, _, err = _git_ejecutar(["fetch", "--quiet", REMOTO_GIT], raiz, timeout=GIT_FETCH_TIMEOUT)
     finally:
         c.release()
-    log(f"git fetch {pid} -> {codigo}")
+    log(f"git fetch {pid} -> {codigo}" + ("" if codigo == 0 else f" ({_limpiar_salida_git(err, 200) or 'sin detalle'})"))
     return {"hecho": codigo == 0, "error": None if codigo == 0 else _limpiar_salida_git(err, 300) or "git fetch falló."}
 
 
