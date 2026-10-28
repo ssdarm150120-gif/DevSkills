@@ -95,7 +95,9 @@ Copia `proyectos.json`, preferencias, estado del panel, historial y propuestas d
 
 ## Pendientes de git (Commit y Push desde el panel)
 
-Cada proyecto del registro (`carpeta` y `repositorio.cuenta` de `proyectos.json`) tiene un apartado **Pendientes de git** con dos botones separados: **Commit** (local) y **Push** (con confirmación). La carpeta debe ser la RAÍZ de un repositorio git; si no lo es, el panel lo dice y no muestra botones.
+> **Una sola sección en el panel.** En la vista de cada proyecto, **Aplicar cambios** y **Pendientes de git** forman la sección **Aplicar y subir cambios**: un resumen común arriba (por ejemplo «Hay cambios sin aplicar: backend · 3 archivos sin commit · rama X») y los dos pasos lado a lado (en marcos angostos se apilan): 1) aplicar para ver los cambios funcionando, 2) commit y push cuando estés conforme. Se refrescan entre sí: tras un commit o un push exitoso se recarga Aplicar, y al terminar de aplicar se recarga git. Es solo interfaz; los endpoints no cambian.
+
+Cada proyecto del registro (`carpeta` y `repositorio.cuenta` de `proyectos.json`) tiene un apartado **Pendientes de git** (paso 2 de la sección **Aplicar y subir cambios**) con dos botones separados: **Commit** (local) y **Push** (con confirmación). La carpeta debe ser la RAÍZ de un repositorio git; si no lo es, el panel lo dice y no muestra botones.
 
 **Vista (solo lectura):** rama actual, upstream y adelante/atrás, archivos sin commit (`git status --porcelain=v1 -z`, estados M/A/D/??/R), commits sin push, stashes y las ramas locales con commits que NO están en `origin/<rama por omisión>` (se compara contra el REMOTO, no contra el `main` local: si el `main` local va atrás, compararlo daría falsos pendientes), con fecha, hash corto, asunto y si tienen remoto. El panel no hace `git fetch` por su cuenta: el botón **Actualizar remoto** (o `GET /api/proyecto/git?id=…&actualizar=1`) lo corre con tiempo límite de 20 s; mientras tanto se muestra la hora de la última consulta.
 
@@ -113,7 +115,7 @@ Cada proyecto del registro (`carpeta` y `repositorio.cuenta` de `proyectos.json`
 
 ## Aplicar cambios (recompilar y reiniciar con un clic)
 
-Después de que una sesión de Claude Code edita un proyecto, para ver los cambios hay que recompilar el front y reiniciar el back. El apartado **Aplicar cambios** de cada proyecto lo hace con un clic, sin abrir terminales. **Limitación:** el panel no puede reiniciar la terminal de Claude Code (el `PATH` se hereda al arrancar); sí recompila el proyecto y reinicia sus servicios.
+Después de que una sesión de Claude Code edita un proyecto, para ver los cambios hay que recompilar el front y reiniciar el back. El apartado **Aplicar cambios** (paso 1 de la sección **Aplicar y subir cambios**, junto a los pendientes de git) de cada proyecto lo hace con un clic, sin abrir terminales. **Limitación:** el panel no puede reiniciar la terminal de Claude Code (el `PATH` se hereda al arrancar); sí recompila el proyecto y reinicia sus servicios.
 
 **Receta detectada y aprobada.** La primera vez, el botón lleva a aprobar la receta que el panel propone a partir de lo que ve: cada subcarpeta (hasta 2 niveles, sin `node_modules`) con `package.json` y script `build` → `npm-install` + `npm-script build`; cada servicio `python-modulo` con `venv` y un `requirements.txt` (en su carpeta o en la raíz) → `pip-requisitos`; y al final el reinicio de los servicios `dotnet`, `django-devskills`, `python-modulo` y los `npm` que no sean de desarrollo (`dev`, `watch`, `serve`…). Los `docker-compose` no se reinician solos. El usuario marca o desmarca pasos y aprueba una vez; queda guardada en `proyectos.json` (clave `aplicar`) y se edita o se quita después. La escritura reusa la del resto del registro: validación completa con las reglas de lectura, escritura atómica y formato con sangría de 2 (el panel no hace respaldo de `proyectos.json` en ninguna de sus escrituras).
 

@@ -12,6 +12,10 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 - **Chat del panel:** «aplica los cambios del <proyecto>», «actualiza el <proyecto>» o «recompila <proyecto>» las resuelve el panel (sin orquestador ni tokens) con una tarjeta con la receta y el botón Ejecutar; el resto de las frases sigue al orquestador.
 - Endpoints: `GET /api/proyecto/aplicar`, `POST /api/proyecto/aplicar/receta`, `POST /api/proyecto/aplicar/ejecutar` y `GET /api/chat/intencion`. Pruebas en `motor/panel/pruebas/test_panel_aplicar.py`; documentación en `docs/motor.md`. Limitación: el panel no puede reiniciar la terminal de Claude Code (el `PATH` se hereda al arrancar).
 
+### Panel: Aplicar y git en una sola sección
+- **Aplicar cambios** y **Pendientes de git** ya no son dos secciones separadas: forman **Aplicar y subir cambios**, con un resumen común arriba («Hay cambios sin aplicar: backend · 3 archivos sin commit · rama X») y los dos pasos lado a lado (1 · Aplicar, 2 · Commit y push); en marcos angostos se apilan, sin scroll horizontal.
+- Se refrescan entre sí: tras un commit o un push exitoso se recarga Aplicar y, al terminar de aplicar, se recarga git. Solo cambia la interfaz (`motor/panel/index.html`, `crearCambios`); los endpoints y las pruebas no cambian.
+
 ### Panel: pendientes de git por proyecto (Commit y Push)
 - Nuevo apartado **Pendientes de git** en cada proyecto: rama, upstream y adelante/atrás, archivos sin commit, stashes y ramas locales con commits fuera de `origin/<rama por omisión>` (se compara contra el remoto, no contra el `main` local). `GET /api/proyecto/git?id=…[&actualizar=1]`; el `git fetch` solo corre bajo petición y con tiempo límite.
 - **Commit** (`POST /api/proyecto/git/commit`): mensaje propuesto por plantilla (sin IA, editable) y validado como conventional commits; archivos elegidos con casillas y aceptados solo si están en la salida actual de `git status --porcelain` (sin `..` ni rutas absolutas, tras `--`, sin shell); gitleaks siempre antes, y si no está disponible o hay hallazgos no se commitea.

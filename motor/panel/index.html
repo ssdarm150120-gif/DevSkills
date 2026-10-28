@@ -436,6 +436,16 @@ details.agente[open] > summary::after { transform: rotate(225deg); }
 .aplicar .botones { margin-top: 12px; }
 .aplicar .aviso { margin: 12px 0 0; }
 .aplicar .limites { margin: 12px 0 0; font-size: 12.5px; color: var(--tenue); }
+/* Aplicar y git en una sola sección: resumen común arriba y los dos pasos lado a lado (apilados en marcos angostos). */
+.cambios { max-width: 1180px; margin-bottom: 8px; }
+.cambios .resumen-cambios { padding: 14px 18px; border: 1px solid var(--borde); border-radius: var(--radio-chico); background: rgba(0,0,0,.28); margin-bottom: 12px; }
+.cambios .resumen-cambios .estados { margin-bottom: 8px; }
+.cambios .resumen-cambios p { margin: 0; }
+.cambios .resumen-cambios .flujo { margin: 8px 0 0; font-size: 12.5px; color: var(--tenue); }
+.cambios .columnas { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; }
+.cambios .columnas > * { min-width: 0; }
+.cambios .aplicar, .cambios .pend-git { max-width: none; margin-bottom: 0; }
+@container (min-width: 1000px) { .cambios .columnas { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
 .ap-pasos { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; }
 .ap-paso { border: 1px solid var(--borde); border-radius: 14px; padding: 8px 12px; background: rgba(255,255,255,.02); min-width: 0; }
 .ap-paso .ap-cab { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
@@ -1824,19 +1834,15 @@ function vistaProyecto(pid) {
   horasSel.value = leer("panel.horas", "6");
   horasSel.style.width = "auto";
   const enrutamiento = crearEnrutamiento(pid, () => id === rutaVigente);
-  const pendientesGit = crearPendientesGit(pid, () => id === rutaVigente);
-  const aplicar = crearAplicar(pid, () => id === rutaVigente);
+  const cambios = crearCambios(pid, () => id === rutaVigente);
   $("vista").replaceChildren(
     el("div", { class: "proyecto-superior" }, cabeza,
       el("section", { class: "columna-servicios", "aria-label": "Servicios" },
         el("div", { class: "fila-seccion" }, el("div", {}, el("span", { class: "etq" }, "Servicios"), el("h2", { class: "seccion" }, "Levantar y apagar")), acciones),
         salidaProyecto, servicios)),
-    el("div", { class: "fila-seccion" }, el("div", {}, el("span", { class: "etq" }, "Aplicar"), el("h2", { class: "seccion" }, "Aplicar cambios")),
-      el("span", { class: "extra" }, "Instala lo que cambió, recompila el front y reinicia los servicios; solo lo necesario")),
-    aplicar.nodo,
-    el("div", { class: "fila-seccion" }, el("div", {}, el("span", { class: "etq" }, "Git"), el("h2", { class: "seccion" }, "Pendientes de git")),
-      el("span", { class: "extra" }, "Commit local con gitleaks y Push con confirmación; nunca en main ni forzado")),
-    pendientesGit.nodo,
+    el("div", { class: "fila-seccion" }, el("div", {}, el("span", { class: "etq" }, "Cambios"), el("h2", { class: "seccion" }, "Aplicar y subir cambios")),
+      el("span", { class: "extra" }, "Primero aplica para verlos funcionando; cuando estés conforme, commit y push (nunca en main ni forzado)")),
+    cambios.nodo,
     el("div", { class: "fila-seccion" }, el("div", {}, el("span", { class: "etq" }, "Modelos"), el("h2", { class: "seccion" }, "Enrutamiento de modelos")),
       el("span", { class: "extra" }, "Subagentes con modelo y esfuerzo por rol; se verifica con pruebas y se escala una vez")),
     enrutamiento.nodo,
@@ -1986,7 +1992,7 @@ async function flujoAplicar(pid, forzar, alCambiar) {
     el("div", { class: "botones" }, ir, el("button", { type: "button", class: "boton", onclick: cerrarDialogoAplicar }, "Cancelar")));
 }
 
-function crearAplicar(pid, vigente) {
+function crearAplicar(pid, vigente, enlaces = {}) {
   const nodo = el("section", { class: "aplicar", "aria-label": "Aplicar cambios" }, el("span", { class: "sub" }, "Consultando el proyecto…"));
   const est = { d: null, firma: "", tick: 0 };
   async function pedir() {
@@ -1994,11 +2000,14 @@ function crearAplicar(pid, vigente) {
       const d = await api("/api/proyecto/aplicar?id=" + encodeURIComponent(pid));
       if (!vigente()) return;
       if (d.error && !d.ok) { est.d = null; nodo.replaceChildren(el("span", { class: "sub" }, d.error)); return; }
+      const termino = !!(est.d && est.d.en_curso) && !d.en_curso;
       est.d = d;
       pintar();
+      if (enlaces.alActualizar) enlaces.alActualizar(d);
+      if (termino && enlaces.alTerminar) enlaces.alTerminar();  // lo aplicado pudo cambiar el árbol de git
     } catch (e) {}
   }
-  const alCambiar = (d) => { if (d) { est.d = d; pintar(true); } pedir(); };
+  const alCambiar = (d) => { if (d) { est.d = d; pintar(true); if (enlaces.alActualizar) enlaces.alActualizar(d); } pedir(); };
   function pintar(forzar) {
     const d = est.d;
     if (!d) return;
@@ -2034,7 +2043,7 @@ function crearAplicar(pid, vigente) {
     }
     const ultima = !ej && d.ultima ? el("div", { class: "sub", style: "margin-top:10px" }, `Última aplicación: ${fechaLocal(d.ultima.fin * 1000)} · ${d.ultima.resumen || d.ultima.estado}`) : null;
     nodo.replaceChildren(...[
-      el("div", { class: "encabezado" }, el("span", { class: "etq" }, "Aplicar"), el("div", { class: "estados" }, chips)),
+      el("div", { class: "encabezado" }, el("span", { class: "etq" }, "1 · Aplicar"), el("div", { class: "estados" }, chips)),
       aviso,
       el("div", { class: "botones" }, bAplicar, bForzar, bAbrir, bEditar),
       ...(cuerpo || []), ultima,
@@ -2050,7 +2059,7 @@ function crearAplicar(pid, vigente) {
    El servidor decide todo: aquí solo se muestran los pendientes y se manda la lista de archivos elegidos, el mensaje y
    la rama actual. Nunca se usa alert()/confirm() del navegador ni innerHTML. */
 const ESTADO_ARCHIVO = { M: "modificado", A: "agregado", D: "borrado", R: "renombrado", C: "copiado", T: "tipo", U: "conflicto", "??": "nuevo" };
-function crearPendientesGit(pid, vigente) {
+function crearPendientesGit(pid, vigente, enlaces = {}) {
   const nodo = el("section", { class: "pend-git", "aria-label": "Pendientes de git" }, el("span", { class: "sub" }, "Consultando git…"));
   const est = { d: null, sel: new Map(), mensaje: "", editado: false, ocupado: false, salida: "", salidaMal: false, hallazgos: [], accion: null, firma: "" };
   async function pedir(actualizar) {
@@ -2068,6 +2077,7 @@ function crearPendientesGit(pid, vigente) {
         est.salida = d.fetch.simulado ? "Simulación: no se hizo git fetch." : d.fetch.hecho ? "Se consultó el remoto." : "No se pudo consultar el remoto: " + (d.fetch.error || "");
       }
       pintar();
+      if (enlaces.alActualizar) enlaces.alActualizar(d);
     } catch (e) {}
   }
   const elegidos = () => (est.d.archivos || []).filter((a) => est.sel.get(a.ruta)).map((a) => a.ruta);
@@ -2078,7 +2088,7 @@ function crearPendientesGit(pid, vigente) {
     const firma = JSON.stringify([d, [...est.sel], est.mensaje, est.ocupado, est.salida, est.salidaMal, est.hallazgos, est.accion]);
     if (!forzar && (firma === est.firma || enEdicion)) return;
     est.firma = firma;
-    if (!d.es_repo) { nodo.replaceChildren(el("div", { class: "encabezado" }, el("span", { class: "etq" }, "Git")), el("span", { class: "sub" }, d.motivo || "La carpeta no es un repositorio git.")); return; }
+    if (!d.es_repo) { nodo.replaceChildren(el("div", { class: "encabezado" }, el("span", { class: "etq" }, "2 · Commit y push")), el("span", { class: "sub" }, d.motivo || "La carpeta no es un repositorio git.")); return; }
     const chips = [
       el("span", { class: "chip sin-punto" }, d.rama ? "Rama: " + d.rama : "HEAD desacoplado"),
       d.upstream ? el("span", { class: "chip sin-punto", title: "Rama remota que sigue" }, `${d.upstream} · ↑${d.adelante ?? "?"} ↓${d.atras ?? "?"}`) : el("span", { class: "chip sin-punto" }, "Sin upstream"),
@@ -2129,7 +2139,7 @@ function crearPendientesGit(pid, vigente) {
       : el("span", { class: "sub" }, d.rama_por_omision ? `Ninguna rama local tiene commits fuera de origin/${d.rama_por_omision}.` : "No se conoce la rama por omisión del remoto (haz «Actualizar remoto»)."));
 
     nodo.replaceChildren(...[
-      el("div", { class: "encabezado" }, el("span", { class: "etq" }, "Git"), el("div", { class: "estados" }, chips), consulta, actualizar),
+      el("div", { class: "encabezado" }, el("span", { class: "etq" }, "2 · Commit y push"), el("div", { class: "estados" }, chips), consulta, actualizar),
       d.aviso ? el("div", { class: "aviso", style: "margin:12px 0 0" }, d.aviso) : null,
       el("div", { class: "pg-barra" }, el("h4", {}, `Archivos sin commit (${d.archivos_total})`), alternar),
       lista, masArchivos,
@@ -2158,15 +2168,17 @@ function crearPendientesGit(pid, vigente) {
     est.accion = r.accion || null;
   }
   async function commit(archivos) {
+    let exito = false;
     est.ocupado = true; est.salida = "Escaneando con gitleaks y commiteando…"; est.salidaMal = false; est.hallazgos = []; pintar(true);
     try {
       const r = await api("/api/proyecto/git/commit", { method: "POST", body: JSON.stringify({ id: pid, archivos, mensaje: est.mensaje }) });
       mostrar(r);
-      if (r.ok && !r.simulado) est.editado = false;
+      if (r.ok && !r.simulado) { est.editado = false; exito = true; }
     } catch (e) { est.salidaMal = true; est.salida = "No se pudo contactar al panel."; }
     est.ocupado = false;
     await pedir(false);
     pintar(true);
+    if (exito && enlaces.alExito) enlaces.alExito();
   }
   function cerrarModal() { if ($("dialogo").open) $("dialogo").close(); }
   function confirmarPush() {
@@ -2184,12 +2196,14 @@ function crearPendientesGit(pid, vigente) {
       } }, "Aplicar la cuenta del proyecto") : null;
     const subir = el("button", { type: "button", class: "boton primario", disabled: bloqueada, onclick: async () => {
       cerrarModal();
+      let exito = false;
       est.ocupado = true; est.salida = "Subiendo " + d.rama + "…"; est.salidaMal = false; est.hallazgos = []; pintar(true);
-      try { mostrar(await api("/api/proyecto/git/push", { method: "POST", body: JSON.stringify({ id: pid, rama: d.rama }) })); }
+      try { const r = await api("/api/proyecto/git/push", { method: "POST", body: JSON.stringify({ id: pid, rama: d.rama }) }); mostrar(r); exito = !!(r.ok && !r.simulado); }
       catch (e) { est.salidaMal = true; est.salida = "No se pudo contactar al panel."; }
       est.ocupado = false;
       await pedir(false);
       pintar(true);
+      if (exito && enlaces.alExito) enlaces.alExito();
     } }, d.simulacion ? "Simular el push" : "Sí, subir " + d.rama);
     $("dialogo-etq").textContent = "Confirmar push";
     $("dialogo-titulo").textContent = d.rama;
@@ -2206,6 +2220,51 @@ function crearPendientesGit(pid, vigente) {
   }
   cada(15000, () => pedir(false));
   return { nodo, recargar: () => pedir(false) };
+}
+
+/* ---------- Cambios: Aplicar y Pendientes de git en una sola sección ----------
+   Un solo flujo: 1) aplicar para ver los cambios funcionando, 2) commit y push cuando estés conforme. Cada parte sigue
+   siendo su propio componente; aquí solo se unen en una fila, se resume el estado combinado y se refrescan entre sí:
+   tras un commit o un push exitoso se recarga Aplicar (cambió el árbol) y al terminar de aplicar se recarga git. */
+function crearCambios(pid, vigente) {
+  const est = { ap: null, git: null };
+  const estado = el("div", { class: "estados" });
+  const texto = el("p", { role: "status", "aria-live": "polite" });
+  const resumen = el("div", { class: "resumen-cambios", role: "group", "aria-label": "Resumen de cambios del proyecto" },
+    estado, texto,
+    el("p", { class: "flujo" }, "1) Aplica los cambios para verlos funcionando → 2) haz commit y push cuando estés conforme."));
+  function resumir() {
+    const ap = est.ap, g = est.git;
+    if (!ap && !g) return;
+    const partes = [];
+    let pendiente = false;
+    if (ap) {
+      if (ap.en_curso) { partes.push("Aplicando cambios…"); pendiente = true; }
+      else if (ap.receta_error) { partes.push("La receta de aplicar no es válida"); pendiente = true; }
+      else if (ap.receta && ap.pendientes && ap.pendientes.hay) { partes.push("Hay cambios sin aplicar: " + ap.pendientes.areas.join(", ")); pendiente = true; }
+      else if (ap.receta) partes.push("Todo aplicado");
+      else partes.push("Aún sin receta para aplicar");
+    }
+    if (g && g.es_repo) {
+      const n = g.archivos_total || 0, s = g.sin_subir || 0;
+      if (n) { partes.push(`${n} archivo${n === 1 ? "" : "s"} sin commit`); pendiente = true; }
+      if (s) { partes.push(`${s} commit${s === 1 ? "" : "s"} sin push`); pendiente = true; }
+      if (!n && !s) partes.push("sin pendientes de git");
+      partes.push(g.rama ? "rama " + g.rama : "HEAD desacoplado");
+    }
+    estado.replaceChildren(pendiente ? el("span", { class: "chip parcial" }, "Con pendientes") : el("span", { class: "chip corriendo" }, "Todo al día"));
+    texto.textContent = partes.join(" · ");
+  }
+  let aplicar, git;
+  aplicar = crearAplicar(pid, vigente, {
+    alActualizar: (d) => { est.ap = d; resumir(); },
+    alTerminar: () => git.recargar() });
+  git = crearPendientesGit(pid, vigente, {
+    alActualizar: (d) => { est.git = d; resumir(); },
+    alExito: () => aplicar.recargar() });
+  const nodo = el("section", { class: "cambios", "aria-label": "Aplicar y subir cambios" },
+    resumen, el("div", { class: "columnas" }, aplicar.nodo, git.nodo));
+  return { nodo, recargar: () => { aplicar.recargar(); git.recargar(); } };
 }
 
 /* ---------- enrutamiento de modelos: evaluación (solo lectura), interruptor y tabla rol → modelo/esfuerzo ----------
