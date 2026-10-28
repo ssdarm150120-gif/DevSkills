@@ -10,7 +10,8 @@ de datos del motor (variable DEVSKILLS_DATOS, o ~/.devskills; ver comun/rutas.py
   python panel.py estado  [--puerto N]
 
 --simular: Levantar/Apagar no ejecutan nada; corren servicios.py --simular y devuelven el comando. Tampoco se ejecutan
-           `gh auth switch` ni `git config` (se devuelve el comando que correría); las lecturas sí se hacen.
+           `gh auth switch` ni `git config` (se devuelve el comando que correría); las lecturas sí se hacen. Tampoco
+           `git fetch`, gitleaks, `git add`, `git commit` ni `git push` de Pendientes de git.
 --laboratorio DIR: carpeta base del Laboratorio (por omisión <datos>/laboratorio).
 --registro ARCHIVO: otro proyectos.json (pruebas: así el cambio de cuenta no toca el registro real).
 --estado DIR: carpeta del estado persistente (avisos.json, acciones.json). Por omisión <datos>/panel/estado (puerto 18950)
@@ -1069,6 +1070,655 @@ def fijar_cuenta_repo(pid, cuenta):
         c.release()
     log(f"git config {pid} -> {cuenta}")
     return 200, {"ok": True, "cambio": True, "usuario": credencial_repo(pid)["usuario"], "comandos": visibles}
+
+
+# ---------------------------------------------------------------- pendientes de git: Commit y Push por proyecto
+# Solo se ejecutan argumentos fijos más rutas que estén en la salida ACTUAL de `git status` y la rama actual (HEAD);
+# nunca shell, nunca texto libre como argumento, nunca `--force`. El token no se lee ni se devuelve. La cuenta con la
+# que saldría el push se VERIFICA, jamás se cambia en silencio (el panel responde qué hacer y reusa los endpoints de
+# cuenta que ya existen).
+
+GIT_TIMEOUT = 15              # lecturas de git (status, log, rev-list…)
+GIT_ESCRITURA_TIMEOUT = 60    # git add / git commit (incluye hooks)
+GIT_FETCH_TIMEOUT = 20
+GIT_PUSH_TIMEOUT = 120
+GITLEAKS_TIMEOUT = 120
+MAX_JSON_GIT = 512 * 1024     # la lista de archivos de un commit puede ser larga (el resto de los cuerpos: MAX_JSON)
+MAX_ARCHIVOS_COMMIT = 2000
+MAX_RUTA_GIT = 1024
+MAX_MENSAJE_COMMIT = 4000
+MAX_PRIMERA_LINEA = 100
+MAX_RAMAS_PENDIENTES = 30
+MAX_COMMITS_POR_RAMA = 20
+MAX_ARCHIVOS_VISTA = 500
+MAX_HALLAZGOS = 20
+TIPOS_COMMIT = ("feat", "fix", "docs", "style", "refactor", "perf", "test", "build", "ci", "chore", "revert", "wip")
+RAMAS_PROTEGIDAS = ("main", "master")
+REMOTO_GIT = "origin"
+_RE_COMMIT = re.compile(r"^(" + "|".join(TIPOS_COMMIT) + r")(\([A-Za-z0-9._/-]{1,40}\))?(!)?: (\S.*)$")
+_RE_ELEMENTO = re.compile(r"^(?:en|hu)-\d+", re.I)
+_RE_CONTROL_COMMIT = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+_RE_ATRIBUCION = re.compile(r"(?im)^\s*(?:co-authored-by\s*:|.*\bgenerated (?:with|by)\b.*\bclaude\b)")
+_RE_URL_HTTPS = re.compile(r"^https://(?:(?P<usuario>[^/@\s:]+)(?::[^/@\s]*)?@)?(?P<host>[^/@\s:]+)(?::\d+)?/", re.I)
+_SECRETOS_COMMIT = ("id_rsa", "id_ed25519", "id_ecdsa", "id_dsa", "credentials.json", "secrets.json", ".netrc", ".npmrc",
+                    ".pypirc")
+_EXT_SECRETOS_COMMIT = (".pem", ".key", ".pfx", ".p12", ".jks", ".kdbx")
+_SUFIJOS_EJEMPLO = (".example", ".sample", ".template", ".dist")
+COMO_INSTALAR_GITLEAKS = ("Instala gitleaks: Windows «winget install Gitleaks.Gitleaks», macOS «brew install gitleaks», "
+                          "Linux la release de https://github.com/gitleaks/gitleaks/releases.")
+
+
+def _entorno_git():
+    """Sin preguntas interactivas (un panel sin terminal se quedaría esperando) y sin bloqueos opcionales del índice."""
+    e = dict(os.environ)
+    e.update(GIT_TERMINAL_PROMPT="0", GCM_INTERACTIVE="never", GIT_OPTIONAL_LOCKS="0")
+    return e
+
+
+def _git_ejecutar(args, carpeta, timeout=GIT_TIMEOUT, entrada=None):
+    """-> (código | None, stdout en bytes, stderr en bytes). `--literal-pathspecs`: una ruta nunca se interpreta como
+    patrón. Nunca shell."""
+    try:
+        r = subprocess.run([_git(), "--literal-pathspecs", "-C", carpeta, *args], input=entrada, capture_output=True,
+                           timeout=timeout, env=_entorno_git(), creationflags=_sin_ventana())
+    except subprocess.TimeoutExpired:
+        return None, b"", b"tiempo de espera agotado"
+    except OSError as e:
+        return None, b"", type(e).__name__.encode()
+    return r.returncode, r.stdout, r.stderr
+
+
+def _limpiar_salida_git(datos, n=800):
+    """Texto de git apto para mostrar y registrar: sin usuario ni clave dentro de URLs y con secretos enmascarados."""
+    texto = datos.decode("utf-8", errors="replace") if isinstance(datos, bytes) else str(datos)
+    texto = re.sub(r"(?i)(://)[^/@\s]*@", r"\1", texto)
+    return enmascarar(texto.strip())[-n:]
+
+
+def _raiz_repo(p):
+    """(raíz, None) si la carpeta del proyecto ES la raíz de un repo git; si no, (None, motivo)."""
+    carpeta = p["carpeta"]
+    if not os.path.isdir(carpeta):
+        return None, "La carpeta del proyecto no existe."
+    codigo, raiz = _git_leer(["rev-parse", "--show-toplevel"], carpeta)
+    if codigo != 0 or not raiz:
+        return None, "La carpeta no es un repositorio git."
+    if os.path.normcase(os.path.realpath(raiz[0])) != os.path.normcase(os.path.realpath(carpeta)):
+        return None, ("La carpeta del proyecto está dentro de otro repositorio git y no es su raíz: "
+                      "no se ofrecen Commit ni Push desde aquí.")
+    return raiz[0], None
+
+
+def _rama_actual(raiz):
+    codigo, lineas = _git_leer(["symbolic-ref", "--quiet", "--short", "HEAD"], raiz)
+    rama = lineas[0] if codigo == 0 and lineas else None
+    return rama if rama and _RAMA.match(rama) and not rama.startswith("-") else None
+
+
+def _ref_existe(raiz, ref):
+    codigo, _ = _git_leer(["rev-parse", "--verify", "--quiet", ref + "^{commit}"], raiz)
+    return codigo == 0
+
+
+def _contar(raiz, rango):
+    codigo, lineas = _git_leer(["rev-list", "--count", rango], raiz)
+    try:
+        return int(lineas[0]) if codigo == 0 and lineas else None
+    except ValueError:
+        return None
+
+
+def rama_por_omision(raiz):
+    """Rama por omisión del REMOTO (origin/HEAD; si no está, origin/main u origin/master). None si no se sabe."""
+    codigo, lineas = _git_leer(["symbolic-ref", "--quiet", "--short", f"refs/remotes/{REMOTO_GIT}/HEAD"], raiz)
+    prefijo = REMOTO_GIT + "/"
+    if codigo == 0 and lineas and lineas[0].startswith(prefijo):
+        nombre = lineas[0][len(prefijo):]
+        if _RAMA.match(nombre) and not nombre.startswith("-") and _ref_existe(raiz, f"refs/remotes/{REMOTO_GIT}/{nombre}"):
+            return nombre
+    for nombre in RAMAS_PROTEGIDAS:
+        if _ref_existe(raiz, f"refs/remotes/{REMOTO_GIT}/{nombre}"):
+            return nombre
+    return None
+
+
+def _estado_corto(xy):
+    if xy == "??":
+        return "??"
+    if "U" in xy or xy in ("AA", "DD"):
+        return "U"
+    x, y = xy[0], xy[1]
+    return x if x not in " ?" else y
+
+
+def estado_archivos(raiz):
+    """Salida actual de `git status --porcelain=v1 -z -uall`: [{"ruta", "estado", "original"}] (None si git falla).
+    `ruta` es relativa a la raíz del repo y se usa tal cual como lista blanca del commit. En renombres `original` es el
+    nombre anterior. Con -z los nombres con espacios o acentos llegan sin comillas ni escapes."""
+    codigo, salida, _ = _git_ejecutar(["status", "--porcelain=v1", "-z", "--untracked-files=all"], raiz)
+    if codigo != 0:
+        return None
+    campos = salida.decode("utf-8", errors="replace").split("\0")
+    entradas, i = [], 0
+    while i < len(campos):
+        c = campos[i]
+        i += 1
+        if len(c) < 4 or c[2] != " ":
+            continue
+        xy, ruta = c[:2], c[3:]
+        original = None
+        if "R" in xy or "C" in xy:
+            original = campos[i] if i < len(campos) else None
+            i += 1
+        entradas.append({"ruta": ruta, "estado": _estado_corto(xy), "original": original})
+    return entradas
+
+
+def tipo_de_rama(rama):
+    """(tipo, alcance) del mensaje propuesto según el prefijo de la rama. Sin IA: solo la plantilla."""
+    if not rama:
+        return "chore", None
+    prefijo = rama.split("/", 1)[0].lower() if "/" in rama else ""
+    if prefijo in ("fix", "feat", "docs"):
+        return prefijo, None
+    m = _RE_ELEMENTO.match(rama)
+    if m:
+        return "wip", m.group(0).lower()
+    return "chore", None
+
+
+def describir_cambios(entradas):
+    """Resumen corto de los archivos para el mensaje propuesto ('actualiza 3 archivos (a, b y c)')."""
+    if not entradas:
+        return ""
+    estados = {e["estado"] for e in entradas}
+    verbo = "agrega" if estados <= {"A", "??"} else "elimina" if estados == {"D"} else "actualiza"
+    nombres = [os.path.basename(e["ruta"].rstrip("/")) or e["ruta"] for e in entradas]
+    nombres = [n if len(n) <= 40 else n[:39] + "…" for n in nombres]
+    if len(nombres) == 1:
+        return f"{verbo} {nombres[0]}"
+    base = f"{verbo} {len(nombres)} archivos"
+    resto = len(nombres) - 3
+    detalle = ", ".join(nombres[:3]) + (f" y {resto} más" if resto > 0 else "")
+    texto = f"{base} ({detalle})"
+    return texto if len(texto) <= 70 else base
+
+
+def proponer_mensaje(rama, entradas):
+    """Mensaje de commit propuesto (editable por el usuario): `tipo(alcance): resumen`."""
+    descripcion = describir_cambios(entradas)
+    if not descripcion:
+        return ""
+    tipo, alcance = tipo_de_rama(rama)
+    return f"{tipo}{f'({alcance})' if alcance else ''}: {descripcion}"
+
+
+def validar_mensaje_commit(mensaje):
+    """Conventional commits: `tipo(alcance opcional)!?: descripción`, tipos estándar y `wip`. Devuelve el mensaje
+    normalizado o ValueError con el motivo. Nunca se admite una atribución de IA ni `Co-Authored-By`."""
+    if not isinstance(mensaje, str):
+        raise ValueError("El mensaje del commit debe ser texto.")
+    texto = mensaje.replace("\r\n", "\n").replace("\r", "\n").strip()
+    if not texto:
+        raise ValueError("El mensaje del commit no puede estar vacío.")
+    if len(texto) > MAX_MENSAJE_COMMIT:
+        raise ValueError(f"El mensaje del commit es demasiado largo (máximo {MAX_MENSAJE_COMMIT} caracteres).")
+    if _RE_CONTROL_COMMIT.search(texto):
+        raise ValueError("El mensaje del commit tiene caracteres de control.")
+    lineas = texto.split("\n")
+    primera = lineas[0].rstrip()
+    if len(primera) > MAX_PRIMERA_LINEA:
+        raise ValueError(f"La primera línea mide {len(primera)} caracteres; el máximo es {MAX_PRIMERA_LINEA}.")
+    m = _RE_COMMIT.match(primera)
+    if not m:
+        raise ValueError("La primera línea debe ser «tipo(alcance opcional): descripción» con un tipo de: "
+                         + ", ".join(TIPOS_COMMIT) + ".")
+    if len(m.group(4).strip()) < 3:
+        raise ValueError("La descripción de la primera línea es demasiado corta.")
+    if len(lineas) > 1 and lineas[1].strip():
+        raise ValueError("Deja una línea en blanco entre la primera línea y el cuerpo del mensaje.")
+    if _RE_ATRIBUCION.search(texto):
+        raise ValueError("Los commits de este repo no llevan «Co-Authored-By» ni atribución de IA.")
+    return "\n".join([primera, *lineas[1:]]) + "\n"
+
+
+def _es_archivo_secreto(ruta):
+    n = os.path.basename(ruta).lower()
+    if n.startswith(".env"):
+        return not n.endswith(_SUFIJOS_EJEMPLO)
+    return n in _SECRETOS_COMMIT or n.endswith(_EXT_SECRETOS_COMMIT)
+
+
+def validar_rutas_commit(archivos):
+    """Forma de la lista de archivos del commit (la lista blanca de verdad es `git status`, ver `git_commit`)."""
+    if not isinstance(archivos, list) or not archivos:
+        raise ValueError("Elige al menos un archivo para el commit.")
+    if len(archivos) > MAX_ARCHIVOS_COMMIT:
+        raise ValueError(f"Demasiados archivos (máximo {MAX_ARCHIVOS_COMMIT} por commit).")
+    vistas = []
+    for r in archivos:
+        if not isinstance(r, str) or not r or len(r) > MAX_RUTA_GIT or _RE_CONTROL_COMMIT.search(r) or "\n" in r:
+            raise ValueError("Ruta de archivo inválida.")
+        if es_ruta_absoluta(r) or r.startswith(("\\", "~")) or re.match(r"^[A-Za-z]:", r):
+            raise ValueError(f"Solo se aceptan rutas relativas al repo: {corto(r, 80)}")
+        if ".." in re.split(r"[\\/]", r):
+            raise ValueError(f"No se aceptan rutas con «..»: {corto(r, 80)}")
+        if r not in vistas:
+            vistas.append(r)
+    return vistas
+
+
+def buscar_gitleaks():
+    """Binario nativo de gitleaks: primero el PATH y luego las rutas típicas de winget (mismo criterio que
+    scripts/gitleaks_archivos.py). None si no está."""
+    en_path = shutil.which("gitleaks")
+    if en_path:
+        return en_path
+    local = os.environ.get("LOCALAPPDATA")
+    if not local:
+        return None
+    winget = Path(local) / "Microsoft" / "WinGet"
+    candidatos = [winget / "Links" / "gitleaks.exe", *sorted((winget / "Packages").glob("Gitleaks.Gitleaks_*/gitleaks.exe"))]
+    return next((str(c) for c in candidatos if c.is_file()), None)
+
+
+def escanear_gitleaks(raiz, rutas):
+    """gitleaks sobre lo que se va a commitear: copia a una carpeta temporal el contenido ACTUAL de esos archivos y
+    corre `gitleaks dir` (como scripts/gitleaks_archivos.py). Distingue 'limpio' (código 0), 'hallazgos' (código 1) y
+    'no_disponible' (sin binario o la herramienta falló: no es un escaneo bueno, no se commitea)."""
+    exe = buscar_gitleaks()
+    if not exe:
+        return {"estado": "no_disponible", "detalle": "No encuentro gitleaks. " + COMO_INSTALAR_GITLEAKS}
+    with tempfile.TemporaryDirectory(prefix="panel_gitleaks_") as t:
+        copia, informe = Path(t) / "repo", Path(t) / "informe.json"
+        copia.mkdir()
+        copiados = 0
+        for r in rutas:
+            origen = Path(raiz) / r
+            try:
+                if origen.is_symlink() or not origen.is_file():
+                    continue  # borrados, carpetas (submódulos) y enlaces: no hay contenido propio que escanear
+                destino = copia / r
+                destino.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(ruta_os(origen), ruta_os(destino))
+                copiados += 1
+            except OSError as e:
+                return {"estado": "no_disponible", "detalle": f"No se pudo preparar el escaneo ({type(e).__name__})."}
+        if not copiados:
+            return {"estado": "limpio", "archivos": 0}
+        cmd = [exe, "dir", str(copia), "--no-banner", "--redact", "--report-format", "json", "--report-path", str(informe)]
+        config = Path(raiz) / ".gitleaks.toml"
+        if config.is_file():
+            cmd += ["--config", str(config)]
+        try:
+            r = subprocess.run(cmd, capture_output=True, timeout=GITLEAKS_TIMEOUT, creationflags=_sin_ventana())
+        except (OSError, subprocess.TimeoutExpired) as e:
+            return {"estado": "no_disponible", "detalle": f"gitleaks no pudo correr ({type(e).__name__})."}
+        if r.returncode == 0:
+            return {"estado": "limpio", "archivos": copiados}
+        if r.returncode == 1:
+            hallazgos = []
+            try:
+                for h in json.loads(informe.read_text(encoding="utf-8")) or []:
+                    archivo = os.path.relpath(h.get("File", ""), copia).replace("\\", "/") if h.get("File") else "?"
+                    hallazgos.append({"regla": str(h.get("RuleID", "?"))[:60], "archivo": archivo[:200],
+                                      "linea": h.get("StartLine") if isinstance(h.get("StartLine"), int) else None})
+            except (OSError, ValueError, AttributeError):
+                pass
+            return {"estado": "hallazgos", "hallazgos": hallazgos[:MAX_HALLAZGOS], "total": max(len(hallazgos), 1)}
+        return {"estado": "no_disponible", "detalle": f"gitleaks falló (código {r.returncode}) sin informar hallazgos; "
+                                                     "el escaneo no cuenta como bueno."}
+
+
+def _url_remoto(raiz):
+    codigo, lineas = _git_leer(["remote", "get-url", "--push", REMOTO_GIT], raiz)
+    return lineas[0] if codigo == 0 and lineas else None
+
+
+def analizar_url_remoto(url):
+    """(usuario, host) de una URL https del remoto; (None, None) si no es https. Solo el usuario: la clave o el token
+    que pudiera traer la URL jamás se conserva ni se muestra."""
+    m = _RE_URL_HTTPS.match(url or "")
+    return (m.group("usuario"), m.group("host").lower()) if m else (None, None)
+
+
+def verificar_cuenta_push(pid, p, raiz):
+    """Comprueba con qué cuenta saldría el push. -> (fallo, advertencia): `fallo` es None o (código, respuesta) con lo
+    que hay que hacer (bloquea); `advertencia` es un texto cuando la cuenta NO se pudo determinar (no bloquea: el modal
+    de confirmación la muestra). No cambia nada: reusa los endpoints de cuenta del panel (`accion`).
+
+    Con Git Credential Manager (`manager`) la cuenta activa de gh NO decide con qué cuenta sale el push: se verifica el
+    usuario de la URL del remoto o el `credential.username` del repo y, si no hay ninguno, solo se advierte. Con el helper
+    de gh sí manda la cuenta activa de gh (o el usuario del repo) y se exige el login."""
+    cuenta = (p["repositorio"] or {}).get("cuenta")
+    if not cuenta:
+        return None, ("El proyecto no tiene cuenta de GitHub asignada en el registro: no se puede comprobar con qué "
+                      "cuenta saldría el push.")
+    usuario_url, host = analizar_url_remoto(_url_remoto(raiz))
+    if host != GH_HOST:
+        return None, (f"El remoto {REMOTO_GIT} no es https://{GH_HOST}/…: no se pudo comprobar con qué cuenta saldría "
+                      "el push.")
+    cred = credencial_repo(pid)
+    es_gh = cred["modo"] == "gh"
+    origen, efectiva = "url", usuario_url
+    if not efectiva:
+        origen, efectiva = "repo", cred["usuario"]
+    gh = None
+    if es_gh:
+        gh = estado_gh()
+        if not efectiva:
+            origen = "gh"
+            if not gh["disponible"]:
+                return (503, {"ok": False, "error": gh["error"] or "GitHub CLI no disponible."}), None
+            efectiva = gh["activa"]
+    if not efectiva:
+        return None, (f"No se pudo determinar con qué cuenta saldría el push (el helper de credenciales es "
+                      f"«{cred['modo']}» y ni la URL del remoto ni el repo fijan un usuario). Debería ser {cuenta}; "
+                      f"si quieres asegurarlo, fija {cuenta} para este repo (bloque GitHub).")
+    if efectiva.lower() != cuenta.lower():
+        r = {"ok": False, "cuenta": cuenta, "efectiva": efectiva}
+        if origen == "gh":
+            r.update(requiere_cambio_cuenta=True, accion={"ruta": "/api/github/cuenta", "cuerpo": {"cuenta": cuenta}},
+                     error=f"El push saldría con la cuenta activa de gh ({efectiva}), pero el proyecto usa {cuenta}. "
+                           f"Cambia la cuenta activa a {cuenta} (bloque GitHub) y vuelve a intentarlo.")
+        elif origen == "repo":
+            r.update(requiere_cuenta_repo=True, accion={"ruta": "/api/proyecto/credencial", "cuerpo": {"proyecto": pid, "cuenta": cuenta}},
+                     error=f"El repo tiene fijada la cuenta {efectiva}, pero el proyecto usa {cuenta}. "
+                           f"Fija {cuenta} para este repo (bloque GitHub) y vuelve a intentarlo.")
+        else:
+            r.update(error=f"La URL del remoto {REMOTO_GIT} trae el usuario {efectiva}, distinto de {cuenta}, la cuenta del "
+                           "proyecto. Corrige el remoto tú en una terminal (el panel no lo cambia).")
+        return (409, r), None
+    if es_gh:
+        if not gh["disponible"]:
+            return (503, {"ok": False, "error": gh["error"] or "GitHub CLI no disponible."}), None
+        en_gh = next((c for c in gh["cuentas"] if c["id"].lower() == cuenta.lower()), None)
+        if en_gh is None or not en_gh["ok"]:
+            return (409, {"ok": False, "requiere_login": True, "cuenta": cuenta, "instruccion": INSTRUCCION_LOGIN,
+                          "error": f"La cuenta {cuenta} no está autenticada en GitHub CLI. Agrégala tú en una terminal "
+                                   f"con «{INSTRUCCION_LOGIN}» (inicia sesión como {cuenta}) y vuelve a intentarlo."}), None
+    return None, None
+
+
+def _ultima_consulta(raiz):
+    codigo, lineas = _git_leer(["rev-parse", "--git-path", "FETCH_HEAD"], raiz)
+    if codigo != 0 or not lineas:
+        return None
+    try:
+        return datetime.fromtimestamp(os.stat(os.path.join(raiz, lineas[0])).st_mtime).astimezone().isoformat(timespec="seconds")
+    except OSError:
+        return None
+
+
+def _git_fetch(pid, raiz):
+    """`git fetch origin` con timeout, solo bajo petición. En simulación no se ejecuta."""
+    if ESTADO["simular"]:
+        return {"hecho": False, "simulado": True, "comando": _comando_visible(["git", "fetch", "--quiet", REMOTO_GIT])}
+    c = candado("git-" + pid)
+    if not c.acquire(blocking=False):
+        return {"hecho": False, "error": "Hay otra operación de git en curso."}
+    try:
+        codigo, _, err = _git_ejecutar(["fetch", "--quiet", REMOTO_GIT], raiz, timeout=GIT_FETCH_TIMEOUT)
+    finally:
+        c.release()
+    log(f"git fetch {pid} -> {codigo}" + ("" if codigo == 0 else f" ({_limpiar_salida_git(err, 200) or 'sin detalle'})"))
+    return {"hecho": codigo == 0, "error": None if codigo == 0 else _limpiar_salida_git(err, 300) or "git fetch falló."}
+
+
+def _ramas_pendientes(raiz, defecto, actual):
+    """Ramas locales con commits que NO están en origin/<rama por omisión> (el REMOTO, no el main local)."""
+    if not defecto:
+        return []
+    base = f"refs/remotes/{REMOTO_GIT}/{defecto}"
+    codigo, refs = _git_leer(["for-each-ref", "--format=%(refname:short)", "refs/heads"], raiz)
+    if codigo != 0:
+        return []
+    ramas = []
+    for nombre in refs:
+        if len(ramas) >= MAX_RAMAS_PENDIENTES:
+            break
+        if not _RAMA.match(nombre) or nombre.startswith("-"):
+            continue
+        total = _contar(raiz, f"{base}..refs/heads/{nombre}")
+        if not total:
+            continue
+        _, log_lineas = _git_leer(["log", "-n", str(MAX_COMMITS_POR_RAMA), "--format=%h%x1f%cs%x1f%s",
+                                   f"{base}..refs/heads/{nombre}"], raiz)
+        commits = []
+        for linea in log_lineas:
+            h, _, resto = linea.partition("\x1f")
+            fecha, _, asunto = resto.partition("\x1f")
+            commits.append({"hash": h, "fecha": fecha, "asunto": corto(asunto, 200)})
+        remoto = _ref_existe(raiz, f"refs/remotes/{REMOTO_GIT}/{nombre}")
+        sin_subir = _contar(raiz, f"refs/remotes/{REMOTO_GIT}/{nombre}..refs/heads/{nombre}") if remoto else total
+        ramas.append({"rama": nombre, "actual": nombre == actual, "total": total, "commits": commits,
+                      "remoto": remoto, "sin_subir": sin_subir})
+    return ramas
+
+
+def estado_git(pid, actualizar=False):
+    """Pendientes de git de un proyecto (solo lectura; `actualizar` hace un `git fetch` acotado). KeyError si el
+    proyecto no existe."""
+    reg = registro()
+    if pid not in reg["por_id"]:
+        raise KeyError(pid)
+    p = reg["por_id"][pid]
+    base = {"ok": True, "proyecto": pid, "es_repo": False, "motivo": None, "simulacion": ESTADO["simular"],
+            "cuenta": (p["repositorio"] or {}).get("cuenta"),
+            "commit": {"visible": False, "habilitado": False, "motivo": None},
+            "push": {"visible": False, "habilitado": False, "motivo": None}}
+    raiz, motivo = _raiz_repo(p)
+    if not raiz:
+        return {**base, "motivo": motivo}
+    fetch = _git_fetch(pid, raiz) if actualizar else None
+    rama = _rama_actual(raiz)
+    _, cabeza_ok = _git_leer(["rev-parse", "--verify", "--quiet", "HEAD"], raiz)
+    codigo_remotos, remotos = _git_leer(["remote"], raiz)
+    hay_origen = codigo_remotos == 0 and REMOTO_GIT in remotos
+    defecto = rama_por_omision(raiz) if hay_origen else None
+    codigo_up, up = _git_leer(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"], raiz)
+    upstream = up[0] if codigo_up == 0 and up else None
+    adelante = atras = None
+    if upstream:
+        codigo_n, n = _git_leer(["rev-list", "--left-right", "--count", "@{upstream}...HEAD"], raiz)
+        partes = n[0].split() if codigo_n == 0 and n else []
+        if len(partes) == 2 and all(x.isdigit() for x in partes):
+            atras, adelante = int(partes[0]), int(partes[1])
+    # Commits de la rama actual que el remoto no tiene (con upstream: adelante; sin él: contra origin/<rama> o, si
+    # nunca se subió, contra origin/<rama por omisión>).
+    if adelante is not None:
+        sin_subir = adelante
+    elif rama and hay_origen and _ref_existe(raiz, f"refs/remotes/{REMOTO_GIT}/{rama}"):
+        sin_subir = _contar(raiz, f"refs/remotes/{REMOTO_GIT}/{rama}..HEAD")
+    elif defecto and cabeza_ok:
+        sin_subir = _contar(raiz, f"refs/remotes/{REMOTO_GIT}/{defecto}..HEAD")
+    else:
+        sin_subir = None
+    entradas = estado_archivos(raiz)
+    _, stashes = _git_leer(["stash", "list"], raiz)
+    protegida = bool(rama) and (rama in RAMAS_PROTEGIDAS or rama == defecto)
+    archivos = (entradas or [])[:MAX_ARCHIVOS_VISTA]
+    commit = {"visible": True, "habilitado": bool(entradas) and bool(rama), "motivo": None}
+    if not rama:
+        commit["motivo"] = "HEAD está desacoplado (sin rama): crea o cambia a una rama antes de commitear."
+    elif entradas is None:
+        commit.update(habilitado=False, motivo="No se pudo leer el estado del repo.")
+    elif not entradas:
+        commit["motivo"] = "No hay archivos con cambios."
+    push = {"visible": bool(rama) and not protegida, "habilitado": False, "motivo": None}
+    if protegida:
+        push["motivo"] = (f"Push bloqueado en {rama}: se trabaja en una rama aparte y se integra con un PR.")
+    elif not rama:
+        push["motivo"] = "HEAD está desacoplado (sin rama)."
+    elif not hay_origen:
+        push["motivo"] = f"El repo no tiene remoto «{REMOTO_GIT}»."
+    elif not cabeza_ok:
+        push["motivo"] = "La rama todavía no tiene commits."
+    elif sin_subir == 0:
+        push["motivo"] = "No hay commits sin subir en esta rama."
+    else:
+        push["habilitado"] = True
+        fallo, advertencia = verificar_cuenta_push(pid, p, raiz)
+        push["cuenta"] = ({"estado": "bloqueada", "mensaje": fallo[1]["error"], "accion": fallo[1].get("accion"),
+                           "requiere_login": bool(fallo[1].get("requiere_login")),
+                           "instruccion": fallo[1].get("instruccion")} if fallo
+                          else {"estado": "advertencia", "mensaje": advertencia} if advertencia else {"estado": "ok"})
+    return {**base, "es_repo": True, "raiz": raiz, "rama": rama, "protegida": protegida, "rama_por_omision": defecto,
+            "remoto": REMOTO_GIT if hay_origen else None, "upstream": upstream, "adelante": adelante, "atras": atras,
+            "sin_subir": sin_subir, "archivos": archivos, "archivos_total": len(entradas or []),
+            "ramas": _ramas_pendientes(raiz, defecto, rama) if hay_origen else [], "stashes": len(stashes),
+            "ultima_consulta": _ultima_consulta(raiz), "fetch": fetch, "commit": commit, "push": push,
+            "mensaje_propuesto": proponer_mensaje(rama, entradas or []),
+            "aviso": (f"Estás en {rama}: puedes commitear en local, pero el push está bloqueado. Crea una rama de trabajo."
+                      if protegida else None)}
+
+
+def _p_git(pid):
+    reg = registro()
+    if pid not in reg["por_id"]:
+        raise KeyError(pid)
+    return reg["por_id"][pid]
+
+
+def git_commit(pid, archivos, mensaje):
+    """Commit LOCAL de los archivos elegidos. Orden: validar mensaje y rutas → lista blanca contra `git status` del
+    momento → (simulación: se detiene aquí) → gitleaks sobre esos archivos → `git add` → `git commit`. Si gitleaks no
+    está disponible o encuentra algo, no se toca el índice. -> (código HTTP, respuesta)."""
+    p = _p_git(pid)
+    raiz, motivo = _raiz_repo(p)
+    if not raiz:
+        return 400, {"ok": False, "error": motivo}
+    texto = validar_mensaje_commit(mensaje)
+    rutas = validar_rutas_commit(archivos)
+    c = candado("git-" + pid)
+    if not c.acquire(blocking=False):
+        return 409, {"ok": False, "error": "Ya hay una operación de git en curso para este proyecto."}
+    try:
+        rama = _rama_actual(raiz)
+        if not rama:
+            return 409, {"ok": False, "error": "HEAD está desacoplado (sin rama): cambia a una rama antes de commitear."}
+        entradas = estado_archivos(raiz)
+        if entradas is None:
+            return 500, {"ok": False, "error": "No se pudo leer el estado del repo (git status falló)."}
+        permitidas = {e["ruta"]: e for e in entradas}
+        fuera = [r for r in rutas if r not in permitidas]
+        if fuera:
+            return 400, {"ok": False, "rechazadas": [corto(r, 120) for r in fuera[:20]],
+                         "error": "Estas rutas no están en los cambios actuales del repo (puede que ya cambiaron): "
+                                  + ", ".join(corto(r, 80) for r in fuera[:5]) + ". Actualiza la lista y vuelve a elegir."}
+        elegidas = [permitidas[r] for r in rutas]
+        sin_resolver = [e["ruta"] for e in elegidas if e["estado"] == "U"]
+        if sin_resolver:
+            return 409, {"ok": False, "error": "Hay archivos con conflicto sin resolver: " + ", ".join(sin_resolver[:5])}
+        secretos = [e["ruta"] for e in elegidas if _es_archivo_secreto(e["ruta"])]
+        if secretos:
+            return 409, {"ok": False, "error": "Estos archivos parecen credenciales y no se commitean desde el panel: "
+                                               + ", ".join(secretos[:5]) + ". Desmárcalos (o agrégalos al .gitignore)."}
+        # Un renombre se commitea completo: el nombre anterior viaja en la misma lista de rutas (viene de git status).
+        pathspecs = list(rutas)
+        for e in elegidas:
+            if e["original"] and e["original"] not in pathspecs:
+                pathspecs.append(e["original"])
+        comandos = [_comando_visible(["git", "add", "-A", "--", *pathspecs[:6], *(["…"] if len(pathspecs) > 6 else [])]),
+                    _comando_visible(["git", "commit", "--only", "-F", "-", "--", *pathspecs[:6], *(["…"] if len(pathspecs) > 6 else [])])]
+        if ESTADO["simular"]:
+            log(f"git commit {pid} {len(rutas)} archivos (simulación)")
+            return 200, {"ok": True, "simulado": True, "cambio": False, "rama": rama, "archivos": rutas,
+                         "mensaje": texto.strip(), "gitleaks_disponible": buscar_gitleaks() is not None,
+                         "comandos": ["gitleaks dir <copia de los archivos elegidos> --redact", *comandos],
+                         "aviso": "Simulación: no se escaneó ni se ejecutó nada."}
+        codigo_n, _ = _git_leer(["config", "user.name"], raiz)
+        codigo_e, _ = _git_leer(["config", "user.email"], raiz)
+        if codigo_n != 0 or codigo_e != 0:
+            return 409, {"ok": False, "error": "git no tiene user.name o user.email configurados; configúralos antes de commitear."}
+        escaneo = escanear_gitleaks(raiz, rutas)
+        if escaneo["estado"] == "no_disponible":
+            log(f"git commit {pid}: gitleaks no disponible, no se commitea")
+            return 503, {"ok": False, "gitleaks": "no_disponible",
+                         "error": "gitleaks no está disponible, así que NO se hizo el commit (sin escaneo no se commitea). "
+                                  + escaneo["detalle"]}
+        if escaneo["estado"] == "hallazgos":
+            log(f"git commit {pid}: gitleaks encontró {escaneo['total']} hallazgo(s), no se commitea")
+            return 422, {"ok": False, "gitleaks": "hallazgos", "hallazgos": escaneo["hallazgos"],
+                         "error": f"gitleaks encontró {escaneo['total']} posible(s) secreto(s) en los archivos elegidos; "
+                                  "NO se hizo el commit. Quita el secreto (o desmarca el archivo) y vuelve a intentarlo."}
+        codigo, _, err = _git_ejecutar(["add", "-A", "--", *rutas], raiz, timeout=GIT_ESCRITURA_TIMEOUT)
+        if codigo != 0:
+            log(f"git add {pid} falló ({codigo})")
+            return 500, {"ok": False, "error": "git add falló: " + (_limpiar_salida_git(err, 500) or str(codigo))}
+        codigo, salida, err = _git_ejecutar(["commit", "--only", "-F", "-", "--", *pathspecs], raiz,
+                                            timeout=GIT_ESCRITURA_TIMEOUT, entrada=texto.encode("utf-8"))
+        if codigo != 0:
+            detalle = _limpiar_salida_git(err or salida, 600) or str(codigo)
+            log(f"git commit {pid} falló ({codigo})")
+            return 500, {"ok": False, "error": "git commit falló (los archivos quedaron en el índice): " + detalle}
+        _, corto_hash = _git_leer(["rev-parse", "--short", "HEAD"], raiz)
+        hash_corto = corto_hash[0] if corto_hash else None
+        log(f"git commit {pid} {hash_corto} ({len(rutas)} archivos)")
+    finally:
+        c.release()
+    return 200, {"ok": True, "cambio": True, "commit": hash_corto, "rama": rama, "archivos": len(rutas),
+                 "gitleaks": "limpio", "comandos": comandos, "pendientes": estado_git(pid)}
+
+
+def comando_push(rama, con_upstream):
+    """Argumentos de `git push`: `push [-u] origin <rama>`. Nunca `--force` ni refspecs con `+`."""
+    args = ["push", *([] if con_upstream else ["-u"]), REMOTO_GIT, rama]
+    if any(a in ("-f", "--force") or a.startswith("--force") or a.startswith("+") or ":" in a for a in args):
+        raise RuntimeError("Un push forzado nunca es válido en el panel.")
+    return args
+
+
+def git_push(pid, rama):
+    """Push de la rama ACTUAL (HEAD) a origin, con confirmación previa en la UI. Bloqueado en main/master y en la rama
+    por omisión del remoto; verifica la cuenta antes y jamás fuerza. -> (código HTTP, respuesta)."""
+    p = _p_git(pid)
+    raiz, motivo = _raiz_repo(p)
+    if not raiz:
+        return 400, {"ok": False, "error": motivo}
+    if not isinstance(rama, str) or not _RAMA.match(rama) or rama.startswith("-"):
+        raise ValueError("Rama inválida.")
+    c = candado("git-" + pid)
+    if not c.acquire(blocking=False):
+        return 409, {"ok": False, "error": "Ya hay una operación de git en curso para este proyecto."}
+    try:
+        actual = _rama_actual(raiz)
+        if not actual:
+            return 409, {"ok": False, "error": "HEAD está desacoplado (sin rama): no hay nada que subir."}
+        if rama != actual:
+            return 409, {"ok": False, "error": f"Solo se sube la rama actual ({actual}); se pidió {rama}. Actualiza la vista."}
+        codigo_r, remotos = _git_leer(["remote"], raiz)
+        if codigo_r != 0 or REMOTO_GIT not in remotos:
+            return 409, {"ok": False, "error": f"El repo no tiene remoto «{REMOTO_GIT}»."}
+        defecto = rama_por_omision(raiz)
+        if rama in RAMAS_PROTEGIDAS or rama == defecto:
+            log(f"git push {pid} {rama}: bloqueado (rama protegida)")
+            return 409, {"ok": False, "bloqueada": True,
+                         "error": f"Push bloqueado en {rama}: es una rama principal. Trabaja en una rama aparte "
+                                  "(por ejemplo feat/…) y súbela; se integra a main con un pull request."}
+        if not _ref_existe(raiz, "HEAD"):
+            return 409, {"ok": False, "error": "La rama todavía no tiene commits."}
+        fallo, advertencia = verificar_cuenta_push(pid, p, raiz)
+        if fallo:
+            log(f"git push {pid} {rama}: cuenta no coincide o sin login ({fallo[0]})")
+            return fallo
+        codigo_up, _ = _git_leer(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"], raiz)
+        args = comando_push(rama, codigo_up == 0)
+        visible = _comando_visible(["git", *args])
+        if ESTADO["simular"]:
+            log(f"git push {pid} {rama} (simulación)")
+            return 200, {"ok": True, "simulado": True, "cambio": False, "rama": rama, "comandos": [visible],
+                         "advertencia": advertencia, "mensaje": "Simulación: no se ejecutó nada."}
+        codigo, salida, err = _git_ejecutar(args, raiz, timeout=GIT_PUSH_TIMEOUT)
+        texto = _limpiar_salida_git((err + b"\n" + salida) if err else salida, 1000)
+        log(f"git push {pid} {rama} -> {codigo}")
+        if codigo != 0:
+            return 500, {"ok": False, "rama": rama, "comandos": [visible],
+                         "error": "git push falló: " + (texto or str(codigo)), "salida": texto}
+    finally:
+        c.release()
+    return 200, {"ok": True, "cambio": True, "rama": rama, "comandos": [visible], "salida": texto,
+                 "advertencia": advertencia, "pendientes": estado_git(pid)}
 
 
 # ---------------------------------------------------------------- historial de Levantar/Apagar (persistente)
@@ -4105,6 +4755,13 @@ class Manejador(BaseHTTPRequestHandler):
                     return self._enviar(200, credencial_repo((q.get("id") or [""])[0]))
                 except KeyError:
                     return self._enviar(404, {"ok": False, "error": "Proyecto no encontrado."})
+            if u.path == "/api/proyecto/git":
+                if set(q) - {"id", "actualizar"} or q.get("actualizar", ["1"]) != ["1"]:
+                    return self._enviar(400, {"ok": False, "error": "Solo se aceptan ?id=<proyecto> y, opcional, &actualizar=1."})
+                try:
+                    return self._enviar(200, estado_git((q.get("id") or [""])[0], actualizar="actualizar" in q))
+                except KeyError:
+                    return self._enviar(404, {"ok": False, "error": "Proyecto no encontrado."})
             if u.path == "/api/tokens":
                 if set(q) - {"forzar"} or q.get("forzar", ["1"]) != ["1"]:
                     return self._enviar(400, {"ok": False, "error": "Solo se acepta ?forzar=1."})
@@ -4150,7 +4807,7 @@ class Manejador(BaseHTTPRequestHandler):
             return self._rechazar_sin_leer(400, "Content-Length inválido.")
         if u.path == "/api/laboratorio/archivo":
             return self._subir_archivo(largo)
-        if largo > MAX_JSON:
+        if largo > (MAX_JSON_GIT if u.path == "/api/proyecto/git/commit" else MAX_JSON):
             return self._rechazar_sin_leer(413, "Cuerpo demasiado grande.")
         try:
             cuerpo = json.loads(self.rfile.read(largo) or b"{}") if largo else {}
@@ -4176,6 +4833,28 @@ class Manejador(BaseHTTPRequestHandler):
                     codigo, r = usar_cuenta_gh(cuerpo["cuenta"])
                 else:
                     codigo, r = fijar_cuenta_repo(cuerpo["proyecto"], cuerpo["cuenta"])
+            except ErrorRegistro as e:
+                return self._enviar(500, {"ok": False, "error": str(e)})
+            except KeyError:
+                return self._enviar(404, {"ok": False, "error": "Proyecto no encontrado."})
+            except ValueError as e:
+                return self._enviar(400, {"ok": False, "error": str(e)})
+            return self._enviar(codigo, r)
+        if u.path in ("/api/proyecto/git/commit", "/api/proyecto/git/push"):
+            # Lista blanca estricta de claves; las rutas del commit se validan contra `git status` en el momento.
+            es_commit = u.path.endswith("/commit")
+            claves = {"id", "archivos", "mensaje"} if es_commit else {"id", "rama"}
+            if set(cuerpo) != claves or not isinstance(cuerpo["id"], str) or (
+                    es_commit and not (isinstance(cuerpo["archivos"], list) and isinstance(cuerpo["mensaje"], str))) or (
+                    not es_commit and not isinstance(cuerpo["rama"], str)):
+                return self._enviar(400, {"ok": False, "error": "Solo se acepta " + (
+                    '{"id": "proyecto", "archivos": ["ruta"], "mensaje": "tipo: texto"}' if es_commit
+                    else '{"id": "proyecto", "rama": "rama-actual"}') + "."})
+            try:
+                if es_commit:
+                    codigo, r = git_commit(cuerpo["id"], cuerpo["archivos"], cuerpo["mensaje"])
+                else:
+                    codigo, r = git_push(cuerpo["id"], cuerpo["rama"])
             except ErrorRegistro as e:
                 return self._enviar(500, {"ok": False, "error": str(e)})
             except KeyError:
