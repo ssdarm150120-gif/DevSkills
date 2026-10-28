@@ -415,6 +415,22 @@ details.agente[open] > summary::after { transform: rotate(225deg); }
 .github .explica { margin: 12px 0 0; font-size: 12.5px; color: var(--tenue); line-height: 1.5; }
 .github .explica b { color: var(--texto); font-weight: 500; }
 .github .salida { max-height: 140px; }
+.pend-git { padding: 16px 18px; border: 1px solid var(--borde); border-radius: var(--radio-chico); background: rgba(0,0,0,.28); max-width: 860px; margin-bottom: 8px; }
+.pend-git .encabezado { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pend-git .pg-barra { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 16px 0 6px; }
+.pend-git .pg-barra h4 { margin: 0; font-weight: 500; font-size: 14px; }
+.pend-git .pg-archivos { max-height: 220px; overflow: auto; border: 1px solid var(--borde); border-radius: 14px; padding: 6px 10px; background: rgba(255,255,255,.02); }
+.pend-git .pg-archivo { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 13px; cursor: pointer; overflow-wrap: anywhere; }
+.pend-git .pg-estado { font: 600 11px var(--mono); min-width: 24px; text-align: center; padding: 1px 6px; border-radius: 8px; border: 1px solid var(--borde); color: var(--tenue); }
+.pend-git .pg-estado.e-M, .pend-git .pg-estado.e-R { color: var(--ambar); }
+.pend-git .pg-estado.e-A, .pend-git .pg-estado.e-n { color: var(--ok); }
+.pend-git .pg-estado.e-D, .pend-git .pg-estado.e-U { color: var(--rojo); }
+.pend-git textarea { font-family: var(--mono); font-size: 13px; }
+.pend-git .botones { margin-top: 12px; }
+.pend-git .pg-rama { padding: 8px 0; border-bottom: 1px solid var(--borde); }
+.pend-git .pg-commits { margin: 6px 0 0; padding-left: 20px; font-size: 12.5px; }
+.pend-git .salida { max-height: 160px; }
+.pg-modal p { margin: 0 0 12px; }
 .chip.gh-activa { color: var(--ok); background: rgba(var(--ok-rgb), .1); border-color: rgba(var(--ok-rgb), .25); }
 
 /* ---------- inicio: segundo marco con sesiones recientes ---------- */
@@ -1787,11 +1803,15 @@ function vistaProyecto(pid) {
   horasSel.value = leer("panel.horas", "6");
   horasSel.style.width = "auto";
   const enrutamiento = crearEnrutamiento(pid, () => id === rutaVigente);
+  const pendientesGit = crearPendientesGit(pid, () => id === rutaVigente);
   $("vista").replaceChildren(
     el("div", { class: "proyecto-superior" }, cabeza,
       el("section", { class: "columna-servicios", "aria-label": "Servicios" },
         el("div", { class: "fila-seccion" }, el("div", {}, el("span", { class: "etq" }, "Servicios"), el("h2", { class: "seccion" }, "Levantar y apagar")), acciones),
         salidaProyecto, servicios)),
+    el("div", { class: "fila-seccion" }, el("div", {}, el("span", { class: "etq" }, "Git"), el("h2", { class: "seccion" }, "Pendientes de git")),
+      el("span", { class: "extra" }, "Commit local con gitleaks y Push con confirmación; nunca en main ni forzado")),
+    pendientesGit.nodo,
     el("div", { class: "fila-seccion" }, el("div", {}, el("span", { class: "etq" }, "Modelos"), el("h2", { class: "seccion" }, "Enrutamiento de modelos")),
       el("span", { class: "extra" }, "Subagentes con modelo y esfuerzo por rol; se verifica con pruebas y se escala una vez")),
     enrutamiento.nodo,
@@ -1833,6 +1853,168 @@ function vistaProyecto(pid) {
       restaurarSesiones();
     } catch (e) {}
   });
+}
+
+/* ---------- Pendientes de git: Commit (local, con gitleaks) y Push (con confirmación en un modal) ----------
+   El servidor decide todo: aquí solo se muestran los pendientes y se manda la lista de archivos elegidos, el mensaje y
+   la rama actual. Nunca se usa alert()/confirm() del navegador ni innerHTML. */
+const ESTADO_ARCHIVO = { M: "modificado", A: "agregado", D: "borrado", R: "renombrado", C: "copiado", T: "tipo", U: "conflicto", "??": "nuevo" };
+function crearPendientesGit(pid, vigente) {
+  const nodo = el("section", { class: "pend-git", "aria-label": "Pendientes de git" }, el("span", { class: "sub" }, "Consultando git…"));
+  const est = { d: null, sel: new Map(), mensaje: "", editado: false, ocupado: false, salida: "", salidaMal: false, hallazgos: [], accion: null, firma: "" };
+  async function pedir(actualizar) {
+    try {
+      const d = await api("/api/proyecto/git?id=" + encodeURIComponent(pid) + (actualizar ? "&actualizar=1" : ""));
+      if (!vigente()) return;
+      if (d.error && !d.es_repo) { est.d = null; nodo.replaceChildren(el("span", { class: "sub" }, d.error)); return; }
+      est.d = d;
+      const rutas = new Set((d.archivos || []).map((a) => a.ruta));
+      for (const r of [...est.sel.keys()]) if (!rutas.has(r)) est.sel.delete(r);
+      for (const r of rutas) if (!est.sel.has(r)) est.sel.set(r, true);  // los archivos nuevos entran marcados
+      if (!est.editado) est.mensaje = d.mensaje_propuesto || "";
+      if (actualizar && d.fetch) {
+        est.salidaMal = !d.fetch.hecho && !d.fetch.simulado;
+        est.salida = d.fetch.simulado ? "Simulación: no se hizo git fetch." : d.fetch.hecho ? "Se consultó el remoto." : "No se pudo consultar el remoto: " + (d.fetch.error || "");
+      }
+      pintar();
+    } catch (e) {}
+  }
+  const elegidos = () => (est.d.archivos || []).filter((a) => est.sel.get(a.ruta)).map((a) => a.ruta);
+  function pintar(forzar) {
+    const d = est.d;
+    if (!d) return;
+    const enEdicion = nodo.contains(document.activeElement) && ["TEXTAREA", "INPUT"].includes(document.activeElement.tagName);
+    const firma = JSON.stringify([d, [...est.sel], est.mensaje, est.ocupado, est.salida, est.salidaMal, est.hallazgos, est.accion]);
+    if (!forzar && (firma === est.firma || enEdicion)) return;
+    est.firma = firma;
+    if (!d.es_repo) { nodo.replaceChildren(el("div", { class: "encabezado" }, el("span", { class: "etq" }, "Git")), el("span", { class: "sub" }, d.motivo || "La carpeta no es un repositorio git.")); return; }
+    const chips = [
+      el("span", { class: "chip sin-punto" }, d.rama ? "Rama: " + d.rama : "HEAD desacoplado"),
+      d.upstream ? el("span", { class: "chip sin-punto", title: "Rama remota que sigue" }, `${d.upstream} · ↑${d.adelante ?? "?"} ↓${d.atras ?? "?"}`) : el("span", { class: "chip sin-punto" }, "Sin upstream"),
+      d.sin_subir ? el("span", { class: "chip parcial" }, `${d.sin_subir} commit${d.sin_subir === 1 ? "" : "s"} sin push`) : null,
+      d.stashes ? el("span", { class: "chip sin-punto" }, `${d.stashes} stash${d.stashes === 1 ? "" : "es"}`) : null,
+      d.protegida ? el("span", { class: "chip conflicto" }, "Rama protegida") : null].filter(Boolean);
+    const consulta = el("span", { class: "sub" }, d.ultima_consulta ? "Remoto consultado: " + fechaLocal(d.ultima_consulta) : "Remoto sin consultar todavía");
+    const actualizar = el("button", { type: "button", class: "boton mini", disabled: est.ocupado, title: "git fetch origin (con tiempo límite)", onclick: () => pedir(true) }, "Actualizar remoto");
+
+    // Archivos con casillas (todas marcadas por omisión).
+    const marcados = elegidos();
+    const todos = d.archivos || [];
+    const lista = el("div", { class: "pg-archivos seccion-scroll", role: "group", "aria-label": "Archivos sin commit", tabindex: "0" },
+      todos.length ? todos.map((a) => el("label", { class: "pg-archivo" },
+        el("input", { type: "checkbox", checked: est.sel.get(a.ruta) ? true : null, disabled: est.ocupado || a.estado === "U",
+          onchange: (e) => { est.sel.set(a.ruta, e.target.checked); pintar(true); } }),
+        el("span", { class: "pg-estado e-" + (a.estado === "??" ? "n" : a.estado), title: ESTADO_ARCHIVO[a.estado] || a.estado }, a.estado),
+        el("span", { class: "mono" }, a.original ? `${a.original} → ${a.ruta}` : a.ruta)))
+        : el("span", { class: "sub" }, "No hay archivos con cambios."));
+    const masArchivos = d.archivos_total > todos.length ? el("span", { class: "sub" }, `Se muestran ${todos.length} de ${d.archivos_total} archivos.`) : null;
+    const todosMarcados = todos.length && marcados.length === todos.length;
+    const alternar = el("button", { type: "button", class: "boton mini", disabled: est.ocupado || !todos.length,
+      onclick: () => { for (const a of todos) est.sel.set(a.ruta, !todosMarcados && a.estado !== "U"); pintar(true); } }, todosMarcados ? "Desmarcar todo" : "Marcar todo");
+
+    const msg = el("textarea", { id: "pg-mensaje-" + pid, rows: "3", "aria-label": "Mensaje del commit (conventional commits)", maxlength: "4000", disabled: est.ocupado,
+      placeholder: "tipo(alcance opcional): descripción" });
+    msg.value = est.mensaje;
+    msg.addEventListener("input", () => { est.mensaje = msg.value; est.editado = true; });
+    const reproponer = el("button", { type: "button", class: "boton mini", disabled: est.ocupado || !d.mensaje_propuesto,
+      onclick: () => { est.mensaje = d.mensaje_propuesto; est.editado = false; pintar(true); } }, "Proponer de nuevo");
+
+    const bCommit = el("button", { type: "button", class: "boton", disabled: est.ocupado || !d.commit.habilitado || !marcados.length || !est.mensaje.trim(),
+      title: d.commit.motivo || "Commit local de los archivos marcados; antes corre gitleaks sobre ellos", onclick: () => commit(marcados) },
+      `Commit (${marcados.length})`);
+    const bPush = d.push.visible ? el("button", { type: "button", class: "boton", disabled: est.ocupado || !d.push.habilitado,
+      title: d.push.motivo || "Sube la rama actual a origin (pide confirmación)", onclick: () => confirmarPush() }, "Push…") : null;
+
+    // Ramas locales con commits que no están en origin/<rama por omisión> (comparado contra el remoto).
+    const ramas = d.ramas || [];
+    const detalle = plegable("git-ramas-" + pid, "Ramas con commits sin integrar", { abierto: false });
+    detalle.contar(String(ramas.length));
+    detalle.cuerpo.replaceChildren(ramas.length ? ramas.map((r) => el("div", { class: "pg-rama" },
+      el("div", { class: "estados" },
+        el("b", { class: "mono" }, r.rama), r.actual ? el("span", { class: "chip sin-punto" }, "actual") : null,
+        el("span", { class: "chip " + (r.remoto ? "sin-punto" : "parcial") }, r.remoto ? (r.sin_subir ? `en remoto · ${r.sin_subir} sin subir` : "en remoto · al día") : "solo local"),
+        el("span", { class: "sub" }, `${r.total} commit${r.total === 1 ? "" : "s"} fuera de origin/${d.rama_por_omision}`)),
+      el("ul", { class: "pg-commits" }, r.commits.map((c) => el("li", {}, el("span", { class: "mono" }, c.hash), " ", el("span", { class: "sub" }, c.fecha), " ", c.asunto)))))
+      : el("span", { class: "sub" }, d.rama_por_omision ? `Ninguna rama local tiene commits fuera de origin/${d.rama_por_omision}.` : "No se conoce la rama por omisión del remoto (haz «Actualizar remoto»)."));
+
+    nodo.replaceChildren(...[
+      el("div", { class: "encabezado" }, el("span", { class: "etq" }, "Git"), el("div", { class: "estados" }, chips), consulta, actualizar),
+      d.aviso ? el("div", { class: "aviso", style: "margin:12px 0 0" }, d.aviso) : null,
+      el("div", { class: "pg-barra" }, el("h4", {}, `Archivos sin commit (${d.archivos_total})`), alternar),
+      lista, masArchivos,
+      el("div", { class: "pg-barra" }, el("h4", {}, "Mensaje del commit"), reproponer),
+      msg,
+      el("div", { class: "botones" }, bCommit, bPush,
+        d.push.visible ? null : el("span", { class: "sub" }, d.push.motivo || "")),
+      d.push.visible && !d.push.habilitado && d.push.motivo ? el("span", { class: "sub" }, d.push.motivo) : null,
+      est.hallazgos.length ? el("div", { class: "aviso mal", style: "margin:12px 0 0" }, el("strong", {}, "gitleaks encontró: "),
+        el("ul", { style: "margin:6px 0 0; padding-left:20px" }, est.hallazgos.map((h) => el("li", {}, `${h.archivo}${h.linea ? ":" + h.linea : ""} · ${h.regla}`)))) : null,
+      detalle.nodo,
+      el("div", { class: "salida", role: "log", "aria-live": "polite", style: est.salidaMal ? "color:#ffd2cb" : null }, est.salida)].filter(Boolean));
+  }
+  function mostrar(r) {
+    est.salidaMal = !r.ok;
+    est.hallazgos = r.hallazgos || [];
+    const lineas = [];
+    if (r.simulado) lineas.push("Simulación: no se ejecutó nada. Esto haría:");
+    if (r.comandos) lineas.push(...r.comandos);
+    if (r.ok && !r.simulado) lineas.push(r.commit ? `Commit ${r.commit} creado en ${r.rama} (${r.archivos} archivo${r.archivos === 1 ? "" : "s"}; gitleaks limpio).` : `Rama ${r.rama} subida.`);
+    if (r.advertencia) lineas.push("Aviso: " + r.advertencia);
+    if (r.error) lineas.push(r.error);
+    if (r.instruccion) lineas.push(r.instruccion);
+    if (r.salida && !r.ok) lineas.push(r.salida);
+    est.salida = lineas.join("\n") || (r.ok ? "Listo." : "Falló.");
+    est.accion = r.accion || null;
+  }
+  async function commit(archivos) {
+    est.ocupado = true; est.salida = "Escaneando con gitleaks y commiteando…"; est.salidaMal = false; est.hallazgos = []; pintar(true);
+    try {
+      const r = await api("/api/proyecto/git/commit", { method: "POST", body: JSON.stringify({ id: pid, archivos, mensaje: est.mensaje }) });
+      mostrar(r);
+      if (r.ok && !r.simulado) est.editado = false;
+    } catch (e) { est.salidaMal = true; est.salida = "No se pudo contactar al panel."; }
+    est.ocupado = false;
+    await pedir(false);
+    pintar(true);
+  }
+  function cerrarModal() { if ($("dialogo").open) $("dialogo").close(); }
+  function confirmarPush() {
+    const d = est.d;
+    const cuenta = d.push.cuenta || { estado: "ok" };
+    const bloqueada = cuenta.estado === "bloqueada";
+    const comando = `git push ${d.upstream ? "" : "-u "}${d.remoto || "origin"} ${d.rama}`;
+    const msgAccion = el("span", { class: "sub", role: "status", "aria-live": "polite" });
+    const accionCuenta = bloqueada && cuenta.accion ? el("button", { type: "button", class: "boton",
+      onclick: async () => {
+        msgAccion.textContent = "Ejecutando…";
+        const r = await api(cuenta.accion.ruta, { method: "POST", body: JSON.stringify(cuenta.accion.cuerpo) });
+        msgAccion.textContent = r.ok ? (r.simulado ? "Simulación: no se cambió nada." : "Listo: vuelve a abrir esta confirmación.") : (r.error || "No se pudo.");
+        if (r.ok) { await pedir(false); }
+      } }, "Aplicar la cuenta del proyecto") : null;
+    const subir = el("button", { type: "button", class: "boton primario", disabled: bloqueada, onclick: async () => {
+      cerrarModal();
+      est.ocupado = true; est.salida = "Subiendo " + d.rama + "…"; est.salidaMal = false; est.hallazgos = []; pintar(true);
+      try { mostrar(await api("/api/proyecto/git/push", { method: "POST", body: JSON.stringify({ id: pid, rama: d.rama }) })); }
+      catch (e) { est.salidaMal = true; est.salida = "No se pudo contactar al panel."; }
+      est.ocupado = false;
+      await pedir(false);
+      pintar(true);
+    } }, d.simulacion ? "Simular el push" : "Sí, subir " + d.rama);
+    $("dialogo-etq").textContent = "Confirmar push";
+    $("dialogo-titulo").textContent = d.rama;
+    $("dialogo-contenido").replaceChildren(el("div", { class: "pg-modal" },
+      el("p", {}, "Vas a subir la rama ", el("b", { class: "mono" }, d.rama), " a ", el("b", { class: "mono" }, d.remoto || "origin"),
+        d.sin_subir ? ` con ${d.sin_subir} commit${d.sin_subir === 1 ? "" : "s"} que el remoto no tiene.` : "."),
+      el("div", { class: "comando" }, el("pre", {}, comando)),
+      el("p", { class: "sub" }, "Nunca se fuerza el push (sin --force). Si el remoto cambió, git lo rechazará y no se pisa nada."),
+      d.simulacion ? el("div", { class: "aviso info" }, "Modo simulación: no se subirá nada; verás el comando.") : null,
+      cuenta.estado === "advertencia" ? el("div", { class: "aviso" }, el("strong", {}, "Atención: "), cuenta.mensaje) : null,
+      bloqueada ? el("div", { class: "aviso mal" }, cuenta.mensaje, cuenta.instruccion ? el("div", { class: "comando" }, el("pre", {}, cuenta.instruccion)) : null) : null,
+      el("div", { class: "botones" }, subir, accionCuenta, el("button", { type: "button", class: "boton", onclick: cerrarModal }, "Cancelar"), msgAccion)));
+    $("dialogo").showModal();
+  }
+  cada(15000, () => pedir(false));
+  return { nodo, recargar: () => pedir(false) };
 }
 
 /* ---------- enrutamiento de modelos: evaluación (solo lectura), interruptor y tabla rol → modelo/esfuerzo ----------
