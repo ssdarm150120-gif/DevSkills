@@ -29,6 +29,16 @@ devskills servicios levantar <proyecto|servicio> --simular   # muestra qué har�
 
 Requisito: Python 3.12 en el PATH (`python3`, `python` o `py`). El motor no instala nada más.
 
+## Lanzador: ventana del servicio, apagado y reinicio
+
+`levantar` abre cada servicio detrás de un **envoltorio** (`servicios.py _ejecutar <plan>`): en Windows es una consola nueva y en macOS y Linux un proceso en segundo plano con su propia sesión. El envoltorio corre el servicio y, en Windows, al terminar espera un Enter para que alcances a leer el error. Su pid queda registrado en `servicios/pids/<id>.pid` (en todos los sistemas).
+
+**Apagar y reiniciar cierran también la ventana anterior.** `apagar` (y por lo tanto el paso `reiniciar-servicio` de Aplicar cambios, que es apagar y levantar) cierra el envoltorio registrado junto con todo su árbol (Windows: `taskkill /PID <pid> /F /T`; macOS y Linux: `killpg` del grupo), y después sigue con lo que ya hacía: matar lo que escucha en los puertos del servicio. Antes de matar verifica que el pid registrado siga siendo un envoltorio, leyendo su línea de comandos (PowerShell/CIM en Windows, `ps` en macOS y Linux): debe contener `servicios.py` y `_ejecutar`. Si el pid fue reciclado por otro programa, o la línea de comandos no se puede leer, **no se mata** y solo se limpia el archivo. El envoltorio también se lanza con `python.exe` aunque el panel corra con `pythonw.exe` (sin consola no hay ventana ni Enter que esperar).
+
+**Señal de apagado intencional (decisión).** Matar el envoltorio con su árbol ya resuelve el caso normal, pero se agregó un marcador `servicios/pids/<id>.apagado` como segunda defensa: `apagar` lo crea antes de matar y, si el envoltorio sobrevive (por ejemplo si no se pudo verificar su pid), lo consume al terminar el servicio y cierra la ventana sin pedir Enter. Si el servicio se cae solo, no hay marcador y la pausa «Presiona Enter para cerrar esta ventana...» se conserva para leer el error. Se eligió un archivo (y no una señal ni el código de salida) porque funciona igual en los tres sistemas, sobrevive a que `apagar` y el envoltorio sean procesos distintos y no depende del código de salida, que en Windows es 1 con `taskkill /F` igual que en una caída real. `levantar` borra cualquier marcador viejo antes de lanzar, y `apagar` borra el suyo cuando sí pudo cerrar el envoltorio. `docker-compose` no usa envoltorio (corre `docker compose up -d` y termina): `apagar` solo ejecuta `docker compose stop`.
+
+**Limitación.** Un envoltorio lanzado con una versión anterior del lanzador no tiene pid registrado: `apagar` mata el servicio por puerto, pero esa ventana vieja se cierra a mano una vez.
+
 ## Enganchar el motor a Claude Code
 
 `devskills motor enganchar [--quitar] [--si] [--envolver "<cmd>"] [--hooks] [--limpiar-hooks]` escribe en el `settings.json` de usuario de Claude Code (`$CLAUDE_CONFIG_DIR/settings.json` o `~/.claude/settings.json`):
@@ -60,7 +70,8 @@ Todo el estado vive en el directorio de datos: la variable `DEVSKILLS_DATOS` o, 
 | `preferencias.json` | Preferencias del panel |
 | `panel/estado/`, `panel/.token`, `panel/panel.log` | Avisos, acciones, token y log del panel |
 | `orquestador/` | Token, historial, propuestas, fallos de enrutamiento, log, `config.json` y `.venv` |
-| `servicios/logs`, `servicios/pids` | Logs y pids de los servicios (macOS y Linux) |
+| `servicios/logs` | Logs de los servicios (macOS y Linux) |
+| `servicios/pids` | Pid del envoltorio de cada servicio (`<id>.pid`, todos los sistemas) y marcador de apagado intencional (`<id>.apagado`) |
 
 Una instancia en otro puerto (`--puerto`) usa archivos con el puerto en el nombre y nunca pisa la principal.
 

@@ -4,6 +4,12 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 
 ## [Sin publicar]
 
+### Lanzador: reiniciar un servicio ya no deja una ventana muerta
+- **Defecto:** en Windows, `apagar` mataba lo que escucha en los puertos pero el envoltorio `servicios.py _ejecutar` de la consola sobrevivía esperando el Enter, así que cada reinicio (Apagar + Levantar y el paso `reiniciar-servicio` de Aplicar cambios) dejaba una terminal con logs viejos.
+- **Arreglo:** `lanzar` registra el pid del envoltorio en `servicios/pids/<id>.pid` (ahora también en Windows) y `apagar` lo cierra con su árbol (`taskkill /T /F`; `killpg` en macOS y Linux) tras verificar su línea de comandos (`servicios.py` + `_ejecutar`), para no matar un pid reciclado ni un proceso ajeno.
+- **Apagado intencional:** `apagar` deja un marcador `<id>.apagado`; si el envoltorio sobrevive, cierra la ventana sin esperar Enter. Una caída real conserva la pausa para leer el error. El envoltorio se lanza con `python.exe` aunque el panel use `pythonw.exe`, y la pausa tolera la falta de consola. Sin cambios para `docker-compose` ni para el resto de los tipos.
+- Pruebas en `motor/servicios/pruebas/test_servicios.py` (clase `Envoltorio`, con fakes); documentación en `docs/motor.md`.
+
 ### Panel: Aplicar cambios (recompilar el front y reiniciar los servicios con un clic)
 - Nuevo apartado **Aplicar cambios** en cada proyecto: instala lo que cambió, recompila el front y reinicia los servicios, sin abrir terminales. El panel **propone la receta** a partir de lo que ve (carpetas con `package.json` y script `build`, `requirements.txt` junto al venv de un servicio `python-modulo`, servicios a reiniciar) y el usuario la aprueba una vez; queda en `proyectos.json` bajo `aplicar` y se edita o se quita después.
 - **Pasos tipados de lista blanca**, nunca comandos libres ni shell: `npm-install` (`npm ci` con lock, si no `npm install`), `npm-script` (el script debe existir en `package.json`), `pip-requisitos` y `reiniciar-servicio` (con el lanzador: apagar, levantar y esperar la salud). Carpetas relativas validadas con `ruta_segura`, tiempo límite por paso (en Windows un tiempo agotado mata el árbol de procesos) y `npm`/`npm.cmd` resuelto sin shell.
